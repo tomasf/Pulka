@@ -96,6 +96,7 @@ signal pressed(action: StringName)
 ## Hint labels with a keyboard/pad text and a touch text: [label, keys, touch].
 var _hints: Array = []
 var _pause_button: Button
+var _fullscreen_button: Button
 
 var settings_open: bool:
 	get:
@@ -110,6 +111,8 @@ func _ready() -> void:
 	_build_pause()
 	_build_game_over()
 	_build_settings()
+	if OS.has_feature("web"):
+		_build_fullscreen_button()
 	_default_focus[_menu] = _menu_start
 	# Left/right on the menu pick a ride, so focus only moves up and down there.
 	for button in [_menu_start, _menu_settings]:
@@ -124,6 +127,10 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	if is_instance_valid(_fullscreen_button):
+		var fullscreen := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+		_fullscreen_button.text = "Fönsterläge" if fullscreen else "Fullskärm"
+		_fullscreen_button.tooltip_text = "Lämna fullskärm (Esc / F)" if fullscreen else "Visa i fullskärm (F)"
 	if _over.visible:
 		_over_record.scale = Vector2.ONE * (1.0 + 0.06 * sin(_time * 6.0))
 	if _menu.visible:
@@ -242,6 +249,18 @@ func _button(text: String, action: StringName, font_size := 34, accent := false,
 		button.add_theme_stylebox_override(state, box)
 	button.pressed.connect(func() -> void: pressed.emit(action))
 	return button
+
+
+## Always available on the web, beside the pause button during a run.
+func _build_fullscreen_button() -> void:
+	var controls := _full_rect()
+	_fullscreen_button = _button("Fullskärm", &"fullscreen", 24, false, false)
+	_fullscreen_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_fullscreen_button.offset_left = -340
+	_fullscreen_button.offset_right = -130
+	_fullscreen_button.offset_top = 92
+	_fullscreen_button.offset_bottom = 150
+	controls.add_child(_fullscreen_button)
 
 
 func _hint(text: String, touch_text: String, font_size: int, color: Color, outline := 8) -> Label:

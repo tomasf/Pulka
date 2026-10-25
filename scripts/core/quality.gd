@@ -1,7 +1,8 @@
 class_name Quality
 extends RefCounted
 ## Rendering budget per platform: phones and tablets get a shorter view
-## distance, fewer snowflakes and thicker fog to hide the horizon.
+## distance, fewer snowflakes and thicker fog to hide the horizon. Browsers
+## use the same rendering budget, keeping the desktop camera and UI.
 
 
 ## Testing aid: preview phone settings on the desktop (--mobile-preview).
@@ -12,20 +13,24 @@ static func is_mobile() -> bool:
 	return force_mobile or OS.has_feature("mobile")
 
 
+static func reduced_effects() -> bool:
+	return is_mobile() or OS.has_feature("web")
+
+
 static func chunks_ahead() -> int:
-	return 9 if is_mobile() else 14
+	return 9 if reduced_effects() else 14
 
 
 static func snowflakes() -> int:
-	return 2500 if is_mobile() else 6000
+	return 2500 if reduced_effects() else 6000
 
 
 static func shadow_distance() -> float:
-	return 80.0 if is_mobile() else 140.0
+	return 80.0 if reduced_effects() else 140.0
 
 
 static func base_fog() -> float:
-	return 0.0042 if is_mobile() else 0.0028
+	return 0.0042 if reduced_effects() else 0.0028
 
 
 ## Phones have small screens: pull the chase camera in and narrow the view.

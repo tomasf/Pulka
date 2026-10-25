@@ -156,12 +156,21 @@ func _parse_args() -> void:
 			_start_vehicle = int(arg.get_slice("=", 1))
 
 
+## Browsers require fullscreen requests to run inside the input event itself.
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"fullscreen") and not event.is_echo():
+		_toggle_fullscreen()
+		get_viewport().set_input_as_handled()
+
+
+func _toggle_fullscreen() -> void:
+	var fullscreen := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fullscreen else DisplayServer.WINDOW_MODE_FULLSCREEN)
+
+
 func _process(delta: float) -> void:
 	_elapsed += delta
 	_input_cooldown = maxf(0.0, _input_cooldown - delta)
-	if Input.is_action_just_pressed(&"fullscreen"):
-		var fullscreen := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fullscreen else DisplayServer.WINDOW_MODE_FULLSCREEN)
 	_update_settings_input()
 	match state:
 		State.MENU:
@@ -400,6 +409,8 @@ func _confirm_pressed() -> bool:
 
 func _on_hud_pressed(action: StringName) -> void:
 	match action:
+		&"fullscreen":
+			_toggle_fullscreen()
 		&"start":
 			if state == State.MENU:
 				_start_run()

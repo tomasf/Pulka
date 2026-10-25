@@ -6,6 +6,7 @@ extends Node
 
 const MUSIC_BUS := &"Music"
 const SFX_BUS := &"SFX"
+const WEB_AUDIO := "res://generated/web_audio/"
 
 var engine_sound: AudioStreamWAV
 var music_player: AudioStreamPlayer
@@ -29,15 +30,19 @@ var _first_song := 0
 func _ready() -> void:
 	_ensure_bus(MUSIC_BUS)
 	_ensure_bus(SFX_BUS)
-	_effects = Synth.effects()
-	engine_sound = Synth.engine()
+	if OS.has_feature("web"):
+		_effects = load(WEB_AUDIO + "effects.res").get_meta(&"streams")
+		engine_sound = load(WEB_AUDIO + "engine.res")
+	else:
+		_effects = Synth.effects()
+		engine_sound = Synth.engine()
 	for i in 14:
 		var player := AudioStreamPlayer.new()
 		player.bus = SFX_BUS
 		add_child(player)
 		_players.append(player)
-	_wind = _loop(Synth.wind())
-	_scrape = _loop(Synth.scrape())
+	_wind = _loop(load(WEB_AUDIO + "wind.res") if OS.has_feature("web") else Synth.wind())
+	_scrape = _loop(load(WEB_AUDIO + "scrape.res") if OS.has_feature("web") else Synth.scrape())
 	music_player = AudioStreamPlayer.new()
 	music_player.volume_db = -8.0
 	music_player.bus = MUSIC_BUS
@@ -45,6 +50,12 @@ func _ready() -> void:
 	add_child(music_player)
 	music_player.finished.connect(_next_song)
 	_first_song = randi() % MusicComposer.SONG_COUNT
+	# The single-threaded web build loads audio baked by tools/export_web.sh.
+	# Rendering songs here would block the browser's main thread for seconds.
+	if OS.has_feature("web"):
+		for i in MusicComposer.SONG_COUNT:
+			_songs[i] = load(WEB_AUDIO + "song_%d.res" % i)
+		return
 	for i in MusicComposer.SONG_COUNT:
 		var index := (_first_song + i) % MusicComposer.SONG_COUNT
 		var thread := Thread.new()
@@ -100,7 +111,10 @@ func _loop(stream: AudioStream) -> AudioStreamPlayer:
 static func _ensure_bus(bus: StringName) -> void:
 	if AudioServer.get_bus_index(bus) != -1:
 		return
-	AudioServer.add_bus()
+	# Godot 4.7's Web Sample backend misorders buses when add_bus() appends
+	# with index -1, disconnecting Master. Growing bus_count preserves routing.
+	# https://github.com/godotengine/godot/issues/119026
+	AudioServer.bus_count += 1
 	var index := AudioServer.bus_count - 1
 	AudioServer.set_bus_name(index, bus)
 	AudioServer.set_bus_send(index, &"Master")
