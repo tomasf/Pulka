@@ -32,7 +32,7 @@ func _run() -> void:
 		_check("speed display scales by %s" % multiplier, is_equal_approx(sled.speed(), 5.0 * multiplier))
 		sled.place_at(8.0, 0.0, 15.0)
 		_check("placement preserves multiplier", sled.speed_multiplier == multiplier)
-		sled.step(1.0 / 60.0, 0.0, 0.0, 0.0, true)
+		sled.step(1.0 / 60.0, 0.0, 0.0, true)
 		_check("jump still works at %s" % multiplier, not sled.on_ground)
 		sled.free()
 	print("speed test: %s" % ("all passed" if _failures == 0 else "%d failed" % _failures))
@@ -59,7 +59,7 @@ func _flight(multiplier: float) -> Vector3:
 	sled.velocity = Vector3(4.0, 6.5, -15.0)
 	var start := sled.position
 	for frame in 60:
-		sled.step(1.0 / 60.0, 0.3, 0.0, 0.0, false)
+		sled.step(1.0 / 60.0, 0.3, 0.0, false)
 	var result := Vector3(sled.position.z - start.z, sled.position.y - start.y, sled.yaw)
 	sled.free()
 	return result

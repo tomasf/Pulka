@@ -129,6 +129,10 @@ static func apply_volumes(master: float, music: float, effects: float) -> void:
 		AudioServer.set_bus_mute(index, level <= 0.0)
 
 
+func stream(effect: String) -> AudioStream:
+	return _effects.get(effect)
+
+
 func play(effect: String, volume_db := 0.0, pitch := 1.0) -> void:
 	var stream: AudioStream = _effects.get(effect)
 	if stream == null:

@@ -16,7 +16,6 @@ var grip := 3.0
 var scrub := 0.2
 var drag := 0.0022
 var friction := 0.035
-var brake := 9.0
 var jump := 6.0
 ## How strongly the nose swings back to the direction of travel.
 var self_align := 1.5

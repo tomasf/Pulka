@@ -3,7 +3,7 @@ extends Node3D
 ## Something on the slope you can hit. Collision is analytic: a vertical
 ## cylinder (or a box for vehicles) with a top you can jump over.
 
-enum Kind { TREE, ROCK, STUMP, SNOWMAN, PERSON, KID, DOG, MOOSE, DEER, HARE, CAR, PLOW, BIN, TENT, LOG }
+enum Kind { TREE, ROCK, STUMP, SNOWMAN, PERSON, KID, DOG, MOOSE, DEER, HARE, CAR, PLOW, BIN, TENT, LOG, CART, PLANT, FOUNTAIN, CONE, TRAIN, PLANE, TUG, GOAL, TRUCK }
 
 var kind: Kind
 var radius := 0.6
@@ -94,6 +94,34 @@ func configure(which: Kind, rig: Props.Rig, terrain: TerrainField) -> Obstacle:
 			top = 0.45
 			# Riding into a log throws you over it instead of ending the run.
 			soft = true
+		Kind.CART:
+			half_extents = Vector2(0.35, 0.5)
+			top = 1.2
+		Kind.PLANT:
+			radius = 0.5
+			top = 2.6
+		Kind.FOUNTAIN:
+			radius = 2.2
+			top = 1.0
+		Kind.CONE:
+			radius = 0.28
+			top = 0.8
+		Kind.TRAIN:
+			half_extents = Vector2(1.6, 7.4)
+			top = 4.0
+		Kind.PLANE:
+			half_extents = Vector2(2.1, 15.0)
+			top = 5.2
+		Kind.TUG:
+			half_extents = Vector2(0.9, 3.8)
+			top = 2.3
+		Kind.TRUCK:
+			half_extents = Vector2(1.3, 7.8)
+			top = 4.2
+			follow_terrain = false
+		Kind.GOAL:
+			half_extents = Vector2(1.9, 0.7)
+			top = 2.1
 		Kind.CAR:
 			half_extents = Vector2(0.95, 2.25)
 			top = 1.7
@@ -111,7 +139,7 @@ func is_creature() -> bool:
 
 
 func is_vehicle() -> bool:
-	return kind == Kind.CAR or kind == Kind.PLOW
+	return kind in [Kind.CAR, Kind.PLOW, Kind.TRAIN, Kind.PLANE, Kind.TUG, Kind.TRUCK]
 
 
 func patrol(speed: float, lo: float, hi: float) -> void:

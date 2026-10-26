@@ -19,9 +19,9 @@ func _run() -> void:
 	var right := Vector2(view.x * 0.8, view.y * 0.7)
 	var failures := 0
 	_press(0, left, true)
-	failures += _check("left half steers left", touch.steer == -1.0 and touch.brake == 0.0)
+	failures += _check("left half steers left", touch.steer == -1.0)
 	_press(1, right, true)
-	failures += _check("both halves brake", touch.steer == 0.0 and touch.brake == 1.0)
+	failures += _check("both halves cancel out", touch.steer == 0.0)
 	_press(0, left, false)
 	failures += _check("right half steers right", touch.steer == 1.0)
 	_press(1, right, false)
@@ -54,5 +54,5 @@ func _press(index: int, at: Vector2, down: bool) -> void:
 
 
 func _check(what: String, ok: bool) -> int:
-	print(("  ok    " if ok else "  FAIL  ") + what + "   steer=%s brake=%s" % [_touch.steer, _touch.brake])
+	print(("  ok    " if ok else "  FAIL  ") + what + "   steer=%s" % _touch.steer)
 	return 0 if ok else 1

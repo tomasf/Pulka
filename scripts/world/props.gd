@@ -6,7 +6,7 @@ extends RefCounted
 static var _cache: Dictionary = {}
 
 
-static func _cached(key: String, builder: Callable) -> ArrayMesh:
+static func cached_mesh(key: String, builder: Callable) -> ArrayMesh:
 	if not _cache.has(key):
 		_cache[key] = builder.call()
 	return _cache[key]
@@ -46,7 +46,7 @@ class Rig:
 static var _rigs: Dictionary = {}
 
 
-static func _cached_rig(key: String, builder: Callable) -> Rig:
+static func cached_rig(key: String, builder: Callable) -> Rig:
 	if not _rigs.has(key):
 		_rigs[key] = builder.call()
 	return _rigs[key]
@@ -63,7 +63,7 @@ static func _legs(rig: Rig, leg: ArrayMesh, half_width: float, front_z: float, b
 # --- Nature ---
 
 static func spruce(variant: int) -> ArrayMesh:
-	return _cached("spruce%d" % variant, func() -> ArrayMesh:
+	return cached_mesh("spruce%d" % variant, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var green: Color = Palette.SPRUCE[variant % Palette.SPRUCE.size()]
 		kit.cylinder(0.18, 1.4, Vector3(0, 0.7, 0), Palette.TRUNK, 8, Vector3.ZERO, 0.12)
@@ -81,7 +81,7 @@ static func spruce(variant: int) -> ArrayMesh:
 
 
 static func birch() -> ArrayMesh:
-	return _cached("birch", func() -> ArrayMesh:
+	return cached_mesh("birch", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var bark := Color(0.93, 0.92, 0.88)
 		var twig := Color(0.45, 0.38, 0.32)
@@ -98,7 +98,7 @@ static func birch() -> ArrayMesh:
 
 
 static func rock(variant: int) -> ArrayMesh:
-	return _cached("rock%d" % variant, func() -> ArrayMesh:
+	return cached_mesh("rock%d" % variant, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var main := Vector3(1.15, 0.7, 0.95) if variant == 0 else Vector3(0.9, 0.85, 1.1)
 		kit.ellipsoid(main, Vector3(0, 0.3, 0), Palette.ROCK, Vector3(0.1, variant, 0.05))
@@ -108,7 +108,7 @@ static func rock(variant: int) -> ArrayMesh:
 
 
 static func stump() -> ArrayMesh:
-	return _cached("stump", func() -> ArrayMesh:
+	return cached_mesh("stump", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		kit.cylinder(0.42, 0.55, Vector3(0, 0.27, 0), Palette.TRUNK, 12, Vector3.ZERO, 0.38)
 		kit.ellipsoid(Vector3(0.42, 0.1, 0.42), Vector3(0, 0.56, 0), Palette.SNOW)
@@ -119,7 +119,7 @@ static func stump() -> ArrayMesh:
 
 
 static func snowman() -> ArrayMesh:
-	return _cached("snowman", func() -> ArrayMesh:
+	return cached_mesh("snowman", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		kit.sphere(0.58, Vector3(0, 0.5, 0), Palette.SNOW)
 		kit.sphere(0.43, Vector3(0, 1.2, 0), Palette.SNOW)
@@ -140,43 +140,61 @@ static func snowman() -> ArrayMesh:
 # --- People and animals ---
 
 static func person(variant: int) -> Rig:
-	return _cached_rig("person%d" % variant, func() -> Rig:
-		var jacket: Color = Palette.JACKETS[variant % Palette.JACKETS.size()]
-		var hat: Color = Palette.JACKETS[(variant + 3) % Palette.JACKETS.size()]
-		var scarf: Color = Palette.JACKETS[(variant + 5) % Palette.JACKETS.size()]
-		var pants := Color(0.12, 0.14, 0.25) if variant % 2 == 0 else Color(0.25, 0.2, 0.18)
+	var jacket: Color = Palette.JACKETS[variant % Palette.JACKETS.size()]
+	var hat: Color = Palette.JACKETS[(variant + 3) % Palette.JACKETS.size()]
+	var scarf: Color = Palette.JACKETS[(variant + 5) % Palette.JACKETS.size()]
+	var pants := Color(0.12, 0.14, 0.25) if variant % 2 == 0 else Color(0.25, 0.2, 0.18)
+	return dressed("person%d" % variant, jacket, hat, scarf, pants)
+
+
+## A person in the given clothes. `bathing` swaps the winter gear for a
+## swimsuit; `stick` adds a bandy stick in the right hand.
+static func dressed(key: String, jacket: Color, hat: Color, scarf: Color, pants: Color, bathing := false, stick := false) -> Rig:
+	return cached_rig(key, func() -> Rig:
+		var skin := Palette.SKIN
+		var top := skin if bathing else jacket
+		var legs := skin if bathing else pants
 		var kit := MeshKit.new()
-		kit.capsule(0.21, 0.74, Vector3(0, 1.2, 0), jacket, Vector3.ZERO, Vector3(1, 1, 0.8))
-		kit.ellipsoid(Vector3(0.19, 0.13, 0.15), Vector3(0, 0.92, 0), pants)
-		kit.sphere(0.15, Vector3(0, 1.72, 0), Palette.SKIN)
-		kit.ellipsoid(Vector3(0.03, 0.035, 0.045), Vector3(0, 1.7, -0.15), Palette.SKIN.darkened(0.1))
+		kit.capsule(0.21, 0.74, Vector3(0, 1.2, 0), top, Vector3.ZERO, Vector3(1, 1, 0.8))
+		kit.ellipsoid(Vector3(0.19, 0.13, 0.15), Vector3(0, 0.92, 0), jacket if bathing else pants)
+		kit.sphere(0.15, Vector3(0, 1.72, 0), skin)
+		kit.ellipsoid(Vector3(0.03, 0.035, 0.045), Vector3(0, 1.7, -0.15), skin.darkened(0.1))
 		for side in [-1.0, 1.0]:
 			kit.sphere(0.022, Vector3(0.055 * side, 1.75, -0.135), Color(0.05, 0.05, 0.05))
 			kit.sphere(0.03, Vector3(0.09 * side, 1.68, -0.12), Color(1.0, 0.6, 0.6))
 		kit.sphere(0.16, Vector3(0, 1.75, 0), hat, Vector3(1, 1.15, 1), 14, 6, true)
 		kit.cylinder(0.163, 0.07, Vector3(0, 1.77, 0), hat.darkened(0.2), 14)
 		kit.sphere(0.065, Vector3(0, 1.95, 0), Color(1, 1, 1))
-		kit.cylinder(0.14, 0.09, Vector3(0, 1.55, 0), scarf, 14)
-		kit.capsule(0.04, 0.32, Vector3(0.08, 1.4, -0.14), scarf, Vector3(0.1, 0, 0.1))
+		if not bathing:
+			kit.cylinder(0.14, 0.09, Vector3(0, 1.55, 0), scarf, 14)
+			kit.capsule(0.04, 0.32, Vector3(0.08, 1.4, -0.14), scarf, Vector3(0.1, 0, 0.1))
 		var rig := Rig.of(kit.build())
 		rig.stride = 4.0
 		var leg := MeshKit.new()
-		leg.capsule(0.085, 0.86, Vector3(0, -0.43, 0), pants)
-		leg.ellipsoid(Vector3(0.08, 0.07, 0.13), Vector3(0, -0.86, -0.04), Color(0.2, 0.13, 0.1))
+		leg.capsule(0.085, 0.86, Vector3(0, -0.43, 0), legs)
+		leg.ellipsoid(Vector3(0.08, 0.07, 0.13), Vector3(0, -0.86, -0.04), skin if bathing else Color(0.2, 0.13, 0.1))
 		var leg_mesh := leg.build()
 		var arm := MeshKit.new()
-		arm.capsule(0.065, 0.58, Vector3(0, -0.26, 0), jacket)
-		arm.sphere(0.075, Vector3(0, -0.57, 0), hat)
+		arm.capsule(0.065, 0.58, Vector3(0, -0.26, 0), top)
+		arm.sphere(0.075, Vector3(0, -0.57, 0), skin if bathing else hat)
 		var arm_mesh := arm.build()
+		var right_arm := arm_mesh
+		if stick:
+			var holding := MeshKit.new()
+			holding.capsule(0.065, 0.58, Vector3(0, -0.26, 0), top)
+			holding.sphere(0.075, Vector3(0, -0.57, 0), hat)
+			holding.cylinder(0.025, 1.1, Vector3(0, -0.6, -0.45), Color(0.6, 0.45, 0.25), 6, Vector3(PI / 2.4, 0, 0))
+			holding.box(Vector3(0.08, 0.06, 0.3), Vector3(0, -0.85, -0.95), Color(0.6, 0.45, 0.25), Vector3(0.4, 0, 0))
+			right_arm = holding.build()
 		rig.limbs.append(Limb.new(leg_mesh, Vector3(-0.1, 0.92, 0), 0.0, 0.55))
 		rig.limbs.append(Limb.new(leg_mesh, Vector3(0.1, 0.92, 0), PI, 0.55))
 		rig.limbs.append(Limb.new(arm_mesh, Vector3(-0.27, 1.45, 0), PI, 0.45))
-		rig.limbs.append(Limb.new(arm_mesh, Vector3(0.27, 1.45, 0), 0.0, 0.45, true))
+		rig.limbs.append(Limb.new(right_arm, Vector3(0.27, 1.45, 0), 0.0, 0.45, not stick))
 		return rig)
 
 
 static func dog() -> Rig:
-	return _cached_rig("dog", func() -> Rig:
+	return cached_rig("dog", func() -> Rig:
 		var fur := Color(0.62, 0.42, 0.22)
 		var dark := Color(0.42, 0.27, 0.14)
 		var kit := MeshKit.new()
@@ -201,7 +219,7 @@ static func dog() -> Rig:
 
 
 static func moose() -> Rig:
-	return _cached_rig("moose", func() -> Rig:
+	return cached_rig("moose", func() -> Rig:
 		var fur := Color(0.3, 0.2, 0.13)
 		var face := Color(0.26, 0.17, 0.11)
 		var antler := Color(0.86, 0.79, 0.62)
@@ -235,7 +253,7 @@ static func moose() -> Rig:
 
 
 static func deer() -> Rig:
-	return _cached_rig("deer", func() -> Rig:
+	return cached_rig("deer", func() -> Rig:
 		var fur := Color(0.64, 0.43, 0.26)
 		var kit := MeshKit.new()
 		kit.ellipsoid(Vector3(0.24, 0.27, 0.55), Vector3(0, 1.05, 0), fur)
@@ -258,7 +276,7 @@ static func deer() -> Rig:
 
 
 static func hare() -> Rig:
-	return _cached_rig("hare", func() -> Rig:
+	return cached_rig("hare", func() -> Rig:
 		var fur := Color(0.92, 0.92, 0.95)
 		var kit := MeshKit.new()
 		kit.ellipsoid(Vector3(0.18, 0.18, 0.27), Vector3(0, 0.22, 0.05), fur)
@@ -276,7 +294,7 @@ static func hare() -> Rig:
 # --- Vehicles on the roads ---
 
 static func car(variant: int) -> ArrayMesh:
-	return _cached("car%d" % variant, func() -> ArrayMesh:
+	return cached_mesh("car%d" % variant, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var paint: Color = Palette.CARS[variant % Palette.CARS.size()]
 		var glass := Color(0.2, 0.28, 0.38)
@@ -294,7 +312,7 @@ static func car(variant: int) -> ArrayMesh:
 
 
 static func plow() -> ArrayMesh:
-	return _cached("plow", func() -> ArrayMesh:
+	return cached_mesh("plow", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var yellow := Color(1.0, 0.72, 0.05)
 		kit.box(Vector3(2.4, 1.6, 2.2), Vector3(0, 1.75, -1.6), yellow)
@@ -313,7 +331,7 @@ static func plow() -> ArrayMesh:
 # --- Buildings and roadside furniture ---
 
 static func house(variant: int) -> ArrayMesh:
-	return _cached("house%d" % variant, func() -> ArrayMesh:
+	return cached_mesh("house%d" % variant, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var walls: Color = [Palette.FALU_RED, Color(0.95, 0.8, 0.35), Color(0.93, 0.92, 0.86), Color(0.55, 0.7, 0.85), Palette.FALU_RED][variant % 5]
 		var trim := Color(0.97, 0.97, 0.95) if variant % 5 != 2 else Color(0.35, 0.4, 0.5)
@@ -348,7 +366,7 @@ static func house(variant: int) -> ArrayMesh:
 
 
 static func edge_pole(variant: int) -> ArrayMesh:
-	return _cached("pole%d" % variant, func() -> ArrayMesh:
+	return cached_mesh("pole%d" % variant, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var color := Color(1.0, 0.42, 0.05) if variant == 0 else Color(0.1, 0.35, 0.95)
 		kit.cylinder(0.05, 1.6, Vector3(0, 0.8, 0), color, 5)
@@ -357,7 +375,7 @@ static func edge_pole(variant: int) -> ArrayMesh:
 
 
 static func lamp_post() -> ArrayMesh:
-	return _cached("lamp", func() -> ArrayMesh:
+	return cached_mesh("lamp", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var metal := Color(0.2, 0.22, 0.25)
 		kit.cylinder(0.09, 5.0, Vector3(0, 2.5, 0), metal, 6)
@@ -369,7 +387,7 @@ static func lamp_post() -> ArrayMesh:
 
 
 static func fence() -> ArrayMesh:
-	return _cached("fence", func() -> ArrayMesh:
+	return cached_mesh("fence", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var wood := Color(0.55, 0.38, 0.24)
 		for i in 5:
@@ -382,7 +400,7 @@ static func fence() -> ArrayMesh:
 
 ## Swedish give-way sign: a downward triangle, yellow with a red border.
 static func yield_sign() -> ArrayMesh:
-	return _cached("yield", func() -> ArrayMesh:
+	return cached_mesh("yield", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		kit.cylinder(0.05, 2.2, Vector3(0, 1.1, 0), Color(0.55, 0.57, 0.6), 8)
 		var flip := Vector3(0, 0, PI)
@@ -394,7 +412,7 @@ static func yield_sign() -> ArrayMesh:
 
 
 static func ramp_flag() -> ArrayMesh:
-	return _cached("flag", func() -> ArrayMesh:
+	return cached_mesh("flag", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		kit.cylinder(0.04, 2.0, Vector3(0, 1.0, 0), Color(0.9, 0.9, 0.9), 5)
 		kit.box(Vector3(0.03, 0.4, 0.6), Vector3(0, 1.75, 0.3), Color(0.95, 0.15, 0.2))
@@ -435,7 +453,7 @@ const SHOP_NAMES := [
 
 
 static func town_house(variant: int) -> ArrayMesh:
-	return _cached("townhouse%d" % variant, func() -> ArrayMesh:
+	return cached_mesh("townhouse%d" % variant, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var walls: Color = [
 			Color(0.95, 0.82, 0.5), Color(0.93, 0.68, 0.62), Color(0.78, 0.86, 0.94),
@@ -481,7 +499,7 @@ static func town_house(variant: int) -> ArrayMesh:
 
 ## Christmas lights strung across the street, `span` metres wide.
 static func light_string(span: int) -> ArrayMesh:
-	return _cached("lights%d" % span, func() -> ArrayMesh:
+	return cached_mesh("lights%d" % span, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var bulbs := [Color(1.0, 0.25, 0.2, 0.0), Color(0.3, 1.0, 0.4, 0.0), Color(1.0, 0.85, 0.3, 0.0), Color(0.35, 0.6, 1.0, 0.0)]
 		var count := int(span / 0.9)
@@ -500,7 +518,7 @@ static func light_string(span: int) -> ArrayMesh:
 
 
 static func bin() -> ArrayMesh:
-	return _cached("bin", func() -> ArrayMesh:
+	return cached_mesh("bin", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		kit.cylinder(0.32, 0.95, Vector3(0, 0.48, 0), Color(0.15, 0.45, 0.25), 14)
 		kit.cylinder(0.35, 0.08, Vector3(0, 0.98, 0), Color(0.1, 0.32, 0.18), 14)
@@ -512,7 +530,7 @@ static func bin() -> ArrayMesh:
 
 ## A fallen trunk lying along local X, low enough to jump.
 static func fallen_log() -> ArrayMesh:
-	return _cached("log", func() -> ArrayMesh:
+	return cached_mesh("log", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		kit.cylinder(0.3, 6.0, Vector3(0, 0.28, 0), Palette.TRUNK, 12, Vector3(0, 0, PI / 2), 0.26)
 		for end in [-1.0, 1.0]:
@@ -523,7 +541,7 @@ static func fallen_log() -> ArrayMesh:
 
 
 static func mushroom_ring() -> ArrayMesh:
-	return _cached("mushrooms", func() -> ArrayMesh:
+	return cached_mesh("mushrooms", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		for i in 5:
 			var angle := i * 1.3
@@ -537,7 +555,7 @@ static func mushroom_ring() -> ArrayMesh:
 # --- Frozen river ---
 
 static func tent() -> ArrayMesh:
-	return _cached("tent", func() -> ArrayMesh:
+	return cached_mesh("tent", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		kit.cone(1.15, 1.7, Vector3(0, 0.85, 0), Color(0.85, 0.15, 0.12), 4, Vector3(0, PI / 4, 0))
 		kit.cone(0.4, 0.6, Vector3(0, 1.45, 0), Palette.SNOW, 4, Vector3(0, PI / 4, 0))
@@ -547,7 +565,7 @@ static func tent() -> ArrayMesh:
 
 
 static func reeds() -> ArrayMesh:
-	return _cached("reeds", func() -> ArrayMesh:
+	return cached_mesh("reeds", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		for i in 9:
 			var angle := i * 2.4
@@ -560,7 +578,7 @@ static func reeds() -> ArrayMesh:
 
 
 static func footbridge(span: int) -> ArrayMesh:
-	return _cached("bridge%d" % span, func() -> ArrayMesh:
+	return cached_mesh("bridge%d" % span, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var wood := Color(0.5, 0.33, 0.2)
 		var dark := Color(0.32, 0.2, 0.12)
@@ -580,7 +598,7 @@ static func footbridge(span: int) -> ArrayMesh:
 # --- Snowpark ---
 
 static func lift_tower() -> ArrayMesh:
-	return _cached("lift", func() -> ArrayMesh:
+	return cached_mesh("lift", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var steel := Color(0.55, 0.58, 0.62)
 		kit.cylinder(0.25, 9.0, Vector3(0, 4.5, 0), steel, 10, Vector3.ZERO, 0.18)
@@ -593,12 +611,12 @@ static func lift_tower() -> ArrayMesh:
 
 ## A unit-length cable segment along X; scale it to span between towers.
 static func cable() -> ArrayMesh:
-	return _cached("cable", func() -> ArrayMesh:
+	return cached_mesh("cable", func() -> ArrayMesh:
 		return MeshKit.new().box(Vector3(1.0, 0.05, 0.05), Vector3.ZERO, Color(0.15, 0.15, 0.15)).build())
 
 
 static func chair(variant: int) -> ArrayMesh:
-	return _cached("chair%d" % variant, func() -> ArrayMesh:
+	return cached_mesh("chair%d" % variant, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var metal := Color(0.3, 0.3, 0.33)
 		kit.box(Vector3(0.06, 2.0, 0.06), Vector3(0, -1.0, 0), metal)
@@ -611,34 +629,10 @@ static func chair(variant: int) -> ArrayMesh:
 		return kit.build())
 
 
-static func banner_node(text: String, color: Color, half_span: float) -> Node3D:
-	var root := Node3D.new()
-	var kit := MeshKit.new()
-	for side in [-1.0, 1.0]:
-		kit.cylinder(0.15, 6.5, Vector3(side * half_span, 3.25, 0), Color(0.45, 0.32, 0.2), 10)
-		kit.sphere(0.22, Vector3(side * half_span, 6.6, 0), Palette.SNOW)
-	kit.box(Vector3(half_span * 2.0 - 0.4, 1.6, 0.1), Vector3(0, 5.5, 0), color)
-	kit.box(Vector3(half_span * 2.0 - 0.3, 0.15, 0.3), Vector3(0, 6.35, 0), Palette.SNOW)
-	var mesh := MeshInstance3D.new()
-	mesh.mesh = kit.build()
-	root.add_child(mesh)
-	var label := Label3D.new()
-	label.text = text
-	label.font_size = 96
-	label.pixel_size = 0.011
-	label.outline_size = 18
-	label.outline_modulate = Color(0, 0, 0, 0.5)
-	label.position = Vector3(0, 5.5, 0.07)
-	label.double_sided = false
-	label.shaded = false
-	root.add_child(label)
-	return root
-
-
 # --- Event visitors ---
 
 static func santa_sleigh() -> ArrayMesh:
-	return _cached("sleigh", func() -> ArrayMesh:
+	return cached_mesh("sleigh", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var red := Color(0.8, 0.08, 0.1)
 		var gold := Color(1.0, 0.78, 0.2)
@@ -670,7 +664,7 @@ static func santa_sleigh() -> ArrayMesh:
 
 
 static func gift(variant: int) -> ArrayMesh:
-	return _cached("gift%d" % variant, func() -> ArrayMesh:
+	return cached_mesh("gift%d" % variant, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var paper: Color = [Color(0.85, 0.1, 0.12), Color(0.15, 0.55, 0.25), Color(0.2, 0.35, 0.85), Color(0.95, 0.75, 0.15)][variant % 4]
 		var ribbon: Color = [Color(1.0, 0.85, 0.2), Color(0.95, 0.1, 0.1), Color(1, 1, 1), Color(0.8, 0.1, 0.5)][variant % 4]
@@ -683,7 +677,7 @@ static func gift(variant: int) -> ArrayMesh:
 
 
 static func snowball() -> ArrayMesh:
-	return _cached("snowball", func() -> ArrayMesh:
+	return cached_mesh("snowball", func() -> ArrayMesh:
 		return MeshKit.new().sphere(0.2, Vector3.ZERO, Color(1, 1, 1), Vector3.ONE, 10, 6).build())
 
 
@@ -707,7 +701,7 @@ static func posed(rig: Rig, phase: float) -> Node3D:
 # --- Pickups ---
 
 static func gingerbread() -> ArrayMesh:
-	return _cached("ginger", func() -> ArrayMesh:
+	return cached_mesh("ginger", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var dough := Color(0.72, 0.38, 0.14)
 		kit.cylinder(0.32, 0.08, Vector3.ZERO, dough, 6, Vector3(PI / 2, 0, 0))
@@ -717,7 +711,7 @@ static func gingerbread() -> ArrayMesh:
 
 
 static func cocoa() -> ArrayMesh:
-	return _cached("cocoa", func() -> ArrayMesh:
+	return cached_mesh("cocoa", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		kit.cylinder(0.25, 0.45, Vector3.ZERO, Color(0.9, 0.15, 0.2), 8)
 		kit.cylinder(0.22, 0.02, Vector3(0, 0.22, 0), Color(0.4, 0.22, 0.1), 8)
@@ -727,7 +721,7 @@ static func cocoa() -> ArrayMesh:
 
 
 static func wax() -> ArrayMesh:
-	return _cached("wax", func() -> ArrayMesh:
+	return cached_mesh("wax", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		kit.cylinder(0.14, 0.6, Vector3.ZERO, Color(0.2, 0.5, 1.0, 0.6), 8)
 		kit.cylinder(0.145, 0.15, Vector3(0, 0.1, 0), Color(1.0, 0.85, 0.1), 8)
@@ -738,7 +732,7 @@ static func wax() -> ArrayMesh:
 # --- The player ---
 
 static func vehicle(model: VehicleSpec.Model) -> ArrayMesh:
-	return _cached("vehicle%d" % model, func() -> ArrayMesh:
+	return cached_mesh("vehicle%d" % model, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		match model:
 			VehicleSpec.Model.PULKA:

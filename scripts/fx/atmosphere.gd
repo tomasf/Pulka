@@ -21,6 +21,8 @@ var night_override := 0.0
 var aurora := 0.0
 ## Sideways wind direction for the snowfall (world X).
 var wind := 1.0
+## Under a roof (the mall): no snow falls.
+var indoor := false
 var _environment: Environment
 var _sky: ProceduralSkyMaterial
 var _sun: DirectionalLight3D
@@ -101,7 +103,7 @@ func flash(color: Color, amount := 0.6) -> void:
 func update_atmosphere(delta: float, camera: Camera3D, distance: float, speed_factor: float, boosting: bool) -> void:
 	_snow.global_position = camera.global_position - camera.global_basis.z * 16.0 + Vector3.UP * 5.0
 	set_time_of_day(distance)
-	_snow.amount_ratio = 0.25 + 0.75 * storm
+	_snow.amount_ratio = 0.0 if indoor else 0.25 + 0.75 * storm
 	_snow_process.gravity = Vector3(wind * storm * 14.0, -1.5 - storm * 4.0, 0.0)
 	_environment.fog_density = Quality.base_fog() + storm * 0.032
 	_update_aurora(camera)

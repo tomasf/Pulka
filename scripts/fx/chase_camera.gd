@@ -57,12 +57,13 @@ func _update_chase(delta: float) -> void:
 	var sf := _speed_factor()
 	var zoom := Quality.camera_zoom()
 	var distance := lerpf(6.8, 5.0, minf(sf, 1.0)) * zoom
-	var height := lerpf(3.4, 2.6, minf(sf, 1.0)) * zoom
+	# High enough that the rider sits low in the frame and the way ahead shows.
+	var height := lerpf(4.5, 3.6, minf(sf, 1.0)) * zoom
 	var desired := target.position - _look_dir * distance + Vector3.UP * height
 	desired.y = maxf(desired.y, field.height_world(desired.x, desired.z) + 1.0)
 	var follow := 1.0 - exp(-12.0 * delta)
 	position = Vector3(lerpf(position.x, desired.x, follow), lerpf(position.y, desired.y, 1.0 - exp(-8.0 * delta)), lerpf(position.z, desired.z, follow))
-	var look := target.position + _look_dir * 9.0 + Vector3.UP * 0.4
+	var look := target.position + _look_dir * 12.0
 	if position.distance_squared_to(look) > 0.01:
 		look_at(look, Vector3.UP)
 	rotate_object_local(Vector3.BACK, -target.steer_visual * 0.06 * minf(sf, 1.0))

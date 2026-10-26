@@ -58,6 +58,9 @@ static func effects() -> Dictionary:
 		"jingle": jingle(),
 		"hohoho": hohoho(),
 		"splat": poff(),
+		"train_horn": train_horn(),
+		"jet": jet(),
+		"splash": splash(),
 	}
 
 
@@ -239,6 +242,75 @@ static func beep(frequency: float) -> AudioStreamWAV:
 	for i in out.size():
 		var t := float(i) / RATE
 		out[i] = (sin(t * TAU * frequency) + sin(t * TAU * frequency * 3.0) / 3.0) * minf(1.0, (0.25 - t) * 30.0) * 0.3
+	return to_stream(out)
+
+
+## Two-tone diesel horn, low and long.
+static func train_horn() -> AudioStreamWAV:
+	var out := _buffer(1.6)
+	var low := 0.0
+	for i in out.size():
+		var t := float(i) / RATE
+		var s := 0.0
+		for f in [185.0, 233.0, 277.0]:
+			var p: float = t * f
+			s += 2.0 * (p - floorf(p)) - 1.0
+		low += 0.15 * (s - low)
+		var env := minf(1.0, t * 12.0) * minf(1.0, (1.6 - t) * 6.0)
+		out[i] = low * env * 0.35
+	return to_stream(out)
+
+
+## Jet engine roar swelling and fading as it passes.
+static func jet() -> AudioStreamWAV:
+	var out := _buffer(5.0)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	var low := 0.0
+	var band := 0.0
+	for i in out.size():
+		var t := float(i) / RATE
+		var pass_by := exp(-pow((t - 2.4) / 1.1, 2.0))
+		low += (0.04 + 0.2 * pass_by) * (rng.randf_range(-1.0, 1.0) - low)
+		band += 0.5 * (low - band)
+		out[i] = (low - band * 0.3) * (0.15 + pass_by) * 2.2 + sin(t * TAU * (900.0 - 300.0 * t / 5.0)) * pass_by * 0.05
+	return to_stream(out)
+
+
+## Water splash: a broadband slap, a churning body of filtered noise, rising
+## bubble "bloops" and a sprinkle of falling droplets.
+static func splash() -> AudioStreamWAV:
+	var out := _buffer(0.9)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 21
+	var low := 0.0
+	var band := 0.0
+	for i in out.size():
+		var t := float(i) / RATE
+		var white := rng.randf_range(-1.0, 1.0)
+		low += 0.35 * (white - low)
+		band += 0.12 * (low - band)
+		var slap := (white - low) * exp(-t * 45.0) * 0.9
+		var body := (low - band) * exp(-t * 7.0) * (0.8 + 0.2 * sin(t * 90.0)) * 1.4
+		out[i] = slap + body
+	for bubble in 14:
+		var start := rng.randf_range(0.02, 0.45)
+		var pitch := rng.randf_range(350.0, 1300.0)
+		var loud := rng.randf_range(0.08, 0.2) * exp(-start * 3.0)
+		var phase := 0.0
+		var first := int(start * RATE)
+		for k in int(0.07 * RATE):
+			var t := float(k) / RATE
+			phase += pitch * (1.0 + 7.0 * t) / RATE
+			if first + k < out.size():
+				out[first + k] += sin(phase * TAU) * exp(-t * 55.0) * loud
+	for drop in 22:
+		var first := int(rng.randf_range(0.15, 0.85) * RATE)
+		var pitch := rng.randf_range(1800.0, 4200.0)
+		for k in int(0.02 * RATE):
+			var t := float(k) / RATE
+			if first + k < out.size():
+				out[first + k] += sin(t * TAU * pitch * (1.0 + 4.0 * t)) * exp(-t * 220.0) * 0.06
 	return to_stream(out)
 
 

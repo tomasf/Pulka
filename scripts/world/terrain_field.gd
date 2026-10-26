@@ -6,12 +6,30 @@ extends RefCounted
 ## bumps, roads, ramps and ice — is a pure function of (x, d) and the seed, so
 ## the sled physics samples exactly the same surface that the meshes show.
 ##
-## Every so often the slope gives way to a special region (a town street, a
-## frozen river, a snowpark, a deep forest trail) for a few hundred metres.
+## Now and then the slope briefly gives way to a special region: a town
+## street, a frozen river, a snowpark, a forest trail, a shopping mall, a rail
+## yard, an airport, a lake to skim across, a bandy rink or a motorway. They are short
+## and spread out, so the run still feels like a sledding hill.
 
 enum Zone { OPEN, FOREST, MOGULS, VILLAGE, WILDLIFE }
-enum Region { SLOPE, TOWN, RIVER, PARK, WOODS }
-const REGION_KINDS := 4
+enum Region { SLOPE, TOWN, RIVER, PARK, WOODS, MALL, RAIL, AIRPORT, LAKE, BANDY, HIGHWAY }
+## How the ground meets the edge of the track.
+enum Edge { BANK, KERB, GORGE, FLOOR }
+
+## Per region: track half width, edge shape, grip, how rough the ground stays
+## (1 = like the open slope), length, and whether roads/kickers may appear.
+const REGION_STYLE := {
+	Region.TOWN: {"width": 9.5, "edge": Edge.KERB, "grip": 1.0, "rough": 0.15, "length": 300.0, "roads": true, "ramps": false},
+	Region.RIVER: {"width": 15.0, "edge": Edge.GORGE, "grip": 0.35, "rough": 0.15, "length": 280.0, "roads": false, "ramps": false},
+	Region.PARK: {"width": 27.0, "edge": Edge.BANK, "grip": 1.0, "rough": 0.15, "length": 300.0, "roads": false, "ramps": true},
+	Region.WOODS: {"width": 8.5, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.6, "length": 300.0, "roads": false, "ramps": false},
+	Region.MALL: {"width": 13.0, "edge": Edge.KERB, "grip": 1.0, "rough": 0.0, "length": 230.0, "roads": false, "ramps": false},
+	Region.RAIL: {"width": 14.0, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.3, "length": 280.0, "roads": false, "ramps": false},
+	Region.AIRPORT: {"width": 22.0, "edge": Edge.KERB, "grip": 1.0, "rough": 0.05, "length": 280.0, "roads": false, "ramps": false},
+	Region.LAKE: {"width": 18.0, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.15, "length": 250.0, "roads": false, "ramps": false},
+	Region.HIGHWAY: {"width": 16.0, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.1, "length": 300.0, "roads": false, "ramps": false},
+	Region.BANDY: {"width": 24.0, "edge": Edge.KERB, "grip": 0.35, "rough": 0.0, "length": 200.0, "roads": false, "ramps": false},
+}
 
 const ZONE_LENGTH := 280.0
 const ROAD_START := 520.0
@@ -25,14 +43,14 @@ const RAMP_HEIGHT := 1.6
 const HUMP_CELL := 70.0
 const ICE_CELL := 60.0
 const PARK_RAMP_CELL := 45.0
-const REGION_START := 750.0
-const REGION_SPACING := 1250.0
-const REGION_LENGTH := 420.0
-const REGION_BLEND := 50.0
-const TOWN_HALF_WIDTH := 9.5
-const RIVER_HALF_WIDTH := 15.0
-const PARK_HALF_WIDTH := 27.0
-const WOODS_HALF_WIDTH := 8.5
+const REGION_START := 800.0
+const REGION_SPACING := 1400.0
+## Share of region slots that actually hold a region.
+const REGION_CHANCE := 0.8
+const REGION_BLEND := 40.0
+## Open water in lake regions: (offset from region start, length).
+const LAKE_WATER := [Vector2(70.0, 26.0), Vector2(150.0, 32.0)]
+const WATER_BLEND := 14.0
 
 var world_seed: int
 var _noise := FastNoiseLite.new()
@@ -41,6 +59,9 @@ var _phases := PackedFloat32Array()
 var _region_cells: Dictionary = {}
 var _roads: Dictionary = {}
 var _ramps: Dictionary = {}
+## Region kinds in a seeded order; slots walk through it so no kind repeats
+## until all have been seen.
+var _region_order := PackedInt32Array()
 
 
 func _init(seed_value: int) -> void:
@@ -51,6 +72,9 @@ func _init(seed_value: int) -> void:
 	_noise.fractal_octaves = 2
 	for i in 8:
 		_phases.append(hash01(i, 101) * TAU)
+	var kinds := Array(REGION_STYLE.keys())
+	kinds.sort_custom(func(a: int, b: int) -> bool: return hash01(a, 41) < hash01(b, 41))
+	_region_order = PackedInt32Array(kinds)
 
 
 func hash01(a: int, b: int) -> float:
@@ -77,14 +101,7 @@ func half_width(d: float) -> float:
 	var hw := 20.0 + 5.0 * sin(d * 0.0031 + _phases[2]) - 6.0 * difficulty(d)
 	var span := region_span(d)
 	if span.z != Region.SLOPE:
-		var target := TOWN_HALF_WIDTH
-		if span.z == Region.RIVER:
-			target = RIVER_HALF_WIDTH
-		elif span.z == Region.PARK:
-			target = PARK_HALF_WIDTH
-		elif span.z == Region.WOODS:
-			target = WOODS_HALF_WIDTH
-		hw = lerpf(hw, target, _span_weight(span, d))
+		hw = lerpf(hw, style(int(span.z)).width, _span_weight(span, d))
 	return hw
 
 
@@ -97,8 +114,10 @@ func region_span(d: float) -> Vector3:
 	if cell < 0:
 		return Vector3(0.0, 0.0, Region.SLOPE)
 	if not _region_cells.has(cell):
-		var first := REGION_START + cell * REGION_SPACING + hash01(cell, 31) * 250.0
-		_region_cells[cell] = Vector3(first, first + REGION_LENGTH, 1 + posmod(cell + int(hash01(0, 32) * REGION_KINDS), REGION_KINDS))
+		var kind := _region_order[cell % _region_order.size()] if hash01(cell, 33) < REGION_CHANCE else Region.SLOPE
+		var length: float = style(kind).length if kind != Region.SLOPE else 0.0
+		var first := REGION_START + cell * REGION_SPACING + hash01(cell, 31) * (REGION_SPACING - length - 200.0)
+		_region_cells[cell] = Vector3(first, first + length, kind)
 	var slot: Vector3 = _region_cells[cell]
 	if d < slot.x or d >= slot.y:
 		return Vector3(slot.x, slot.y, Region.SLOPE)
@@ -121,14 +140,43 @@ func _span_weight(span: Vector3, d: float) -> float:
 	return smoothstep(span.x, span.x + REGION_BLEND, d) * (1.0 - smoothstep(span.y - REGION_BLEND, span.y, d))
 
 
-## Grip multiplier for the surface: patchy ice is glassy, the frozen river
-## slippery all over.
+func style(kind: int) -> Dictionary:
+	return REGION_STYLE.get(kind, {})
+
+
+## Grip multiplier for the surface: patchy ice is glassy, frozen rivers,
+## bandy rinks and polished mall floors slippery all over.
 func grip_factor(x: float, d: float) -> float:
 	if is_ice(x, d):
 		return 0.12
-	if region(d) == Region.RIVER and absf(x - center_x(d)) < half_width(d):
-		return 0.35
+	var kind := region(d)
+	if kind != Region.SLOPE and absf(x - center_x(d)) < half_width(d):
+		return style(kind).grip
 	return 1.0
+
+
+# --- Open water (lakes) ---
+
+## (start, end) of the open-water strip around d, or Vector2.ZERO.
+func water_strip(d: float) -> Vector2:
+	var span := region_span(d)
+	if span.z != Region.LAKE:
+		return Vector2.ZERO
+	for water: Vector2 in LAKE_WATER:
+		var start := span.x + water.x
+		if d > start - WATER_BLEND - 1.0 and d < start + water.y + WATER_BLEND + 1.0:
+			return Vector2(start, start + water.y)
+	return Vector2.ZERO
+
+
+func is_water(d: float) -> bool:
+	var strip := water_strip(d)
+	return strip != Vector2.ZERO and d >= strip.x and d <= strip.y
+
+
+## Water lies level, at the height of the slope where the strip ends.
+func water_level(strip: Vector2) -> float:
+	return base_height(strip.y)
 
 
 func track_dir(d: float) -> Vector3:
@@ -172,26 +220,35 @@ func base_height(d: float) -> float:
 
 func height(x: float, d: float, with_ramps := true) -> float:
 	var span := region_span(d)
-	var groomed := _span_weight(span, d)
-	var town := groomed if span.z == Region.TOWN else 0.0
-	var river := groomed if span.z == Region.RIVER else 0.0
-	var woods := groomed if span.z == Region.WOODS else 0.0
+	var weight := _span_weight(span, d)
+	var look := style(int(span.z))
+	var rough: float = look.rough if weight > 0.0 else 1.0
+	var calm := 1.0 - weight * (1.0 - rough)
 	var h := base_height(d)
-	h += _noise.get_noise_2d(x, d) * (0.3 + 0.9 * bumpiness(d)) * (1.0 - 0.85 * groomed + 0.45 * woods)
-	var moguls := zone_weight(d, Zone.MOGULS) * (1.0 - groomed)
+	h += _noise.get_noise_2d(x, d) * (0.3 + 0.9 * bumpiness(d)) * calm
+	var moguls := zone_weight(d, Zone.MOGULS) * (1.0 - weight)
 	if moguls > 0.0:
 		h += moguls * 0.65 * sin(x * 0.62 + d * 0.21) * sin(d * 0.47 - x * 0.18)
-	h += hump(d) * (1.0 - groomed + woods)
+	h += hump(d) * calm
 	var outside := absf(x - center_x(d)) - half_width(d)
 	if outside > 0.0:
 		var bank := 7.0 * smoothstep(0.0, 22.0, outside) + 0.08 * outside
-		# Town: a kerb up to the pavement, flat under the buildings.
-		var kerb := 0.3 * smoothstep(0.0, 0.3, outside) + maxf(outside - 16.0, 0.0) * 0.15
-		# River: steep rocky banks.
-		var gorge := 9.0 * smoothstep(0.0, 9.0, outside) + 0.1 * outside
-		# Woods: the forest floor rises gently on either side of the trail.
-		var forest_floor := 2.5 * smoothstep(0.0, 12.0, outside) + 0.05 * outside
-		h += lerpf(lerpf(lerpf(bank, kerb, town), gorge, river), forest_floor, woods)
+		if weight > 0.0:
+			var edge := bank
+			match int(look.edge):
+				Edge.KERB:
+					# A kerb up to the pavement, flat under the buildings.
+					edge = 0.3 * smoothstep(0.0, 0.3, outside) + maxf(outside - 16.0, 0.0) * 0.15
+				Edge.GORGE:
+					edge = 9.0 * smoothstep(0.0, 9.0, outside) + 0.1 * outside
+				Edge.FLOOR:
+					edge = 2.5 * smoothstep(0.0, 12.0, outside) + 0.05 * outside
+			bank = lerpf(bank, edge, weight)
+		h += bank
+	var water := water_strip(d)
+	if water != Vector2.ZERO:
+		var gap := maxf(maxf(water.x - d, d - water.y), 0.0)
+		h = lerpf(h, water_level(water), 1.0 - smoothstep(0.0, WATER_BLEND, gap))
 	var road := nearest_road(d)
 	var road_gap := absf(d - road)
 	if road_gap < ROAD_HALF_WIDTH + ROAD_BLEND:
@@ -249,7 +306,7 @@ func _compute_road(index: int) -> float:
 	var road := ROAD_START + index * ROAD_SPACING + (hash01(index, 11) - 0.5) * 140.0
 	for probe in [road - 40.0, road, road + 40.0]:
 		var kind := region(probe)
-		if kind == Region.RIVER or kind == Region.PARK or kind == Region.WOODS:
+		if kind != Region.SLOPE and not style(kind).roads:
 			return NO_ROAD
 	var span := region_span(road)
 	if span.z == Region.TOWN and (road < span.x + 70.0 or road > span.y - 70.0):
@@ -308,7 +365,7 @@ func _compute_ramp(cell: int, layer: int) -> Vector3:
 	var size := ramp_cell_size(layer)
 	var start := cell * size + 12.0 + hash01(cell, 12 + layer * 40) * (size - 25.0)
 	var kind := region(start)
-	if layer == 0 and (hash01(cell, 7) > 0.6 or kind == Region.TOWN or kind == Region.RIVER or kind == Region.WOODS):
+	if layer == 0 and (hash01(cell, 7) > 0.6 or (kind != Region.SLOPE and not style(kind).ramps)):
 		return Vector3.ZERO
 	if layer == 1 and (kind != Region.PARK or region(start + RAMP_LENGTH + 10.0) != Region.PARK):
 		return Vector3.ZERO

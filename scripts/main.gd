@@ -20,6 +20,15 @@ const CRASH_LINES := {
 	Obstacle.Kind.CAR: ["Tuuut! Bilen hade företräde.", "Titta åt båda hållen nästa gång!", "Pulka mot Volvo. Volvo vann."],
 	Obstacle.Kind.PLOW: ["Plogbilen plogade dig.", "Du blev en snövall."],
 	Obstacle.Kind.BIN: ["Soptunnan tog hand om dig.", "Rätt i återvinningen!"],
+	Obstacle.Kind.CART: ["Kundvagnen vann.", "Du blev handlad.", "Kassa 3 är stängd."],
+	Obstacle.Kind.PLANT: ["Fikusen överlevde.", "Rakt in i grönskan."],
+	Obstacle.Kind.FOUNTAIN: ["Plask i fontänen!", "Önska något!"],
+	Obstacle.Kind.CONE: ["Konen stod där av en anledning.", "Pling, kon!"],
+	Obstacle.Kind.TRAIN: ["Tåget går inte att stoppa.", "Fel spår!", "Inte ens försenat."],
+	Obstacle.Kind.PLANE: ["Flyget väntar inte på någon.", "Försenad avgång."],
+	Obstacle.Kind.TUG: ["Bagaget kom fram. Du inte.", "Bagagebandet nästa!"],
+	Obstacle.Kind.TRUCK: ["Långtradaren vann.", "Fel fil!", "Chauffören fick en historia att berätta."],
+	Obstacle.Kind.GOAL: ["Självmål!", "Rakt i nätet!"],
 	Obstacle.Kind.TENT: ["Pimpelfiskaren är inte glad.", "Abborrarna skrattar åt dig."],
 }
 const GAME_OVER_LINES := [
@@ -96,12 +105,17 @@ func _ready() -> void:
 	_world_root.add_child(_atmosphere)
 	_world = SlopeWorld.new()
 	_world.engine_sound = _sound.engine_sound
+	_world.horn_sound = _sound.stream("train_horn")
+	_world.jet_sound = _sound.stream("jet")
+	_world.car_horn_sound = _sound.stream("horn")
 	_world_root.add_child(_world)
 	_sled = Sled.new()
 	_sled.speed_multiplier = _speed_multiplier
 	_world_root.add_child(_sled)
 	_sled.jumped.connect(_on_jumped)
 	_sled.landed.connect(_on_landed)
+	_sled.skimmed.connect(_on_skimmed)
+	_sled.sank.connect(_on_sank)
 	_director = EventDirector.new()
 	_director.sled = _sled
 	_director.atmosphere = _atmosphere
@@ -125,6 +139,7 @@ func _ready() -> void:
 	if _muted:
 		AudioServer.set_bus_mute(AudioServer.get_bus_index(&"Master"), true)
 
+	_restore_fullscreen.call_deferred()
 	_enter_menu()
 	if _open_settings_at_start:
 		_hud.open_settings(_save.master_volume, _save.music_volume, _save.effects_volume)
@@ -178,6 +193,21 @@ func _input(event: InputEvent) -> void:
 func _toggle_fullscreen() -> void:
 	var fullscreen := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fullscreen else DisplayServer.WINDOW_MODE_FULLSCREEN)
+	_remember_fullscreen()
+
+
+## Stores the current window mode so the next launch starts the same way.
+func _remember_fullscreen() -> void:
+	if _autopilot or Quality.is_mobile():
+		return
+	_save.fullscreen = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+	_save.store()
+
+
+## Desktop only: browsers refuse fullscreen without a click, phones always are.
+func _restore_fullscreen() -> void:
+	if _save.fullscreen and not _autopilot and _screenshot_path == "" and not OS.has_feature("web") and not Quality.is_mobile():
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 
 func _process(delta: float) -> void:
@@ -198,6 +228,7 @@ func _process(delta: float) -> void:
 	if state != State.PAUSED:
 		var playing := state == State.PLAYING and not _sled.crashed
 		_director.update(delta, playing)
+		_atmosphere.indoor = _world.regions.indoors(_sled.distance())
 		_camera.update_camera(delta)
 		_atmosphere.update_atmosphere(delta, _camera, _sled.distance(), _sled.speed() / 45.0 if playing else 0.0, _sled.boost_time > 0.0)
 		_sound.set_motion(delta, _sled.speed(), _sled.on_ground, playing)
@@ -243,7 +274,7 @@ func _is_unlocked(spec: VehicleSpec) -> bool:
 
 func _update_menu(delta: float) -> void:
 	_world.update_world(_sled.distance(), delta)
-	_sled.step(delta, 0.0, 0.0, 0.0, false)
+	_sled.step(delta, 0.0, 0.0, false)
 	if _input_cooldown > 0.0 or _hud.settings_open:
 		return
 	if Input.is_action_just_pressed(&"menu_left"):
@@ -301,7 +332,7 @@ func _start_run() -> void:
 
 func _update_countdown(delta: float) -> void:
 	_world.update_world(_sled.distance(), delta, 3)
-	_sled.step(delta, 0.0, 0.0, 0.0, false)
+	_sled.step(delta, 0.0, 0.0, false)
 	_countdown -= delta
 	var step := ceili(_countdown)
 	if step != _countdown_step and step > 0:
@@ -323,13 +354,11 @@ func _update_playing(delta: float) -> void:
 		return
 	var steer := clampf(Input.get_axis(&"steer_left", &"steer_right") + _touch.steer, -1.0, 1.0)
 	var tuck := maxf(Input.get_action_strength(&"tuck"), _touch.tuck())
-	var brake := maxf(Input.get_action_strength(&"brake"), _touch.brake)
 	var jump := Input.is_action_just_pressed(&"jump") or _touch.consume_jump()
 	if _autopilot:
 		steer = _autopilot_steer()
 		tuck = 1.0
-		brake = 0.0
-	_sled.step(delta, steer, tuck, brake, jump)
+	_sled.step(delta, steer, tuck, jump)
 	_world.update_world(_sled.distance(), delta)
 	_cookie_timer = maxf(0.0, _cookie_timer - delta)
 	if _cookie_timer == 0.0:
@@ -400,7 +429,7 @@ func _update_paused() -> void:
 
 func _update_game_over(delta: float) -> void:
 	_world.update_world(_sled.distance(), delta)
-	_sled.step(delta, 0.0, 0.0, 0.0, false)
+	_sled.step(delta, 0.0, 0.0, false)
 	if _input_cooldown > 0.0:
 		return
 	if _confirm_pressed():
@@ -454,8 +483,11 @@ func _close_settings() -> void:
 	_input_cooldown = 0.2
 
 
-## Phones: leaving the app (call, home button) pauses the run.
+## Phones: leaving the app (call, home button) pauses the run. Closing the
+## window remembers fullscreen (the window button may have changed it).
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_remember_fullscreen()
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_APPLICATION_PAUSED:
 		if state == State.PLAYING:
 			_set_paused(true)
@@ -617,6 +649,9 @@ func _after_crash() -> void:
 		_game_over()
 		return
 	var d := _sled.distance() + 4.0
+	var water := _field.water_strip(d)
+	if water != Vector2.ZERO:
+		d = water.y + TerrainField.WATER_BLEND + 6.0
 	if _field.near_road(d, 8.0):
 		d = _field.nearest_road(d) + TerrainField.ROAD_HALF_WIDTH + 20.0
 	_sled.place_at(d, 0.0, 12.0)
@@ -643,6 +678,13 @@ func _check_bounds() -> void:
 	var d := _sled.distance()
 	var outside := absf(_sled.position.x - _field.center_x(d)) - _field.half_width(d)
 	var in_town := _field.region(d) == TerrainField.Region.TOWN
+	var kind := _field.region(d)
+	if kind == TerrainField.Region.MALL and outside > 2.0:
+		_crash(["Rakt in i skyltfönstret!", "Du provade en tröja. Med ansiktet.", "Öppet köp gäller inte."][_rng.randi_range(0, 2)])
+		return
+	if kind == TerrainField.Region.BANDY and outside > 1.0:
+		_crash(["In i sargen!", "Utvisning, tio minuter!"][_rng.randi_range(0, 1)])
+		return
 	var in_woods := _field.region(d) == TerrainField.Region.WOODS
 	if in_woods and outside > 2.8:
 		_crash(["In i granskogen!", "Barr överallt.", "Skogen tog dig."][_rng.randi_range(0, 2)])
@@ -674,6 +716,24 @@ func _check_pickups() -> void:
 				_camera.add_shake(0.4)
 
 
+func _on_skimmed(speed: float) -> void:
+	if state != State.PLAYING:
+		return
+	_sound.play("splash", 0.0, _rng.randf_range(0.9, 1.15))
+	Splash.spawn(_world_root, _sled.position, _sled.velocity, 0.8)
+	_camera.add_shake(0.25)
+	_rumble(0.2, 0.3, 0.1)
+	_add_bonus(int(speed))
+
+
+func _on_sank() -> void:
+	if state != State.PLAYING or _sled.crashed:
+		return
+	_sound.play("splash", 4.0, 0.75)
+	Splash.spawn(_world_root, _sled.position, Vector3.ZERO, 1.8)
+	_crash(["Plask!", "Blöta byxor!", "Isvak!", "För lite fart, för mycket vatten."][_rng.randi_range(0, 3)])
+
+
 func _on_jumped() -> void:
 	_sound.play("jump", -4.0)
 
@@ -693,9 +753,11 @@ func _on_landed(air_time: float, impact: float, spin: float) -> void:
 		_hud.popup("%d°! +%d" % [degrees, degrees], Hud.HOT, 60)
 		_sound.play("trick")
 	elif air_time > 0.7:
+		# Short hops still score, but only real flights get a call-out.
 		var points := int(air_time * 40.0)
 		_add_bonus(points)
-		_hud.popup("Luftfärd! %s s +%d" % [("%.1f" % air_time).replace(".", ","), points], Hud.WARM)
+		if air_time >= 2.0:
+			_hud.popup("Luftfärd! %s s +%d" % [("%.1f" % air_time).replace(".", ","), points], Hud.WARM)
 
 
 func _rumble(weak: float, strong: float, duration: float) -> void:
@@ -721,7 +783,11 @@ func _autopilot_steer() -> float:
 
 ## Testing aid: distance where the first region of the named kind begins.
 func _find_region(name: String) -> float:
-	var wanted := {"town": TerrainField.Region.TOWN, "river": TerrainField.Region.RIVER, "park": TerrainField.Region.PARK, "woods": TerrainField.Region.WOODS}.get(name, TerrainField.Region.TOWN) as TerrainField.Region
+	var wanted := {
+		"town": TerrainField.Region.TOWN, "river": TerrainField.Region.RIVER, "park": TerrainField.Region.PARK,
+		"woods": TerrainField.Region.WOODS, "mall": TerrainField.Region.MALL, "rail": TerrainField.Region.RAIL,
+		"airport": TerrainField.Region.AIRPORT, "highway": TerrainField.Region.HIGHWAY, "lake": TerrainField.Region.LAKE, "bandy": TerrainField.Region.BANDY,
+	}.get(name, TerrainField.Region.TOWN) as TerrainField.Region
 	var d := 0.0
 	while d < 40000.0:
 		if _field.region(d) == wanted:

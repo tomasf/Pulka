@@ -10,6 +10,7 @@ var vehicle_id := "pulka"
 var master_volume := 1.0
 var music_volume := 0.8
 var effects_volume := 1.0
+var fullscreen := false
 
 
 static func load_saved() -> SaveData:
@@ -22,6 +23,7 @@ static func load_saved() -> SaveData:
 		data.master_volume = float(config.get_value("audio", "master", 1.0))
 		data.music_volume = float(config.get_value("audio", "music", 0.8))
 		data.effects_volume = float(config.get_value("audio", "effects", 1.0))
+		data.fullscreen = bool(config.get_value("settings", "fullscreen", false))
 	return data
 
 
@@ -30,6 +32,7 @@ func store() -> void:
 	config.set_value("records", "best_distance", best_distance)
 	config.set_value("records", "best_score", best_score)
 	config.set_value("settings", "vehicle", vehicle_id)
+	config.set_value("settings", "fullscreen", fullscreen)
 	config.set_value("audio", "master", master_volume)
 	config.set_value("audio", "music", music_volume)
 	config.set_value("audio", "effects", effects_volume)

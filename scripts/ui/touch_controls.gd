@@ -1,8 +1,8 @@
 class_name TouchControls
 extends Node
 ## Phone and tablet controls: hold the left or right half of the screen to
-## steer, hold both halves to brake, swipe upwards to jump. Touch mode turns
-## itself on with the first touch and off again when a key or pad is used.
+## steer, swipe upwards to jump. Touch mode turns itself on with the first
+## touch and off again when a key or pad is used.
 
 ## Upward travel, as a fraction of screen height, that counts as a swipe.
 const SWIPE_DISTANCE := 0.06
@@ -21,7 +21,6 @@ class Finger:
 signal mode_changed(touch: bool)
 
 var steer := 0.0
-var brake := 0.0
 var touch_mode := false:
 	set(value):
 		if value != touch_mode:
@@ -45,14 +44,13 @@ func consume_jump() -> bool:
 
 ## While touching, the ride tucks automatically whenever you are not steering.
 func tuck() -> float:
-	return 1.0 if touch_mode and steer == 0.0 and brake == 0.0 else 0.0
+	return 1.0 if touch_mode and steer == 0.0 else 0.0
 
 
 func reset() -> void:
 	_fingers.clear()
 	_jump_pending = false
 	steer = 0.0
-	brake = 0.0
 
 
 func _input(event: InputEvent) -> void:
@@ -97,7 +95,6 @@ func _update_steering(view: Vector2) -> void:
 			left = true
 		else:
 			right = true
-	brake = 1.0 if left and right else 0.0
 	steer = 0.0 if left == right else (-1.0 if left else 1.0)
 
 

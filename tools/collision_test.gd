@@ -28,7 +28,7 @@ func _run() -> void:
 	_check("sliding into a log bumps you over it", await _try(main, sled, Obstacle.Kind.LOG, Props.Rig.of(Props.fallen_log()), 0.0, true) == false and not sled.on_ground)
 	_check("a small hop clears a log", await _try(main, sled, Obstacle.Kind.LOG, Props.Rig.of(Props.fallen_log()), 0.3, false) == false)
 	sled.place_at(8.0, 0.0, 15.0)
-	sled.step(1.0 / 60.0, 0.0, 0.0, 0.0, true)
+	sled.step(1.0 / 60.0, 0.0, 0.0, true)
 	_check("jump input still leaves the ground", not sled.on_ground)
 	if no_crash:
 		var lives: int = main.get("_lives")

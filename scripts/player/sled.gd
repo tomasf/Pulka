@@ -6,10 +6,16 @@ extends Node3D
 
 signal jumped
 signal landed(air_time: float, impact: float, spin: float)
+## Skipped across open water like a flat stone.
+signal skimmed(speed: float)
+## Too slow on open water: in you go.
+signal sank
 
 const GRAVITY := 15.0
 const RADIUS := 0.55
 const MAX_STEP := 1.0 / 120.0
+## Below this speed (m/s) open water swallows you instead of throwing you on.
+const SKIM_SPEED := 12.0
 ## How far the nose may turn away from straight downhill. Sleds can't carve
 ## uphill, so holding a turn ends in a hard traverse instead of a U-turn.
 const MAX_TURN := deg_to_rad(75.0)
@@ -104,7 +110,7 @@ func place_at(d: float, lateral := 0.0, start_speed := 0.0) -> void:
 	_update_visual(1.0)
 
 
-func step(delta: float, steer: float, tuck: float, brake: float, jump: bool) -> void:
+func step(delta: float, steer: float, tuck: float, jump: bool) -> void:
 	steer_visual = lerpf(steer_visual, steer, 1.0 - exp(-8.0 * delta))
 	if frozen:
 		_update_visual(delta)
@@ -117,7 +123,7 @@ func step(delta: float, steer: float, tuck: float, brake: float, jump: bool) -> 
 		if crashed:
 			_step_crash(dt)
 		else:
-			_step_physics(dt, steer, tuck, brake, jump and first)
+			_step_physics(dt, steer, tuck, jump and first)
 		first = false
 	boost_time = maxf(0.0, boost_time - delta)
 	invulnerable_time = maxf(0.0, invulnerable_time - delta)
@@ -125,7 +131,7 @@ func step(delta: float, steer: float, tuck: float, brake: float, jump: bool) -> 
 	_update_particles()
 
 
-func _step_physics(dt: float, steer: float, tuck: float, brake: float, jump: bool) -> void:
+func _step_physics(dt: float, steer: float, tuck: float, jump: bool) -> void:
 	var gravity := GRAVITY
 	if on_ground:
 		_ground_time += dt
@@ -163,12 +169,12 @@ func _step_physics(dt: float, steer: float, tuck: float, brake: float, jump: boo
 		var side_speed := velocity.dot(side)
 		var normal_speed := velocity.dot(n)
 		var drag := spec.drag * (1.0 - 0.4 * tuck) * current * current
-		var friction := spec.friction * GRAVITY * maxf(n.y, 0.2) * (0.5 if on_ice else 1.0) + brake * spec.brake
+		var friction := spec.friction * GRAVITY * maxf(n.y, 0.2) * (0.5 if on_ice else 1.0)
 		var planar := Vector2(forward_speed, side_speed)
 		var planar_speed := planar.length()
 		# Arcade carving: the velocity swings round to follow the nose instead of
 		# the ride skidding sideways down the hill. Low grip means a lazier swing.
-		var grip := spec.grip * (1.0 + brake * 0.6) * surface_grip
+		var grip := spec.grip * surface_grip
 		if planar_speed > 0.5:
 			var slip := atan2(side_speed, forward_speed)
 			var turned := slip * exp(-grip * dt)
@@ -203,6 +209,10 @@ func _resolve_ground() -> void:
 	var h := field.height_world(position.x, position.z)
 	var gap := position.y - h
 	if gap <= 0.0 or (on_ground and gap < 0.002):
+		if field.is_water(-position.z):
+			position.y = h
+			_touch_water()
+			return
 		var n := field.normal_world(position.x, position.z)
 		var into := velocity.dot(n)
 		position.y = h
@@ -219,6 +229,23 @@ func _resolve_ground() -> void:
 		on_ground = false
 		air_time = 0.0
 		air_spin = 0.0
+
+
+func _touch_water() -> void:
+	var current := velocity.length()
+	if current < SKIM_SPEED:
+		velocity *= 0.2
+		on_ground = true
+		sank.emit()
+		return
+	velocity *= 0.93
+	velocity.y = 2.4 + current * 0.035
+	on_ground = false
+	_air_since = 1.0
+	_ground_time = 0.0
+	air_time = 0.0
+	air_spin = 0.0
+	skimmed.emit(current)
 
 
 ## Springs the ride back into the air, e.g. off a car roof.
