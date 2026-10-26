@@ -49,7 +49,7 @@ func _speed_factor() -> float:
 
 
 func _update_chase(delta: float) -> void:
-	var velocity := target.velocity
+	var velocity := target.travel_velocity()
 	var flat := Vector3(velocity.x, 0.0, velocity.z)
 	var dir := flat.normalized() if flat.length() > 2.0 else target.forward()
 	dir = dir.lerp(target.forward(), 0.3).normalized()

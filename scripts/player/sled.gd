@@ -17,6 +17,8 @@ const MAX_TURN := deg_to_rad(75.0)
 var spec: VehicleSpec
 var field: TerrainField
 var velocity := Vector3.ZERO
+## Testing aid: scale horizontal travel without changing jump impulses or gravity.
+var speed_multiplier := 1.0
 var yaw := 0.0
 var on_ground := true
 var on_ice := false
@@ -70,7 +72,11 @@ func distance() -> float:
 
 
 func speed() -> float:
-	return velocity.length()
+	return travel_velocity().length()
+
+
+func travel_velocity() -> Vector3:
+	return velocity if crashed else Vector3(velocity.x * speed_multiplier, velocity.y, velocity.z * speed_multiplier)
 
 
 func forward() -> Vector3:
@@ -189,7 +195,7 @@ func _step_physics(dt: float, steer: float, tuck: float, brake: float, jump: boo
 		velocity *= 1.0 - spec.drag * 0.5 * velocity.length() * dt
 		gravity *= spec.air_gravity
 	velocity.y -= gravity * dt
-	position += (velocity + wind_drift) * dt
+	position += (travel_velocity() + wind_drift) * dt
 	_resolve_ground()
 
 
@@ -229,13 +235,14 @@ func bounce(upward: float) -> void:
 func crash() -> void:
 	if crashed:
 		return
+	var impact_velocity := travel_velocity()
 	crashed = true
 	var xform := _rider.global_transform
 	_rider.top_level = true
 	_rider.global_transform = xform
-	_rider_velocity = velocity * 0.85 + Vector3.UP * 6.0
+	_rider_velocity = impact_velocity * 0.85 + Vector3.UP * 6.0
 	_rider_spin = Vector3(randf_range(-9, 9), randf_range(-5, 5), randf_range(-9, 9))
-	velocity = velocity * -0.15 + Vector3.UP * 3.0
+	velocity = impact_velocity * -0.15 + Vector3.UP * 3.0
 	on_ground = false
 	_puff.restart()
 

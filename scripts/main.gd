@@ -59,6 +59,8 @@ var _screenshot_path := ""
 var _screenshot_times: Array[float] = [6.0]
 var _screenshot_index := 0
 var _reckless := false
+var _no_crash := false
+var _speed_multiplier := 1.0
 var _muted := false
 var _open_settings_at_start := false
 var _start_region := ""
@@ -96,6 +98,7 @@ func _ready() -> void:
 	_world.engine_sound = _sound.engine_sound
 	_world_root.add_child(_world)
 	_sled = Sled.new()
+	_sled.speed_multiplier = _speed_multiplier
 	_world_root.add_child(_sled)
 	_sled.jumped.connect(_on_jumped)
 	_sled.landed.connect(_on_landed)
@@ -152,6 +155,15 @@ func _parse_args() -> void:
 			_open_settings_at_start = true
 		elif arg == "--reckless":
 			_reckless = true
+		elif arg == "--no-crash":
+			_no_crash = true
+		elif arg.begins_with("--speed-multiplier="):
+			var value := arg.trim_prefix("--speed-multiplier=")
+			var multiplier := value.to_float() if value.is_valid_float() else 0.0
+			if is_finite(multiplier) and multiplier > 0.0:
+				_speed_multiplier = multiplier
+			else:
+				push_warning("--speed-multiplier requires a positive, finite number; ignoring '%s'." % value)
 		elif arg.begins_with("--vehicle="):
 			_start_vehicle = int(arg.get_slice("=", 1))
 
@@ -551,6 +563,8 @@ func _near_miss(obstacle: Obstacle) -> void:
 
 
 func _hit_obstacle(obstacle: Obstacle) -> void:
+	if _no_crash and not obstacle.soft:
+		return
 	obstacle.react_to_hit(_sled.velocity)
 	if obstacle.soft:
 		if obstacle.kind == Obstacle.Kind.SNOWMAN:
@@ -583,6 +597,8 @@ func _hit_obstacle(obstacle: Obstacle) -> void:
 
 
 func _crash(line: String) -> void:
+	if _no_crash:
+		return
 	if _autopilot:
 		print("crash at %d m: %s" % [int(_run_distance), line])
 	_sled.crash()
