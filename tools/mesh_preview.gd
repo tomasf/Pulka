@@ -1,7 +1,7 @@
 extends SceneTree
 ## Renders one model from three angles side by side.
 ## Run: Godot --path . --script res://tools/mesh_preview.gd -- <name> <out.png>
-## Names: plane, truck, pulka, stjartlapp, snowracer, tefat, rider.
+## Names: plane, truck, pulka, stjartlapp, snowracer, tefat, wok, rider.
 
 
 func _initialize() -> void:
@@ -18,12 +18,12 @@ func _model(name: String) -> Node3D:
 		"rider":
 			node.mesh = RideModels.rider(Color(0.9, 0.3, 0.6), Color(0.95, 0.8, 0.1))
 		_:
-			var models := {"pulka": VehicleSpec.Model.PULKA, "stjartlapp": VehicleSpec.Model.STJARTLAPP, "snowracer": VehicleSpec.Model.SNOWRACER, "tefat": VehicleSpec.Model.TEFAT}
+			var models := {"pulka": VehicleSpec.Model.PULKA, "stjartlapp": VehicleSpec.Model.STJARTLAPP, "snowracer": VehicleSpec.Model.SNOWRACER, "tefat": VehicleSpec.Model.TEFAT, "wok": VehicleSpec.Model.WOK}
 			var model: VehicleSpec.Model = models.get(name, VehicleSpec.Model.PULKA)
 			node.mesh = RideModels.vehicle(model)
 			var rider := MeshInstance3D.new()
 			rider.mesh = RideModels.rider(Color(0.9, 0.3, 0.6), Color(0.95, 0.8, 0.1), model)
-			var seats := {"pulka": 0.16, "stjartlapp": 0.05, "snowracer": 0.42, "tefat": 0.12}
+			var seats := {"pulka": 0.16, "stjartlapp": 0.05, "snowracer": 0.42, "tefat": 0.12, "wok": 0.1}
 			rider.position = Vector3(0, seats.get(name, 0.16), 0.05)
 			node.add_child(rider)
 	return node

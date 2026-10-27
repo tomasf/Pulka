@@ -2,7 +2,7 @@ class_name VehicleSpec
 extends RefCounted
 ## Handling characteristics for each ride.
 
-enum Model { PULKA, STJARTLAPP, SNOWRACER, TEFAT }
+enum Model { PULKA, STJARTLAPP, SNOWRACER, TEFAT, WOK }
 
 var id := ""
 var model := Model.PULKA
@@ -23,6 +23,9 @@ var self_align := 1.5
 var wobble := 0.0
 ## Visual spin of the whole ride (the saucer never stops turning).
 var visual_spin := 0.0
+## Rides that just go down the fall line (saucer, wok): `steer` is then how
+## far, in radians, steering can lean them off it.
+var spins := false
 var air_spin := 5.0
 var air_gravity := 1.0
 var seat_height := 0.22
@@ -107,15 +110,14 @@ static func all() -> Array[VehicleSpec]:
 	saucer.id = "tefat"
 	saucer.model = Model.TEFAT
 	saucer.title = "Tefat"
-	saucer.description = "Ett snurrande plastfat. Snabbast i backen, sämst på allt annat."
-	saucer.steer = 2.1
+	saucer.description = "Ett snurrande plastfat. Går dit backen vill, du får mest åka med."
+	saucer.spins = true
+	saucer.steer = 0.5
 	saucer.grip = 2.2
 	saucer.scrub = 0.08
 	saucer.drag = 0.0015
 	saucer.friction = 0.018
 	saucer.jump = 5.5
-	saucer.self_align = 0.15
-	saucer.wobble = 2.2
 	saucer.visual_spin = 2.5
 	saucer.air_spin = 9.0
 	saucer.seat_height = 0.12
@@ -126,5 +128,28 @@ static func all() -> Array[VehicleSpec]:
 	saucer.stat_handling = 0.4
 	saucer.stat_grip = 0.1
 	list.append(saucer)
+
+	var wok := VehicleSpec.new()
+	wok.id = "wok"
+	wok.model = Model.WOK
+	wok.title = "Wokpanna"
+	wok.description = "Lånad ur köket utan lov. Svinsnabb, snurrar som en propeller och luktar vitlök."
+	wok.spins = true
+	wok.steer = 0.4
+	wok.grip = 2.0
+	wok.scrub = 0.05
+	wok.drag = 0.001
+	wok.friction = 0.011
+	wok.jump = 5.0
+	wok.visual_spin = 3.6
+	wok.air_spin = 10.0
+	wok.seat_height = 0.1
+	wok.mass = 2.5
+	wok.protection = 0.85
+	wok.unlock_distance = 3000.0
+	wok.stat_speed = 1.0
+	wok.stat_handling = 0.3
+	wok.stat_grip = 0.05
+	list.append(wok)
 
 	return list

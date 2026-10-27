@@ -22,6 +22,8 @@ static func vehicle(model: VehicleSpec.Model) -> ArrayMesh:
 				_snowracer(kit)
 			VehicleSpec.Model.TEFAT:
 				_saucer(kit)
+			VehicleSpec.Model.WOK:
+				_wok(kit)
 		return kit.build())
 
 
@@ -134,6 +136,26 @@ static func _saucer(kit: MeshKit) -> void:
 	kit.lathe(PackedVector2Array([Vector2(0.0, 0.034), Vector2(0.18, 0.036)]), Transform3D.IDENTITY, Color(1, 1, 1), 20)
 
 
+# --- Wok: a black carbon-steel pan with a long wooden handle ---
+
+static func _wok(kit: MeshKit) -> void:
+	var steel := Color(0.16, 0.16, 0.18)
+	var bowl := PackedVector2Array([
+		Vector2(0.0, 0.02), Vector2(0.15, 0.03), Vector2(0.3, 0.07), Vector2(0.42, 0.13),
+		Vector2(0.5, 0.2), Vector2(0.55, 0.26),
+	])
+	kit.lathe(bowl, Transform3D.IDENTITY, steel, 32)
+	kit.torus(0.54, 0.575, Transform3D(Basis.IDENTITY, Vector3(0, 0.262, 0)), steel.lightened(0.25), 32, 6)
+	# A well-used, oiled patch in the middle catches the light.
+	kit.lathe(PackedVector2Array([Vector2(0.0, 0.026), Vector2(0.2, 0.04)]), Transform3D.IDENTITY, Color(0.3, 0.27, 0.24), 24)
+	var wood := Color(0.55, 0.33, 0.17)
+	_capsule_between(kit, Vector3(0, 0.25, 0.5), Vector3(0, 0.27, 0.66), 0.03, steel.lightened(0.3))
+	_capsule_between(kit, Vector3(0, 0.27, 0.66), Vector3(0, 0.36, 1.12), 0.042, wood)
+	kit.cylinder(0.046, 0.04, Vector3(0, 0.36, 1.12), wood.darkened(0.3), 10, Vector3(PI / 2.0 - 0.2, 0, 0))
+	# The little helper handle on the far side.
+	kit.torus(0.05, 0.075, Transform3D(Basis(Vector3.RIGHT, PI / 2.0), Vector3(0, 0.27, -0.58)), steel.lightened(0.3), 14, 5)
+
+
 # --- Rider ---
 
 ## The rider sitting on `model`: arms reach for the rope, wheel, pad strap
@@ -141,9 +163,11 @@ static func _saucer(kit: MeshKit) -> void:
 static func rider(jacket: Color, hat: Color, model := VehicleSpec.Model.PULKA) -> ArrayMesh:
 	var kit := MeshKit.new()
 	var scarf: Color = jacket.lerp(Color(1, 1, 1), 0.15).inverted().lerp(hat, 0.5)
-	var hands: Vector3 = [Vector3(0.32, 0.24, -0.34), Vector3(0.14, 0.32, -0.6), Vector3(0.08, 0.06, -0.36), Vector3(0.5, 0.06, 0.0)][model]
-	var knees: Vector3 = [Vector3(0.11, 0.26, -0.27), Vector3(0.16, 0.12, -0.32), Vector3(0.12, 0.3, -0.24), Vector3(0.3, 0.16, -0.18)][model]
-	var feet: Vector3 = [Vector3(0.09, 0.1, -0.44), Vector3(0.2, -0.24, -0.62), Vector3(0.12, 0.04, -0.5), Vector3(0.1, 0.05, -0.34)][model]
+	# Per VehicleSpec.Model: pulka (rope), stjärtlapp (strap), snowracer
+	# (wheel), tefat and wok (rim).
+	var hands: Vector3 = [Vector3(0.32, 0.24, -0.34), Vector3(0.08, 0.06, -0.36), Vector3(0.14, 0.32, -0.6), Vector3(0.5, 0.06, 0.0), Vector3(0.44, 0.12, 0.0)][model]
+	var knees: Vector3 = [Vector3(0.11, 0.26, -0.27), Vector3(0.12, 0.3, -0.24), Vector3(0.16, 0.12, -0.32), Vector3(0.3, 0.16, -0.18), Vector3(0.28, 0.2, -0.16)][model]
+	var feet: Vector3 = [Vector3(0.09, 0.1, -0.44), Vector3(0.12, 0.04, -0.5), Vector3(0.2, -0.24, -0.62), Vector3(0.1, 0.05, -0.34), Vector3(0.1, 0.08, -0.32)][model]
 	for side in [-1.0, 1.0]:
 		var mirror := Vector3(side, 1, 1)
 		var hip := Vector3(0.11 * side, 0.1, 0.0)

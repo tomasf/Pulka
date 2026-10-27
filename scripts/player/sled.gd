@@ -42,6 +42,8 @@ var wind_drift := Vector3.ZERO
 var _ground_time := 0.0
 var _air_since := 0.0
 var _wobble_time := 0.0
+## How far a spinning ride (saucer, wok) leans off the fall line.
+var _lean := 0.0
 var _up := Vector3.UP
 var _body: Node3D
 var _vehicle_mesh: MeshInstance3D
@@ -109,6 +111,7 @@ func place_at(d: float, lateral := 0.0, start_speed := 0.0) -> void:
 	air_time = 0.0
 	air_spin = 0.0
 	boost_time = 0.0
+	_lean = 0.0
 	_ground_time = 1.0
 	_up = field.normal_world(position.x, position.z)
 	_reset_rider()
@@ -154,19 +157,25 @@ func _step_physics(dt: float, steer: float, tuck: float, jump: bool) -> void:
 		steer_rate *= lerpf(0.3, 1.0, surface_grip)
 		var downhill := field.track_dir(-position.z)
 		var fall_yaw := atan2(downhill.x, -downhill.z)
-		var off := wrapf(yaw - fall_yaw, -PI, PI)
-		if absf(off) >= MAX_TURN and signf(steer) == signf(off):
-			steer = 0.0
-		yaw += steer * steer_rate * dt
-		off = wrapf(yaw - fall_yaw, -PI, PI)
-		if absf(off) > MAX_TURN:
-			yaw -= (absf(off) - MAX_TURN) * signf(off) * (1.0 - exp(-8.0 * dt))
-		if Vector2(velocity.x, velocity.z).length() > 1.5:
-			var travel_yaw := atan2(velocity.x, -velocity.z)
-			yaw += wrapf(travel_yaw - yaw, -PI, PI) * (1.0 - exp(-spec.self_align * dt))
-		if spec.wobble > 0.0:
-			_wobble_time += dt
-			yaw += sin(_wobble_time * 1.7) * sin(_wobble_time * 0.63 + 1.0) * spec.wobble * dt * clampf(current / 20.0, 0.0, 1.0)
+		if spec.spins:
+			# A saucer goes where the hill goes; steering only leans it a little
+			# off the fall line, and letting go lets it drift back.
+			_lean = lerpf(_lean, steer * spec.steer, 1.0 - exp(-2.5 * dt * lerpf(0.3, 1.0, surface_grip)))
+			yaw = fall_yaw + _lean
+		else:
+			var off := wrapf(yaw - fall_yaw, -PI, PI)
+			if absf(off) >= MAX_TURN and signf(steer) == signf(off):
+				steer = 0.0
+			yaw += steer * steer_rate * dt
+			off = wrapf(yaw - fall_yaw, -PI, PI)
+			if absf(off) > MAX_TURN:
+				yaw -= (absf(off) - MAX_TURN) * signf(off) * (1.0 - exp(-8.0 * dt))
+			if Vector2(velocity.x, velocity.z).length() > 1.5:
+				var travel_yaw := atan2(velocity.x, -velocity.z)
+				yaw += wrapf(travel_yaw - yaw, -PI, PI) * (1.0 - exp(-spec.self_align * dt))
+			if spec.wobble > 0.0:
+				_wobble_time += dt
+				yaw += sin(_wobble_time * 1.7) * sin(_wobble_time * 0.63 + 1.0) * spec.wobble * dt * clampf(current / 20.0, 0.0, 1.0)
 		var along := forward()
 		along = (along - n * along.dot(n)).normalized()
 		var side := along.cross(n)
@@ -347,15 +356,21 @@ func _update_visual(delta: float) -> void:
 	_body.rotation.z = -steer_visual * 0.22
 	_body.rotation.x = 0.0 if on_ground else clampf(velocity.y * 0.02, -0.3, 0.3)
 	# The ride's pose is rebuilt from scratch every frame so nothing a
-	# previous ride left behind can turn it. Only the saucer spins; its rider
-	# keeps facing downhill.
+	# previous ride left behind can turn it. A saucer spins round with its
+	# rider, unevenly and faster the faster it goes, whichever way it travels.
 	var spinning := spec != null and spec.visual_spin > 0.0
-	_visual_spin = wrapf(_visual_spin + spec.visual_spin * delta, 0.0, TAU) if spinning else 0.0
-	_vehicle_mesh.transform = Transform3D(Basis(Vector3.UP, _visual_spin), Vector3.ZERO)
+	if spinning:
+		var rate := spec.visual_spin * (0.7 + 0.5 * sin(_visual_spin * 0.37 + _wobble_time)) * (0.5 + clampf(speed() / 25.0, 0.0, 1.0))
+		_wobble_time += delta * 0.3
+		_visual_spin = wrapf(_visual_spin + rate * delta, 0.0, TAU)
+	else:
+		_visual_spin = 0.0
+	_body.rotation.y = _visual_spin
+	_vehicle_mesh.transform = Transform3D.IDENTITY
 	if not crashed and _rider:
 		_rider.rotation.z = -steer_visual * 0.25
 		_rider.rotation.x = 0.0
-		_rider.rotation.y = sin(_visual_spin * 0.5) * 0.12 if spinning else 0.0
+		_rider.rotation.y = 0.0
 	_body.visible = invulnerable_time <= 0.0 or fmod(invulnerable_time, 0.2) < 0.12
 
 

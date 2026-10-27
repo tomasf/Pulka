@@ -32,6 +32,10 @@ func _run() -> void:
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame
+	# Always the pulka, whatever ride is saved, and as a test run so the
+	# player's save (chosen ride, records) is left alone.
+	main.set("_vehicle", 0)
+	main.set("_autopilot", true)
 	main.call("_start_run")
 	await create_timer(3.5).timeout
 	var sled: Sled = main.get("_sled")
@@ -75,7 +79,9 @@ func _try(main: Node, sled: Sled, kind: Obstacle.Kind, rig: Props.Rig, height: f
 	var field: TerrainField = main.get("_field")
 	var obstacle := Obstacle.new().configure(kind, rig, field)
 	var ground := field.height_world(sled.position.x, sled.position.z)
-	obstacle.position = Vector3(sled.position.x + aside, field.height_world(sled.position.x + aside, sled.position.z), sled.position.z)
+	# Level with the sled, so a sideways slope can't lift what is tested
+	# above or below the rider.
+	obstacle.position = Vector3(sled.position.x + aside, ground, sled.position.z)
 	sled.position.y = ground + height
 	sled.on_ground = grounded
 	var world: SlopeWorld = main.get("_world")
