@@ -51,6 +51,10 @@ var _rider_spin := Vector3.ZERO
 var _spray: GPUParticles3D
 var _puff: GPUParticles3D
 var _visual_spin := 0.0
+## The ground under the ride (normal, height) and where it was sampled; the
+## physics and the visuals ask for the same spot several times a frame.
+var _ground := Vector4.ZERO
+var _ground_at := Vector2.INF
 
 
 func _ready() -> void:
@@ -142,7 +146,7 @@ func _step_physics(dt: float, steer: float, tuck: float, jump: bool) -> void:
 		air_time += dt
 	# Tiny hops over bumps keep full control for a moment ("coyote time").
 	if on_ground or _air_since < 0.1:
-		var n := field.normal_world(position.x, position.z)
+		var n := _surface_normal()
 		var current := velocity.length()
 		var surface_grip := field.grip_factor(position.x, -position.z)
 		on_ice = surface_grip < 0.9
@@ -206,15 +210,29 @@ func _step_physics(dt: float, steer: float, tuck: float, jump: bool) -> void:
 	_resolve_ground()
 
 
+## The ground's normal and height under the ride, sampled once per spot.
+func _surface() -> Vector4:
+	var at := Vector2(position.x, position.z)
+	if at != _ground_at:
+		_ground = field.surface_world(at.x, at.y)
+		_ground_at = at
+	return _ground
+
+
+func _surface_normal() -> Vector3:
+	var ground := _surface()
+	return Vector3(ground.x, ground.y, ground.z)
+
+
 func _resolve_ground() -> void:
-	var h := field.height_world(position.x, position.z)
+	var h := _surface().w
 	var gap := position.y - h
 	if gap <= 0.0 or (on_ground and gap < 0.002):
 		if field.is_water(-position.z):
 			position.y = h
 			_touch_water()
 			return
-		var n := field.normal_world(position.x, position.z)
+		var n := _surface_normal()
 		var into := velocity.dot(n)
 		position.y = h
 		if into < 0.0:
@@ -320,7 +338,7 @@ func _reset_rider() -> void:
 
 
 func _update_visual(delta: float) -> void:
-	var target_up := field.normal_world(position.x, position.z) if on_ground or crashed else Vector3.UP
+	var target_up := _surface_normal() if on_ground or crashed else Vector3.UP
 	_up = _up.lerp(target_up, 1.0 - exp(-14.0 * delta)).normalized()
 	var ahead := forward()
 	ahead = (ahead - _up * ahead.dot(_up)).normalized()

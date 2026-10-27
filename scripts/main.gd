@@ -74,6 +74,10 @@ var _no_crash := false
 var _speed_multiplier := 1.0
 var _muted := false
 var _open_settings_at_start := false
+## Testing aid: show the frame rate without changing the saved setting.
+var _show_fps := false
+## Testing aid: a graphics level (Quality.Level) other than the default.
+var _graphics_override := -1
 var _start_region := ""
 var _start_d := START_D
 var _start_event := ""
@@ -90,6 +94,8 @@ func _ready() -> void:
 	_parse_args()
 	get_window().content_scale_factor = Quality.ui_scale()
 	_save = SaveData.load_saved()
+	if _graphics_override >= 0:
+		Quality.level = _graphics_override as Quality.Level
 	_specs = VehicleSpec.all()
 	for i in _specs.size():
 		if _specs[i].id == _save.vehicle_id:
@@ -143,6 +149,8 @@ func _ready() -> void:
 		AudioServer.set_bus_mute(AudioServer.get_bus_index(&"Master"), true)
 
 	_restore_fullscreen.call_deferred()
+	_hud.set_fps_visible(_save.show_fps or _show_fps)
+	_apply_graphics()
 	_enter_menu()
 	if _open_settings_at_start:
 		_hud.open_settings(_save.master_volume, _save.music_volume, _save.effects_volume)
@@ -157,6 +165,9 @@ func _parse_args() -> void:
 			_muted = true
 		elif arg == "--mobile-preview":
 			Quality.force_mobile = true
+		elif arg == "--tv-preview":
+			Quality.force_tv = true
+			Quality.level = Quality.default_level()
 		elif arg == "--mute":
 			_muted = true
 		elif arg.begins_with("--screenshot="):
@@ -169,6 +180,10 @@ func _parse_args() -> void:
 			_start_region = arg.get_slice("=", 1)
 		elif arg.begins_with("--event="):
 			_start_event = arg.get_slice("=", 1)
+		elif arg.begins_with("--graphics="):
+			_graphics_override = Quality.LEVEL_NAMES.find(arg.get_slice("=", 1).capitalize())
+		elif arg == "--show-fps":
+			_show_fps = true
 		elif arg == "--settings":
 			_open_settings_at_start = true
 		elif arg == "--reckless":
@@ -214,9 +229,11 @@ func _restore_fullscreen() -> void:
 
 
 func _process(delta: float) -> void:
+	var started := Time.get_ticks_usec()
 	_elapsed += delta
 	_input_cooldown = maxf(0.0, _input_cooldown - delta)
 	_update_settings_input()
+	_update_go_back()
 	match state:
 		State.MENU:
 			_update_menu(delta)
@@ -235,6 +252,7 @@ func _process(delta: float) -> void:
 		_camera.update_camera(delta)
 		_atmosphere.update_atmosphere(delta, _camera, _sled.distance(), _sled.speed() / 45.0 if playing else 0.0, _sled.boost_time > 0.0)
 		_sound.set_motion(delta, _sled.speed(), _sled.on_ground, playing)
+	FpsMeter.record_logic(Time.get_ticks_usec() - started)
 	_maybe_screenshot()
 
 
@@ -334,7 +352,8 @@ func _start_run() -> void:
 
 
 func _update_countdown(delta: float) -> void:
-	_world.update_world(_sled.distance(), delta, 3)
+	# The countdown stands still, so it can afford to build more ahead.
+	_world.update_world(_sled.distance(), delta, 8.0)
 	_sled.step(delta, 0.0, 0.0, false)
 	_countdown -= delta
 	var step := ceili(_countdown)
@@ -455,6 +474,9 @@ func _on_hud_pressed(action: StringName) -> void:
 	match action:
 		&"fullscreen":
 			_toggle_fullscreen()
+		&"show_fps":
+			_save.show_fps = not _save.show_fps
+			_hud.set_fps_visible(_save.show_fps)
 		&"start":
 			if state == State.MENU:
 				_start_run()
@@ -480,6 +502,14 @@ func _on_hud_pressed(action: StringName) -> void:
 				_start_run()
 
 
+## Applies the graphics level to the 3D view, the light and the snowfall.
+func _apply_graphics() -> void:
+	var viewport := get_viewport()
+	viewport.scaling_3d_mode = Quality.scaling_mode()
+	viewport.scaling_3d_scale = Quality.render_scale()
+	_atmosphere.apply_quality()
+
+
 func _close_settings() -> void:
 	_hud.close_settings()
 	_save.store()
@@ -488,12 +518,37 @@ func _close_settings() -> void:
 
 ## Phones: leaving the app (call, home button) pauses the run. Closing the
 ## window remembers fullscreen (the window button may have changed it).
+## Apple TV's Menu button pauses or goes back a step.
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		_remember_fullscreen()
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		_go_back()
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_APPLICATION_PAUSED:
 		if state == State.PLAYING and not _autopilot:
 			_set_paused(true)
+
+
+## Menu on the Siri Remote: pause a run, otherwise act as the back button.
+## In the main menu it goes to the Apple TV home screen instead, as tvOS
+## expects (see _update_go_back).
+func _go_back() -> void:
+	if state == State.PLAYING:
+		_set_paused(true)
+		return
+	var press := InputEventAction.new()
+	press.action = &"back"
+	press.pressed = true
+	Input.parse_input_event(press)
+	var release := press.duplicate() as InputEventAction
+	release.pressed = false
+	Input.parse_input_event.call_deferred(release)
+
+
+## Only the top level hands Menu back to the system.
+func _update_go_back() -> void:
+	if Quality.is_tv():
+		get_tree().quit_on_go_back = state == State.MENU and not _hud.settings_open
 
 
 # --- Settings ---

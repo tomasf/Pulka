@@ -26,6 +26,17 @@ static func configure() -> void:
 		InputMap.action_add_event(&"ui_accept", _button(JOY_BUTTON_A))
 	_action(&"settings", [_key(KEY_TAB), _key(KEY_O), _button(JOY_BUTTON_Y)])
 	_action(&"fullscreen", [_key(KEY_F11), _key(KEY_F)])
+	if Quality.is_tv():
+		_add_siri_remote()
+
+
+## The Siri Remote: swiping or holding an edge of the clickpad steers, a
+## click jumps (and confirms), Play/Pause pauses. On a device it arrives as a
+## joypad (click is A, Play/Pause is X); the Simulator sends keys instead
+## (click is Enter, Play/Pause is Space). Menu is handled as a go-back request.
+static func _add_siri_remote() -> void:
+	InputMap.action_add_event(&"jump", _key(KEY_ENTER))
+	InputMap.action_add_event(&"pause", _button(JOY_BUTTON_X))
 
 
 static func _action(action: StringName, events: Array, deadzone := 0.5) -> void:

@@ -99,6 +99,8 @@ var _hints: Array = []
 var _pause_button: Button
 var _fullscreen_button: Button
 var _fullscreen_toggle: Button
+var _fps_toggle: Button
+var _fps_meter: FpsMeter
 
 var settings_open: bool:
 	get:
@@ -115,6 +117,8 @@ func _ready() -> void:
 	_build_settings()
 	if OS.has_feature("web"):
 		_build_fullscreen_button()
+	_fps_meter = FpsMeter.new()
+	add_child(_fps_meter)
 	_default_focus[_menu] = _menu_start
 	# Left/right on the menu pick a ride, so focus only moves up and down there.
 	for button in [_menu_start, _menu_settings]:
@@ -132,6 +136,7 @@ func _process(delta: float) -> void:
 	var fullscreen := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 	if is_instance_valid(_fullscreen_toggle):
 		_fullscreen_toggle.text = "På" if fullscreen else "Av"
+	_fps_toggle.text = "På" if _fps_meter.visible else "Av"
 	if is_instance_valid(_fullscreen_button):
 		_fullscreen_button.text = "Fönsterläge" if fullscreen else "Fullskärm"
 		_fullscreen_button.tooltip_text = "Lämna fullskärm (Esc / F)" if fullscreen else "Visa i fullskärm (F)"
@@ -473,7 +478,10 @@ func _build_menu() -> void:
 	_menu_start = _button("Åk!", &"start", 44, true)
 	go_row.add_child(_menu_start)
 	column.add_child(go_row)
-	column.add_child(_hint("Styr: A/D, pilar eller spak\nLuta fram: W / RT • Hopp: Space / A",
+	var keys := "Styr: A/D, pilar eller spak\nLuta fram: W / RT • Hopp: Space / A"
+	if Quality.is_tv():
+		keys = "Styr: svep eller håll kanten på fjärrkontrollen, eller spak\nHopp: klicka / A • Paus: ▶︎❙❙"
+	column.add_child(_hint(keys,
 		"Håll vänster eller höger sida för att styra\nSvep uppåt för att hoppa", 20, Color(1, 1, 1, 0.85), 6))
 	_menu_best = label("", 28, COOL, 8)
 	column.add_child(_menu_best)
@@ -613,20 +621,31 @@ func _build_settings() -> void:
 		column.add_child(row)
 		_sliders.append(slider)
 		channel += 1
-	if not Quality.is_mobile():
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 28)
-		var caption := label("Fullskärm", 36, Color(1, 1, 1), 8)
-		caption.custom_minimum_size = Vector2(300, 0)
-		row.add_child(caption)
-		_fullscreen_toggle = _button("Av", &"fullscreen", 30)
-		_fullscreen_toggle.custom_minimum_size = Vector2(140, 0)
-		_fullscreen_toggle.focus_entered.connect(func() -> void: caption.add_theme_color_override("font_color", WARM))
-		_fullscreen_toggle.focus_exited.connect(func() -> void: caption.add_theme_color_override("font_color", Color(1, 1, 1)))
-		row.add_child(_fullscreen_toggle)
-		column.add_child(row)
+	if not Quality.is_mobile() and not Quality.is_tv():
+		_fullscreen_toggle = _toggle_row(column, "Fullskärm", &"fullscreen")
+	_fps_toggle = _toggle_row(column, "Visa FPS", &"show_fps")
 	column.add_child(_button_row([["Klar", &"close_settings", true]]))
 	_settings.visible = false
+
+
+## A settings row with a caption and an on/off button sending `action`.
+func _toggle_row(column: Container, text: String, action: StringName) -> Button:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 28)
+	var caption := label(text, 36, Color(1, 1, 1), 8)
+	caption.custom_minimum_size = Vector2(300, 0)
+	row.add_child(caption)
+	var toggle := _button("Av", action, 30)
+	toggle.custom_minimum_size = Vector2(140, 0)
+	toggle.focus_entered.connect(func() -> void: caption.add_theme_color_override("font_color", WARM))
+	toggle.focus_exited.connect(func() -> void: caption.add_theme_color_override("font_color", Color(1, 1, 1)))
+	row.add_child(toggle)
+	column.add_child(row)
+	return toggle
+
+
+func set_fps_visible(on: bool) -> void:
+	_fps_meter.visible = on
 
 
 func open_settings(master: float, music: float, effects: float) -> void:

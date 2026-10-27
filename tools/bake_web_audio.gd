@@ -1,5 +1,6 @@
 extends SceneTree
-## Prepares synthesized audio for the single-threaded Web export.
+## Prepares synthesized audio for the Web and Apple TV exports
+## (see SoundBank.uses_baked_audio).
 
 const OUTPUT := "res://generated/web_audio/"
 

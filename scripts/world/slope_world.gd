@@ -5,7 +5,31 @@ extends Node3D
 const CHUNK_LENGTH := 50.0
 const CHUNKS_BEHIND := 2
 const ROW_STEP := 50.0 / 30.0
+## Terrain rows per chunk: CHUNK_LENGTH / ROW_STEP + 1.
+const TERRAIN_ROWS := 31
 const SAFE_START := 160.0
+## Milliseconds per frame spent building chunks ahead of the player. Building
+## one in a single frame stalls a slow device (Apple TV) for 50–100 ms.
+const BUILD_MS := 2.5
+## Chunks this close ahead are needed now and are always finished at once.
+const URGENT_AHEAD := 1
+
+
+## A chunk built a little at a time: the terrain a few rows per step, then
+## the scenery, obstacles and decor one stage per step.
+class ChunkBuild:
+	var chunk: Chunk
+	var rng := RandomNumberGenerator.new()
+	var decor := {}
+	var d0 := 0.0
+	var d1 := 0.0
+	## Next build stage; terrain rows are stages 0 and 1, counted by `row`.
+	var stage := 0
+	var row := 0
+	var grid := PackedVector3Array()
+	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var colors := PackedColorArray()
 
 const ZONE_SIGNS := {
 	TerrainField.Zone.OPEN: ["Öppen backe. Inga ursäkter.", Color(0.15, 0.45, 0.8)],
@@ -28,6 +52,8 @@ var player_d := 0.0
 var _free: Array[Node] = []
 var _free_obstacles: Array[Obstacle] = []
 var _chunks: Dictionary = {}
+## Chunk index -> ChunkBuild for chunks still being built.
+var _building: Dictionary = {}
 var _columns := PackedFloat32Array()
 var _chunks_ahead := Quality.chunks_ahead()
 
@@ -52,6 +78,7 @@ func reset(new_field: TerrainField, start_d: float) -> void:
 	for chunk: Chunk in _chunks.values():
 		chunk.queue_free()
 	_chunks.clear()
+	_building.clear()
 	for node in _free:
 		node.queue_free()
 	_free.clear()
@@ -62,20 +89,23 @@ func reset(new_field: TerrainField, start_d: float) -> void:
 		_ensure(i)
 
 
-func update_world(player_distance: float, delta: float, build_budget := 1) -> void:
+## `build_ms` is the time this frame may spend building chunks ahead.
+func update_world(player_distance: float, delta: float, build_ms := BUILD_MS) -> void:
 	player_d = player_distance
 	var current := int(floorf(player_d / CHUNK_LENGTH))
 	for key: int in _chunks.keys():
 		if key < current - CHUNKS_BEHIND or key > current + _chunks_ahead + 1:
 			(_chunks[key] as Chunk).queue_free()
 			_chunks.erase(key)
-	var built := 0
+			_building.erase(key)
+	# Nearest first; the ones right ahead are finished whatever it costs.
+	var deadline := Time.get_ticks_usec() + int(build_ms * 1000.0)
 	for i in range(current - CHUNKS_BEHIND, current + _chunks_ahead + 1):
-		if built >= build_budget:
+		var urgent := i <= current + URGENT_AHEAD
+		if not urgent and Time.get_ticks_usec() >= deadline:
 			break
-		if not _chunks.has(i):
-			_ensure(i)
-			built += 1
+		if not _chunks.has(i) or _building.has(i):
+			_build(i, INF if urgent else float(deadline))
 	for chunk: Chunk in _chunks.values():
 		chunk.tick(delta)
 	for node in _free.duplicate():
@@ -132,50 +162,88 @@ func pickups_near(d: float) -> Array[Pickup]:
 
 
 func _ensure(index: int) -> void:
-	if _chunks.has(index):
-		return
-	var chunk := Chunk.new()
-	chunk.index = index
-	add_child(chunk)
-	_chunks[index] = chunk
-	var rng := RandomNumberGenerator.new()
-	rng.seed = hash(Vector2i(field.world_seed, index))
-	var d0 := index * CHUNK_LENGTH
-	var d1 := d0 + CHUNK_LENGTH
-	var decor := {}
-	_build_terrain(chunk, d0)
-	_place_edges(decor, d0, d1)
-	_place_scenery(chunk, decor, rng, d0, d1)
-	_place_ramps(chunk, d0, d1)
-	_place_roads(chunk, decor, rng, d0, d1)
-	_place_obstacles(chunk, rng, d0, d1)
-	_place_pickups(chunk, rng, d0, d1)
-	_flush_decor(chunk, decor)
+	if not _chunks.has(index) or _building.has(index):
+		_build(index, INF)
+
+
+## Builds chunk `index` until it is done or the clock passes `deadline`
+## (Time.get_ticks_usec), resuming where an earlier call stopped.
+func _build(index: int, deadline: float) -> void:
+	var build: ChunkBuild = _building.get(index)
+	if build == null:
+		build = ChunkBuild.new()
+		build.chunk = Chunk.new()
+		build.chunk.index = index
+		add_child(build.chunk)
+		_chunks[index] = build.chunk
+		_building[index] = build
+		build.rng.seed = hash(Vector2i(field.world_seed, index))
+		build.d0 = index * CHUNK_LENGTH
+		build.d1 = build.d0 + CHUNK_LENGTH
+	while true:
+		var chunk := build.chunk
+		var d0 := build.d0
+		var d1 := build.d1
+		match build.stage:
+			0:
+				if _terrain_heights(build, deadline):
+					build.stage += 1
+					build.row = 0
+			1:
+				if _terrain_surface(build, deadline):
+					_finish_terrain(build)
+					build.stage += 1
+			2:
+				_place_edges(build.decor, d0, d1)
+				_place_scenery(chunk, build.decor, build.rng, d0, d1)
+				build.stage += 1
+			3:
+				_place_ramps(chunk, d0, d1)
+				_place_roads(chunk, build.decor, build.rng, d0, d1)
+				build.stage += 1
+			4:
+				_place_obstacles(chunk, build.rng, d0, d1)
+				_place_pickups(chunk, build.rng, d0, d1)
+				_flush_decor(chunk, build.decor)
+				_building.erase(index)
+				return
+		if Time.get_ticks_usec() >= deadline:
+			return
 
 
 # --- Terrain ---
 
-func _build_terrain(chunk: Chunk, d0: float) -> void:
-	var rows := int(round(CHUNK_LENGTH / ROW_STEP)) + 1
+## Ground heights row by row, one extra row on each side so normals agree
+## across chunk seams. True once all rows are done.
+func _terrain_heights(build: ChunkBuild, deadline: float) -> bool:
 	var cols := _columns.size()
-	# One extra row on each side so normals agree across chunk seams.
-	var grid := PackedVector3Array()
-	grid.resize((rows + 2) * cols)
-	for r in rows + 2:
-		var d := d0 + (r - 1) * ROW_STEP
+	if build.grid.is_empty():
+		build.grid.resize((TERRAIN_ROWS + 2) * cols)
+	while build.row < TERRAIN_ROWS + 2:
+		var r := build.row
+		var d := build.d0 + (r - 1) * ROW_STEP
 		var cx := field.center_x(d)
 		for c in cols:
 			var x := cx + _columns[c]
-			grid[r * cols + c] = Vector3(x, field.height(x, d, false), -d)
-	var vertices := PackedVector3Array()
-	var normals := PackedVector3Array()
-	var colors := PackedColorArray()
-	vertices.resize(rows * cols)
-	normals.resize(rows * cols)
-	colors.resize(rows * cols)
-	for r in rows:
+			build.grid[r * cols + c] = Vector3(x, field.height(x, d, false), -d)
+		build.row += 1
+		if Time.get_ticks_usec() >= deadline:
+			break
+	return build.row >= TERRAIN_ROWS + 2
+
+
+## Vertices, normals and snow colours row by row. True once all rows are done.
+func _terrain_surface(build: ChunkBuild, deadline: float) -> bool:
+	var cols := _columns.size()
+	var grid := build.grid
+	if build.vertices.is_empty():
+		build.vertices.resize(TERRAIN_ROWS * cols)
+		build.normals.resize(TERRAIN_ROWS * cols)
+		build.colors.resize(TERRAIN_ROWS * cols)
+	while build.row < TERRAIN_ROWS:
+		var r := build.row
 		var g := r + 1
-		var d := d0 + r * ROW_STEP
+		var d := build.d0 + r * ROW_STEP
 		var hw := field.half_width(d)
 		var kind := field.region(d)
 		for c in cols:
@@ -185,9 +253,22 @@ func _build_terrain(chunk: Chunk, d0: float) -> void:
 			var n := along.cross(across).normalized()
 			if n.y < 0.0:
 				n = -n
-			vertices[r * cols + c] = p
-			normals[r * cols + c] = n
-			colors[r * cols + c] = _snow_color(p.x, _columns[c], d, hw, kind)
+			build.vertices[r * cols + c] = p
+			build.normals[r * cols + c] = n
+			build.colors[r * cols + c] = _snow_color(p.x, _columns[c], d, hw, kind)
+		build.row += 1
+		if Time.get_ticks_usec() >= deadline:
+			break
+	return build.row >= TERRAIN_ROWS
+
+
+func _finish_terrain(build: ChunkBuild) -> void:
+	var rows := TERRAIN_ROWS
+	var cols := _columns.size()
+	var vertices := build.vertices
+	var normals := build.normals
+	var colors := build.colors
+	var chunk := build.chunk
 	var indices := PackedInt32Array()
 	for r in rows - 1:
 		for c in cols - 1:

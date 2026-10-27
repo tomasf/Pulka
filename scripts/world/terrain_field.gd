@@ -295,6 +295,19 @@ func height_world(x: float, z: float) -> float:
 	return height(x, -z)
 
 
+## Height and normal at a world point together: xyz is the normal and w the
+## height. Three height lookups (one-sided differences) instead of the five
+## that height_world and normal_world take apart; the ride's physics uses it
+## several times a frame.
+func surface_world(x: float, z: float) -> Vector4:
+	var e := 0.35
+	var h := height_world(x, z)
+	var hx := (height_world(x + e, z) - h) / e
+	var hz := (height_world(x, z + e) - h) / e
+	var n := Vector3(-hx, 1.0, -hz).normalized()
+	return Vector4(n.x, n.y, n.z, h)
+
+
 func normal_world(x: float, z: float) -> Vector3:
 	var e := 0.35
 	var hx := (height_world(x + e, z) - height_world(x - e, z)) / (2.0 * e)

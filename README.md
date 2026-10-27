@@ -11,3 +11,10 @@ Skala åkdonets fart med `--speed-multiplier=2` (dubbel fart) eller
 `--speed-multiplier=0.5` (halv fart). Standard är `1`. Multiplikatorn gäller
 förflyttningen längs marken; hoppens kraft och tyngdkraften är oförändrade.
 Flaggorna kan kombineras: `godot --path . -- --no-crash --speed-multiplier=2`.
+
+## Apple TV
+
+Godot saknar officiellt tvOS-stöd, så Apple TV-versionen byggs med en egen
+Godot 4.7.2 med tvOS-plattformen från godotengine/godot#123885. Bygg den en gång
+med `tools/tvos/build_godot.sh` (hamnar i `../godot-tvos`) och exportera sedan
+med `tools/tvos/export.sh`, som skapar ett Xcode-projekt i `export/tvos`.

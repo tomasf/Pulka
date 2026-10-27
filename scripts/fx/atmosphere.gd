@@ -12,6 +12,11 @@ const TIMES := [
 	[Color(0.18, 0.26, 0.55), Color(0.95, 0.7, 0.7), Color(1.0, 0.75, 0.65), 0.8, 0.6, -15.0],
 ]
 const CYCLE_LENGTH := 6000.0
+## The sky is only repainted after this many metres, or a noticeable change
+## in storm or night. Every change re-renders and filters the sky's lighting
+## map, which costs a phone or Apple TV GPU dearly when done each frame.
+const SKY_STEP := 15.0
+const SKY_EVENT_STEP := 0.03
 
 var overlay: ShaderMaterial
 ## 0–1, driven by events: blizzard thickness and how dark the sky is pulled
@@ -31,6 +36,8 @@ var _flash := 0.0
 var _snow_process: ParticleProcessMaterial
 var _aurora: Array[MeshInstance3D] = []
 var _intensity := 0.0
+## Distance, storm and night the sky was last painted for.
+var _sky_state := Vector3(-INF, 0.0, 0.0)
 
 
 func _ready() -> void:
@@ -38,6 +45,9 @@ func _ready() -> void:
 	_sky.sun_angle_max = 20.0
 	var sky := Sky.new()
 	sky.sky_material = _sky
+	if Quality.reduced_effects():
+		# Spread the occasional repaint over several frames.
+		sky.process_mode = Sky.PROCESS_MODE_INCREMENTAL
 	_environment = Environment.new()
 	_environment.background_mode = Environment.BG_SKY
 	_environment.sky = sky
@@ -49,7 +59,7 @@ func _ready() -> void:
 	_environment.fog_density = 0.0028
 	_environment.fog_aerial_perspective = 0.6
 	_environment.fog_sky_affect = 0.15
-	_environment.glow_enabled = true
+	_environment.glow_enabled = Quality.glow()
 	_environment.glow_intensity = 0.6
 	_environment.glow_bloom = 0.05
 	var world_env := WorldEnvironment.new()
@@ -58,8 +68,6 @@ func _ready() -> void:
 
 	_sun = DirectionalLight3D.new()
 	_sun.shadow_enabled = true
-	_sun.directional_shadow_max_distance = Quality.shadow_distance()
-	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	_sun.rotation_degrees = Vector3(-40.0, 35.0, 0.0)
 	add_child(_sun)
 
@@ -92,7 +100,15 @@ func _ready() -> void:
 	overlay.shader = load("res://shaders/speed_overlay.gdshader")
 	rect.material = overlay
 	layer.add_child(rect)
+	apply_quality()
 	set_time_of_day(0.0)
+
+
+## Picks up the graphics level (Quality.level), also when it changes.
+func apply_quality() -> void:
+	_sun.directional_shadow_max_distance = Quality.shadow_distance()
+	_sun.directional_shadow_mode = Quality.shadow_mode()
+	_snow.amount = maxi(Quality.snowflakes(), 1)
 
 
 func flash(color: Color, amount := 0.6) -> void:
@@ -102,7 +118,8 @@ func flash(color: Color, amount := 0.6) -> void:
 
 func update_atmosphere(delta: float, camera: Camera3D, distance: float, speed_factor: float, boosting: bool) -> void:
 	_snow.global_position = camera.global_position - camera.global_basis.z * 16.0 + Vector3.UP * 5.0
-	set_time_of_day(distance)
+	if _sky_needs_repaint(Vector3(distance, storm, night_override)):
+		set_time_of_day(distance)
 	_snow.amount_ratio = 0.0 if indoor else 0.25 + 0.75 * storm
 	_snow_process.gravity = Vector3(wind * storm * 14.0, -1.5 - storm * 4.0, 0.0)
 	_environment.fog_density = Quality.base_fog() + storm * 0.032
@@ -146,6 +163,19 @@ func set_time_of_day(distance: float) -> void:
 		_sky.ground_horizon_color = horizon
 		_sun.light_energy *= 1.0 - 0.55 * storm
 	_environment.fog_light_color = horizon
+
+
+## True (and remembered) when the sky has drifted far enough from how it was
+## last painted. Storms and nights always repaint as they end, so no trace of
+## them lingers.
+func _sky_needs_repaint(state: Vector3) -> bool:
+	var moved := absf(state.x - _sky_state.x) >= SKY_STEP
+	for i in [1, 2]:
+		moved = moved or absf(state[i] - _sky_state[i]) >= SKY_EVENT_STEP
+		moved = moved or (state[i] == 0.0 and _sky_state[i] != 0.0)
+	if moved:
+		_sky_state = state
+	return moved
 
 
 func _update_aurora(camera: Camera3D) -> void:

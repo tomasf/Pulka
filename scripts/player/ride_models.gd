@@ -51,7 +51,7 @@ static func _pulka(kit: MeshKit) -> void:
 	for i in loop.size() - 1:
 		_capsule_between(kit, loop[i], loop[i + 1], 0.016, rope)
 	for side in [-1.0, 1.0]:
-		kit.cylinder(0.03, 0.04, Vector3(0.2 * side, 0.38, -0.66), red.darkened(0.4), 10, Vector3(PI / 2.5, 0, 0))
+		kit.cylinder(0.022, 0.03, Vector3(0.2 * side, 0.38, -0.66), red.darkened(0.2), 10, Vector3(PI / 2.5, 0, 0))
 
 
 ## One outline of the tub: a rounded oval whose front half rises into the bow.
@@ -142,8 +142,8 @@ static func rider(jacket: Color, hat: Color, model := VehicleSpec.Model.PULKA) -
 	var kit := MeshKit.new()
 	var scarf: Color = jacket.lerp(Color(1, 1, 1), 0.15).inverted().lerp(hat, 0.5)
 	var hands: Vector3 = [Vector3(0.32, 0.24, -0.34), Vector3(0.14, 0.32, -0.6), Vector3(0.08, 0.06, -0.36), Vector3(0.5, 0.06, 0.0)][model]
-	var knees: Vector3 = [Vector3(0.13, 0.24, -0.3), Vector3(0.16, 0.12, -0.32), Vector3(0.12, 0.3, -0.24), Vector3(0.3, 0.16, -0.18)][model]
-	var feet: Vector3 = [Vector3(0.13, 0.1, -0.5), Vector3(0.2, -0.24, -0.62), Vector3(0.12, 0.04, -0.5), Vector3(0.1, 0.05, -0.34)][model]
+	var knees: Vector3 = [Vector3(0.11, 0.26, -0.27), Vector3(0.16, 0.12, -0.32), Vector3(0.12, 0.3, -0.24), Vector3(0.3, 0.16, -0.18)][model]
+	var feet: Vector3 = [Vector3(0.09, 0.1, -0.44), Vector3(0.2, -0.24, -0.62), Vector3(0.12, 0.04, -0.5), Vector3(0.1, 0.05, -0.34)][model]
 	for side in [-1.0, 1.0]:
 		var mirror := Vector3(side, 1, 1)
 		var hip := Vector3(0.11 * side, 0.1, 0.0)
