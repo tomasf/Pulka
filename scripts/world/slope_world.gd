@@ -638,7 +638,7 @@ func _place_obstacles(chunk: Chunk, rng: RandomNumberGenerator, d0: float, d1: f
 		var cx := field.center_x(d)
 		var hw := field.half_width(d)
 		var x := cx + rng.randf_range(-hw * 0.95, hw * 0.95)
-		if field.near_ramp(x, d, 4.0) or field.in_corridor(x, d, 2.0):
+		if field.near_ramp(x, d, 4.0) or field.in_corridor(x, d, 2.0) or field.in_cliff_fall(d):
 			continue
 		var kind := _pick_kind(zone, here, rng)
 		var rig := regions.rig_for(kind, here, rng)

@@ -47,6 +47,8 @@ func place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, 
 		TerrainField.Region.HIGHWAY:
 			_place_motorway(chunk, decor, rng, lo, hi, span)
 			_place_turn_off_arrows(decor, lo, hi, span)
+		TerrainField.Region.CLIFF:
+			_place_cliff(chunk, decor, rng, lo, hi, span)
 
 
 func _place_town(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: float) -> void:
@@ -247,6 +249,11 @@ func ground_color(kind: TerrainField.Region, x: float, lx: float, d: float, hw: 
 					var inside := d > g if g < middle else d < g
 					line = line or (inside and absf(arc - 17.0) < 0.4)
 				return Color(0.85, 0.15, 0.2) if line else Color(0.86, 0.92, 1.0)
+		TerrainField.Region.CLIFF:
+			# Bare rock down the sheer face.
+			var s := d - field.cliff_edge(d)
+			if s > -0.3 and s < TerrainField.CLIFF_LIP + 1.8:
+				return Palette.ROCK
 	return Palette.SNOW
 
 
@@ -306,6 +313,8 @@ func obstacle_table(kind: TerrainField.Region) -> Array:
 			return [[Obstacle.Kind.PERSON, 1]]
 		TerrainField.Region.HIGHWAY:
 			return [[Obstacle.Kind.CONE, 1]]
+		TerrainField.Region.CLIFF:
+			return [[Obstacle.Kind.PERSON, 1], [Obstacle.Kind.SNOWMAN, 1]]
 	return []
 
 
@@ -322,6 +331,8 @@ func density(kind: TerrainField.Region) -> float:
 		TerrainField.Region.BANDY:
 			return 0.7
 		TerrainField.Region.HIGHWAY:
+			return 0.3
+		TerrainField.Region.CLIFF:
 			return 0.3
 		TerrainField.Region.PARK:
 			return 0.5
@@ -393,6 +404,41 @@ func _fixed(chunk: Chunk, kind: Obstacle.Kind, d: float, lateral: float, turn: f
 	obstacle.rotation.y = -world.street_yaw(d) + turn
 	chunk.add_child(obstacle)
 	chunk.obstacles.append(obstacle)
+
+
+# --- Cliff ---
+
+const CLIFF_SIGNS := ["Stup ↓", "Oj.", "Håll i mössan"]
+
+
+## A wall of rock along the edge (the boulders' snow caps make the cornice),
+## a sign that comes far too late and a crowd at the bottom of the landing.
+func _place_cliff(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: float, span: Vector3) -> void:
+	var edge := span.x + TerrainField.CLIFF_EDGE
+	if edge >= lo - 6.0 and edge < hi + 6.0:
+		var cx := field.center_x(edge)
+		var reach := field.half_width(edge) + 90.0
+		var x := cx - reach
+		while x < cx + reach:
+			var below := field.height(x, edge + TerrainField.CLIFF_LIP + 0.6, false)
+			var top := field.height(x, edge - 0.5, false)
+			# A boulder spans about -0.4 to 1.05 (its snow cap) times its scale:
+			# stretch it so the cap sits on the lip and the foot at the bottom.
+			var tall := (top - below) / 1.45
+			var shape := Basis(Vector3.UP, rng.randf_range(-0.4, 0.4)).scaled(Vector3(rng.randf_range(3.0, 4.5), tall, rng.randf_range(2.0, 3.0)))
+			world.add_decor(decor, Props.rock(rng.randi_range(0, 1)), Transform3D(shape, Vector3(x, top - tall * 1.2, -(edge + 2.6))))
+			x += rng.randf_range(4.5, 6.5)
+		world.add_sign(chunk, CLIFF_SIGNS[rng.randi_range(0, CLIFF_SIGNS.size() - 1)], Color(0.85, 0.15, 0.1), edge - 3.0, world.random_sign(rng))
+	# Spectators either side of where the landing hill levels out.
+	var crowd := edge + TerrainField.CLIFF_LIP + TerrainField.CLIFF_RUNOUT * 0.8
+	if crowd >= lo and crowd < hi:
+		for side in [-1.0, 1.0]:
+			for k in 7:
+				var d := crowd + rng.randf_range(-14.0, 14.0)
+				var lx: float = side * (field.half_width(d) + rng.randf_range(2.0, 7.0))
+				var fan := Props.posed(Props.person(rng.randi_range(0, 7)), rng.randf() * TAU)
+				fan.transform = world.ground_xform(field.center_x(d) + lx, d, (-PI / 2.0 if side > 0.0 else PI / 2.0) - world.street_yaw(d))
+				chunk.add_child(fan)
 
 
 # --- Traffic that lives as long as the region ---

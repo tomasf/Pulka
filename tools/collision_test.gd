@@ -8,6 +8,8 @@ var _failures := 0
 var _flew := false
 ## Whether the last _try made any contact at all (a hit or a knock).
 var _touched := false
+## Whether the last _try rustled through a spruce's branches.
+var _brushed := false
 
 
 ## The same hit on a person at 14 m/s: survived on a pulka, a crash on a tefat.
@@ -47,7 +49,7 @@ func _run() -> void:
 		_check("a slow knock into a spruce is survived", not await _try(main, sled, Obstacle.Kind.TREE, Props.Rig.of(Props.spruce(0)), 0.0, true, false, 6.0))
 		_check("a fast hit on a spruce trunk crashes", await _try(main, sled, Obstacle.Kind.TREE, Props.Rig.of(Props.spruce(0)), 0.0, true, false, 20.0))
 		_check("brushing a spruce's top branches is survived", not await _try(main, sled, Obstacle.Kind.TREE, Props.Rig.of(Props.spruce(0)), 5.0, false, false, 20.0))
-		_check("riding under a spruce's low branches is felt", not await _try(main, sled, Obstacle.Kind.TREE, Props.Rig.of(Props.spruce(0)), 0.0, true, false, 15.0, 1.6) and _touched)
+		_check("riding through a spruce's low branches only rustles", not await _try(main, sled, Obstacle.Kind.TREE, Props.Rig.of(Props.spruce(0)), 0.0, true, false, 15.0, 1.6) and not _touched and _brushed)
 		_check("trees beside the track can be hit", _edge_trees_are_solid(main))
 		_check("cones are harmless", not await _try(main, sled, Obstacle.Kind.CONE, Props.Rig.of(RegionProps.cone()), 0.0, true, false, 25.0) and _flew)
 		_check("landing on a rock is survived", not await _try(main, sled, Obstacle.Kind.ROCK, Props.Rig.of(Props.rock(0)), 0.8, false))
@@ -91,6 +93,7 @@ func _try(main: Node, sled: Sled, kind: Obstacle.Kind, rig: Props.Rig, height: f
 	var crashed := sled.crashed
 	_flew = obstacle.flying
 	_touched = obstacle.hit or sled.velocity != velocity
+	_brushed = obstacle.brushed
 	chunk.obstacles.erase(obstacle)
 	obstacle.queue_free()
 	if crashed:

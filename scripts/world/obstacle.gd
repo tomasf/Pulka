@@ -28,6 +28,8 @@ var harmless := false
 var landable := true
 ## True while tumbling through the air after being hit.
 var flying := false
+## Set once the ride has rustled through this spruce's branches.
+var brushed := false
 var radius := 0.6
 var top := 2.0
 ## Non-zero for box colliders: half size along local x and z.
@@ -175,13 +177,6 @@ func height() -> float:
 ## True if p is up among a spruce's branches rather than at its trunk.
 func in_branches(p: Vector3) -> bool:
 	return kind == Kind.TREE and p.y - position.y > BRANCHES_FROM * scale.y
-
-
-## How much of a hit at p a spruce's branches pass on: about half low down
-## where they are thick, a quarter up at the thin top.
-func branch_give(p: Vector3) -> float:
-	var up := clampf(((p.y - position.y) / scale.y - BRANCHES_FROM) / (top - BRANCHES_FROM), 0.0, 1.0)
-	return lerpf(0.55, 0.25, up)
 
 
 ## Horizontal direction from the obstacle towards p (the way a hit pushes).

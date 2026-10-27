@@ -8,11 +8,12 @@ extends RefCounted
 ##
 ## Now and then the slope briefly gives way to a special region: a town
 ## street, a frozen river, a snowpark, a forest trail, a shopping mall, a rail
-## yard, an airport, a lake to skim across, a bandy rink or a motorway. They are short
-## and spread out, so the run still feels like a sledding hill.
+## yard, an airport, a lake to skim across, a bandy rink, a motorway or a
+## cliff that drops away without warning. They are short and spread out, so the
+## run still feels like a sledding hill.
 
 enum Zone { OPEN, FOREST, MOGULS, VILLAGE, WILDLIFE }
-enum Region { SLOPE, TOWN, RIVER, PARK, WOODS, MALL, RAIL, AIRPORT, LAKE, BANDY, HIGHWAY }
+enum Region { SLOPE, TOWN, RIVER, PARK, WOODS, MALL, RAIL, AIRPORT, LAKE, BANDY, HIGHWAY, CLIFF }
 ## How the ground meets the edge of the track.
 enum Edge { BANK, KERB, GORGE, FLOOR }
 
@@ -29,6 +30,7 @@ const REGION_STYLE := {
 	Region.LAKE: {"width": 18.0, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.15, "length": 250.0, "roads": false, "ramps": false},
 	Region.HIGHWAY: {"width": 22.0, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.0, "length": 300.0, "roads": false, "ramps": false},
 	Region.BANDY: {"width": 24.0, "edge": Edge.KERB, "grip": 0.35, "rough": 0.0, "length": 200.0, "roads": false, "ramps": false},
+	Region.CLIFF: {"width": 24.0, "edge": Edge.BANK, "grip": 1.0, "rough": 0.0, "length": 300.0, "roads": false, "ramps": false},
 }
 
 const ZONE_LENGTH := 280.0
@@ -51,12 +53,29 @@ const REGION_BLEND := 40.0
 ## Open water in lake regions: (offset from region start, length).
 const LAKE_WATER := [Vector2(70.0, 26.0), Vector2(150.0, 32.0)]
 const WATER_BLEND := 14.0
+## The cliff: a calm snowfield, then at CLIFF_EDGE metres into the region a
+## sheer face of CLIFF_FACE metres onto a steep landing hill that drops
+## CLIFF_LAND more and levels out over CLIFF_RUNOUT, like a ski jump's.
+## Everything beyond stays that much lower.
+const CLIFF_EDGE := 110.0
+const CLIFF_FACE := 26.0
+const CLIFF_LAND := 36.0
+const CLIFF_RUNOUT := 100.0
+## Horizontal run of the sheer face.
+const CLIFF_LIP := 1.2
 
 var world_seed: int
 var _noise := FastNoiseLite.new()
 var _phases := PackedFloat32Array()
 # Per-cell lookups are pure functions of the seed, so they are memoized.
 var _region_cells: Dictionary = {}
+## Region cell -> total cliff drop of all the cells before it.
+var _cliff_drops: Dictionary = {0: 0.0}
+## The last region cell asked about (heights come in long runs from one
+## cell), its slot and the cliff drop before it.
+var _last_cell := -1
+var _last_slot := Vector3.ZERO
+var _last_drop := 0.0
 var _roads: Dictionary = {}
 var _ramps: Dictionary = {}
 ## Region kinds in a seeded order; slots walk through it so no kind repeats
@@ -110,18 +129,81 @@ func half_width(d: float) -> float:
 ## (start, end, kind) of the region slot that d falls in. Kind is SLOPE when
 ## the slot has no region or d lies outside it.
 func region_span(d: float) -> Vector3:
-	var cell := int(floorf((d - REGION_START) / REGION_SPACING))
+	var cell := _region_cell(d)
 	if cell < 0:
 		return Vector3(0.0, 0.0, Region.SLOPE)
+	var slot := _slot(cell)
+	if d < slot.x or d >= slot.y:
+		return Vector3(slot.x, slot.y, Region.SLOPE)
+	return slot
+
+
+func _region_cell(d: float) -> int:
+	return int(floorf((d - REGION_START) / REGION_SPACING))
+
+
+## (start, end, kind) of the region in slot `cell`; kind is SLOPE if empty.
+func _slot(cell: int) -> Vector3:
 	if not _region_cells.has(cell):
 		var kind := _region_order[cell % _region_order.size()] if hash01(cell, 33) < REGION_CHANCE else Region.SLOPE
 		var length: float = style(kind).length if kind != Region.SLOPE else 0.0
 		var first := REGION_START + cell * REGION_SPACING + hash01(cell, 31) * (REGION_SPACING - length - 200.0)
 		_region_cells[cell] = Vector3(first, first + length, kind)
-	var slot: Vector3 = _region_cells[cell]
-	if d < slot.x or d >= slot.y:
-		return Vector3(slot.x, slot.y, Region.SLOPE)
-	return slot
+	return _region_cells[cell]
+
+
+# --- Cliffs ---
+
+## How far the ground has dropped over cliffs by distance d: the cliffs
+## already passed plus the one d is on, if any.
+func cliff_drop(d: float) -> float:
+	var cell := _region_cell(d)
+	if cell < 0:
+		return 0.0
+	if cell != _last_cell:
+		_last_cell = cell
+		_last_slot = _slot(cell)
+		_last_drop = _cliff_drop_before(cell)
+	if int(_last_slot.z) != Region.CLIFF:
+		return _last_drop
+	return _last_drop + cliff_profile(d - _last_slot.x - CLIFF_EDGE)
+
+
+## Drop of one cliff `s` metres past its edge: the sheer face, then the
+## landing hill, steep at first and level at the bottom.
+func cliff_profile(s: float) -> float:
+	if s <= 0.0:
+		return 0.0
+	var face := CLIFF_FACE * smoothstep(0.0, CLIFF_LIP, s)
+	var t := clampf((s - CLIFF_LIP) / CLIFF_RUNOUT, 0.0, 1.0)
+	return face + CLIFF_LAND * (1.0 - (1.0 - t) * (1.0 - t))
+
+
+## Distance of the cliff edge in the region at d, or INF when there is none.
+func cliff_edge(d: float) -> float:
+	var cell := _region_cell(d)
+	if cell < 0:
+		return INF
+	var slot := _slot(cell)
+	return slot.x + CLIFF_EDGE if int(slot.z) == Region.CLIFF else INF
+
+
+## True from a little before a cliff's edge to the bottom of its landing
+## hill, where nothing should stand in the way.
+func in_cliff_fall(d: float, before := 25.0) -> bool:
+	var edge := cliff_edge(d)
+	return d > edge - before and d < edge + CLIFF_LIP + CLIFF_RUNOUT
+
+
+func _cliff_drop_before(cell: int) -> float:
+	if not _cliff_drops.has(cell):
+		var last := cell - 1
+		while not _cliff_drops.has(last):
+			last -= 1
+		for c in range(last + 1, cell + 1):
+			var full := CLIFF_FACE + CLIFF_LAND if int(_slot(c - 1).z) == Region.CLIFF else 0.0
+			_cliff_drops[c] = float(_cliff_drops[c - 1]) + full
+	return _cliff_drops[cell]
 
 
 func region(d: float) -> Region:
@@ -244,7 +326,7 @@ func bumpiness(d: float) -> float:
 func base_height(d: float) -> float:
 	var descent := 0.30 * d - 400.0 * (1.0 - exp(-d / 4000.0))
 	var rolls := 7.0 * sin(d * 0.0095 + _phases[4]) + 3.0 * sin(d * 0.023 + _phases[5])
-	return -descent + rolls * smoothstep(0.0, 200.0, d)
+	return -descent + rolls * smoothstep(0.0, 200.0, d) - cliff_drop(d)
 
 
 func height(x: float, d: float, with_ramps := true) -> float:

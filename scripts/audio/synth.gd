@@ -48,6 +48,7 @@ static func effects() -> Dictionary:
 		"cocoa": fanfare(),
 		"boost": boost(),
 		"whoosh": whoosh(),
+		"rustle": rustle(),
 		"horn": horn(),
 		"moose": moose(),
 		"poff": poff(),
@@ -182,6 +183,32 @@ static func boost() -> AudioStreamWAV:
 		phase += (200.0 + 1200.0 * t * t) / RATE
 		low += (0.05 + t * 0.4) * (rng.randf_range(-1.0, 1.0) - low)
 		out[i] = (sin(phase * TAU) * 0.3 + low * 0.8) * minf(t * 10.0, 1.0) * exp(-t * 2.5)
+	return to_stream(out)
+
+
+## Spruce branches sweeping over a jacket: a soft hiss of needles with a few
+## twigs snapping in it.
+static func rustle() -> AudioStreamWAV:
+	var length := 0.45
+	var out := _buffer(length)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var low := 0.0
+	var snaps := PackedFloat32Array()
+	for k in 5:
+		snaps.append(rng.randf_range(0.03, length - 0.08))
+	for i in out.size():
+		var t := float(i) / RATE
+		var env := smoothstep(0.0, 0.04, t) * (1.0 - smoothstep(0.12, length, t))
+		var noise := rng.randf_range(-1.0, 1.0)
+		low += 0.35 * (noise - low)
+		var hiss := (noise - low) * (0.55 + 0.45 * sin(t * 61.0) * sin(t * 23.0))
+		var twig := 0.0
+		for snap in snaps:
+			var since := t - snap
+			if since >= 0.0 and since < 0.012:
+				twig += rng.randf_range(-1.0, 1.0) * (1.0 - since / 0.012)
+		out[i] = (hiss * 0.45 + twig * 0.6) * env
 	return to_stream(out)
 
 

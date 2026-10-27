@@ -63,6 +63,8 @@ var _crash_timer := 0.0
 var _input_cooldown := 0.0
 var _cookie_streak := 0
 var _cookie_timer := 0.0
+## Set when the ride goes over a cliff edge, until it lands.
+var _over_cliff := false
 var _elapsed := 0.0
 
 var _autopilot := false
@@ -332,6 +334,7 @@ func _start_run() -> void:
 	_sled.frozen = true
 	_sled.place_at(_start_d)
 	_sled.invulnerable_time = 0.0
+	_over_cliff = false
 	_lives = START_LIVES
 	_bonus = 0
 	_bonus_fraction = 0.0
@@ -380,8 +383,10 @@ func _update_playing(delta: float) -> void:
 	if _autopilot:
 		steer = _autopilot_steer()
 		tuck = 1.0
+	var before := _sled.distance()
 	_sled.step(delta, steer, tuck, jump)
 	_world.update_world(_sled.distance(), delta)
+	_check_cliff(before)
 	_cookie_timer = maxf(0.0, _cookie_timer - delta)
 	if _cookie_timer == 0.0:
 		_cookie_streak = 0
@@ -397,6 +402,17 @@ func _update_playing(delta: float) -> void:
 		_check_pickups()
 		_check_bounds()
 	_update_hud()
+
+
+## Going over a cliff edge: a scream, and a reward if you land it.
+func _check_cliff(before: float) -> void:
+	var edge := _field.cliff_edge(before)
+	if _sled.crashed or before >= edge or _sled.distance() < edge:
+		return
+	_over_cliff = true
+	_hud.popup("AAAAAAAH!", Hud.HOT, 84, 2.5)
+	_sound.play("whoosh", 0.0, 0.7)
+	_camera.add_shake(0.25)
 
 
 func _update_hud() -> void:
@@ -582,6 +598,8 @@ const WIPEOUT_SEVERITY := 3.5
 ## Height of the rider's chest above the collision probe.
 const RIDER_CHEST := 0.75
 const CRASH_SEVERITY := 7.5
+## Points for landing a cliff, on top of the air time.
+const CLIFF_BONUS := 500
 const WIPEOUT_LINES := ["Vurpa!", "Hoppla!", "Puh, klarade mig!", "Det där gjorde ont i stoltheten."]
 
 
@@ -682,6 +700,9 @@ func _near_miss(obstacle: Obstacle) -> void:
 func _impact(obstacle: Obstacle, probe: Vector3) -> void:
 	if _no_crash and not obstacle.soft and not obstacle.harmless:
 		return
+	if obstacle.in_branches(probe):
+		_brush(obstacle)
+		return
 	var travel := _sled.travel_velocity()
 	var heading := Vector3(travel.x, 0.0, travel.z)
 	var normal := obstacle.push_normal(probe, -heading.normalized() if heading.length() > 0.1 else Vector3.BACK)
@@ -700,9 +721,6 @@ func _impact(obstacle: Obstacle, probe: Vector3) -> void:
 		_soft_hit(obstacle)
 		return
 	var severity := closing * share / _sled.spec.protection
-	if obstacle.in_branches(probe):
-		# Branches give way: the thick low ones a little, the top a lot.
-		severity *= obstacle.branch_give(probe)
 	var separation := Sled.RADIUS - obstacle.clearance(probe) + 0.05
 	if severity >= CRASH_SEVERITY:
 		_crash_into(obstacle)
@@ -721,6 +739,15 @@ func _impact(obstacle: Obstacle, probe: Vector3) -> void:
 		_sound.play("land", -2.0, 1.1)
 		_camera.add_shake(clampf(severity * 0.1, 0.1, 0.4))
 		_rumble(0.3, 0.2, 0.1)
+
+
+## Spruce branches are soft: you ride straight through with a rustle
+## against the jacket. Only the trunk is hard.
+func _brush(obstacle: Obstacle) -> void:
+	if obstacle.brushed:
+		return
+	obstacle.brushed = true
+	_sound.play("rustle", -3.0, _rng.randf_range(0.9, 1.15))
 
 
 func _soft_hit(obstacle: Obstacle) -> void:
@@ -876,6 +903,16 @@ func _on_landed(air_time: float, impact: float, spin: float) -> void:
 		_camera.add_shake(clampf(impact * 0.04, 0.0, 0.8))
 		_sled.puff()
 		_rumble(0.3, clampf(impact / 20.0, 0.1, 0.8), 0.15)
+	if _over_cliff:
+		_over_cliff = false
+		var points := CLIFF_BONUS + int(air_time * 40.0)
+		_add_bonus(points)
+		_hud.popup("Du överlevde stupet! +%d" % points, Hud.WARM, 60, 3.0)
+		_sound.play("trick")
+		_camera.add_shake(0.8)
+		_sled.puff()
+		_rumble(0.6, 0.9, 0.35)
+		return
 	var turns := roundi(absf(spin) / PI)
 	if turns >= 2:
 		var degrees := turns * 180
@@ -919,7 +956,7 @@ func _find_region(name: String) -> float:
 	var wanted := {
 		"town": TerrainField.Region.TOWN, "river": TerrainField.Region.RIVER, "park": TerrainField.Region.PARK,
 		"woods": TerrainField.Region.WOODS, "mall": TerrainField.Region.MALL, "rail": TerrainField.Region.RAIL,
-		"airport": TerrainField.Region.AIRPORT, "highway": TerrainField.Region.HIGHWAY, "lake": TerrainField.Region.LAKE, "bandy": TerrainField.Region.BANDY,
+		"airport": TerrainField.Region.AIRPORT, "highway": TerrainField.Region.HIGHWAY, "lake": TerrainField.Region.LAKE, "bandy": TerrainField.Region.BANDY, "cliff": TerrainField.Region.CLIFF,
 	}.get(name, TerrainField.Region.TOWN) as TerrainField.Region
 	var d := 0.0
 	while d < 40000.0:
