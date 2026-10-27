@@ -241,6 +241,27 @@ func add_decor(decor: Dictionary, mesh: Mesh, xform: Transform3D) -> void:
 	(decor[mesh] as Array).append(xform)
 
 
+## Trees this far outside the track edge can still be reached, so they get
+## a collider as well as their batched mesh.
+const TREE_REACH := 35.0
+
+
+## A batched tree that you can also crash into when it stands close enough
+## to the track: an invisible spruce obstacle sized to match.
+func add_tree(chunk: Chunk, decor: Dictionary, mesh: Mesh, xform: Transform3D) -> void:
+	add_decor(decor, mesh, xform)
+	var d := -xform.origin.z
+	if absf(xform.origin.x - field.center_x(d)) - field.half_width(d) > TREE_REACH:
+		return
+	var collider := Obstacle.new().configure(Obstacle.Kind.TREE, Props.Rig.new(), field)
+	collider.position = xform.origin
+	collider.scale = Vector3.ONE * xform.basis.get_scale().x
+	# Skirting the forest edge is not a near miss every few metres.
+	collider.near_miss_done = true
+	chunk.add_child(collider)
+	chunk.obstacles.append(collider)
+
+
 func _flush_decor(chunk: Chunk, decor: Dictionary) -> void:
 	for mesh: Mesh in decor:
 		var xforms: Array = decor[mesh]
@@ -275,16 +296,23 @@ func _track_point(lateral: float, d: float) -> Vector3:
 
 
 func _place_edges(decor: Dictionary, d0: float, d1: float) -> void:
-	var d := ceilf(d0 / 12.0) * 12.0
+	# Swept regions mark the sledding track densely, so it is clear the hill
+	# goes straight on when the tracks or lanes turn away.
+	var swept := TerrainField.CORRIDOR.has(field.region((d0 + d1) * 0.5))
+	var step := 6.0 if swept else 12.0
+	var d := ceilf(d0 / step) * step
 	while d < d1:
 		var kind := field.region(d)
-		if not field.near_road(d, 2.0) and (kind == TerrainField.Region.SLOPE or kind == TerrainField.Region.PARK):
+		var marked := kind == TerrainField.Region.SLOPE or kind == TerrainField.Region.PARK or TerrainField.CORRIDOR.has(kind)
+		if not field.near_road(d, 2.0) and marked:
 			var cx := field.center_x(d)
 			var hw := field.half_width(d)
-			var variant := int(d / 12.0) % 2
-			add_decor(decor, Props.edge_pole(variant), ground_xform(cx - hw - 1.2, d, 0.0))
-			add_decor(decor, Props.edge_pole(variant), ground_xform(cx + hw + 1.2, d, 0.0))
-		d += 12.0
+			var variant := 0 if swept else int(d / 12.0) % 2
+			for side in [-1.0, 1.0]:
+				var x: float = cx + side * (hw + 1.2)
+				if not field.in_corridor(x, d, 1.0):
+					add_decor(decor, Props.edge_pole(variant), ground_xform(x, d, 0.0, 1.4 if swept else 1.0))
+		d += step
 
 
 func street_yaw(d: float) -> float:
@@ -307,8 +335,10 @@ func _place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator,
 		var kind := field.region(d)
 		var nearest := 22.0 if kind == TerrainField.Region.TOWN else (7.0 if kind == TerrainField.Region.RIVER else 3.0)
 		var lx := side * (hw + rng.randf_range(nearest, 90.0 if not forest else 60.0))
+		if field.in_corridor(field.center_x(d) + lx, d, 5.0):
+			continue
 		var mesh: Mesh = Props.birch() if rng.randf() < 0.12 else Props.spruce(rng.randi_range(0, 2))
-		add_decor(decor, mesh, ground_xform(field.center_x(d) + lx, d, rng.randf() * TAU, rng.randf_range(0.8, 1.7), 0.2))
+		add_tree(chunk, decor, mesh, ground_xform(field.center_x(d) + lx, d, rng.randf() * TAU, rng.randf_range(0.8, 1.7), 0.2))
 	var houses := 3 if village else (1 if rng.randf() < 0.7 else 0)
 	for i in houses:
 		var d := rng.randf_range(d0 + 6.0, d1 - 6.0)
@@ -318,6 +348,8 @@ func _place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator,
 		var hw := field.half_width(d)
 		var lx := side * (hw + rng.randf_range(16.0 if village else 24.0, 70.0))
 		var x := field.center_x(d) + lx
+		if field.in_corridor(x, d, 14.0):
+			continue
 		var yaw := (PI / 2.0 if side > 0.0 else -PI / 2.0) + rng.randf_range(-0.3, 0.3)
 		add_decor(decor, Props.house(rng.randi_range(0, 9)), ground_xform(x, d, yaw, 1.0, 0.4))
 		if rng.randf() < 0.5:
@@ -525,7 +557,7 @@ func _place_obstacles(chunk: Chunk, rng: RandomNumberGenerator, d0: float, d1: f
 		var cx := field.center_x(d)
 		var hw := field.half_width(d)
 		var x := cx + rng.randf_range(-hw * 0.95, hw * 0.95)
-		if field.near_ramp(x, d, 4.0):
+		if field.near_ramp(x, d, 4.0) or field.in_corridor(x, d, 2.0):
 			continue
 		var kind := _pick_kind(zone, here, rng)
 		var rig := regions.rig_for(kind, here, rng)

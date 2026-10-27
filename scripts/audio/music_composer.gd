@@ -89,7 +89,7 @@ class Voice:
 	static func bell() -> Voice:
 		return Voice.new(Wave.TRIANGLE, 0.003, 9.0, 0.0, 0.05, 2600.0)
 
-const SONG_COUNT := 4
+const SONG_COUNT := 7
 
 ## E minor polska in 3/4: six eighths per bar.
 const POLSKA_CHORDS := [
@@ -121,12 +121,72 @@ const ARP_CHORDS := [
 	[40, true], [43, false], [38, false], [45, false], [40, true], [43, false], [45, false], [45, false],
 ]
 
+## G major schottis, sixteenth-note grid (16 per bar).
+const SCHOTTIS_CHORDS := [
+	[43, false], [36, false], [38, false], [43, false], [43, false], [40, true], [38, false], [43, false],
+	[36, false], [43, false], [45, true], [38, false], [36, false], [43, false], [38, false], [43, false],
+]
+const SCHOTTIS_MELODY := [
+	[74, 3], [71, 1], [74, 3], [79, 1], [78, 4], [74, 4],
+	[76, 3], [72, 1], [76, 3], [79, 1], [84, 4], [79, 4],
+	[78, 3], [74, 1], [78, 3], [81, 1], [84, 3], [81, 1], [78, 4],
+	[79, 6], [78, 2], [79, 8],
+	[74, 3], [71, 1], [74, 3], [79, 1], [83, 4], [79, 4],
+	[76, 3], [79, 1], [83, 3], [88, 1], [86, 4], [83, 4],
+	[81, 3], [79, 1], [78, 3], [76, 1], [74, 4], [78, 4],
+	[79, 8], [-1, 8],
+	[84, 3], [83, 1], [81, 3], [79, 1], [76, 4], [79, 4],
+	[83, 3], [81, 1], [79, 3], [78, 1], [79, 4], [74, 4],
+	[76, 3], [79, 1], [81, 3], [84, 1], [83, 4], [81, 4],
+	[78, 3], [81, 1], [86, 3], [84, 1], [81, 4], [78, 4],
+	[79, 3], [76, 1], [72, 3], [76, 1], [79, 4], [84, 4],
+	[83, 3], [79, 1], [74, 3], [79, 1], [83, 4], [86, 4],
+	[84, 3], [83, 1], [81, 3], [78, 1], [74, 4], [76, 2], [78, 2],
+	[79, 12], [-1, 4],
+]
+
+## D major fast waltz, six eighths per bar.
+const WALTZ_CHORDS := [
+	[38, false], [38, false], [45, false], [45, false], [43, false], [38, false], [45, false], [38, false],
+	[35, true], [43, false], [38, false], [45, false], [43, false], [38, false], [45, false], [38, false],
+]
+const WALTZ_MELODY := [
+	[74, 2], [78, 2], [81, 2], [86, 4], [81, 2], [81, 2], [79, 2], [76, 2], [73, 4], [76, 2],
+	[79, 2], [83, 2], [86, 2], [86, 4], [78, 2], [76, 2], [79, 2], [85, 2], [86, 4], [-1, 2],
+	[83, 2], [78, 2], [74, 2], [79, 4], [83, 2], [81, 2], [78, 2], [74, 2], [76, 4], [73, 2],
+	[71, 2], [74, 2], [79, 2], [78, 2], [81, 2], [86, 2], [85, 2], [83, 2], [79, 2], [86, 6],
+]
+
+## A minor storm, eight eighths per bar.
+const STORM_CHORDS := [
+	[45, true], [41, false], [36, false], [43, false], [45, true], [41, false], [40, false], [45, true],
+	[38, true], [45, true], [41, false], [43, false], [45, true], [41, false], [40, false], [45, true],
+]
+const STORM_MELODY := [
+	[76, 1], [76, 1], [72, 1], [76, 1], [79, 2], [76, 2],
+	[77, 1], [76, 1], [74, 1], [72, 1], [69, 4],
+	[72, 1], [76, 1], [79, 1], [84, 1], [83, 2], [79, 2],
+	[79, 2], [77, 2], [74, 4],
+	[81, 1], [81, 1], [79, 1], [77, 1], [76, 2], [72, 2],
+	[74, 1], [76, 1], [77, 1], [81, 1], [84, 4],
+	[83, 1], [80, 1], [76, 1], [80, 1], [83, 2], [86, 2],
+	[81, 6], [-1, 2],
+	[77, 1], [81, 1], [86, 1], [81, 1], [77, 2], [74, 2],
+	[76, 1], [72, 1], [76, 1], [81, 1], [79, 2], [76, 2],
+	[77, 2], [76, 1], [74, 1], [72, 2], [77, 2],
+	[79, 2], [83, 2], [86, 4],
+	[88, 1], [86, 1], [84, 1], [83, 1], [81, 2], [76, 2],
+	[77, 1], [81, 1], [84, 1], [81, 1], [77, 4],
+	[76, 2], [80, 2], [83, 2], [88, 2],
+	[81, 4], [-1, 4],
+]
+
 ## A major 12-bar blues, played twice.
 const BOOGIE_CHORDS := [45, 45, 45, 45, 38, 38, 45, 45, 40, 38, 45, 40]
 
 
 static func title(index: int) -> String:
-	return ["Humppa i backen", "Polska på isen", "Fartvind", "Bjällerboogie"][index % SONG_COUNT]
+	return ["Humppa i backen", "Polska på isen", "Fartvind", "Bjällerboogie", "Schottis i spåret", "Kälkvals", "Snöstormen"][index % SONG_COUNT]
 
 
 static func render(index: int) -> AudioStreamWAV:
@@ -137,6 +197,12 @@ static func render(index: int) -> AudioStreamWAV:
 			return _arpeggios()
 		3:
 			return _boogie()
+		4:
+			return _schottis()
+		5:
+			return _waltz()
+		6:
+			return _storm()
 		_:
 			return _humppa()
 
@@ -304,6 +370,97 @@ static func _boogie() -> AudioStreamWAV:
 				_note(buffer, swung_start, length * beat * 0.5, root + 24 + int(note[0]), 0.11, Voice.reed(2000.0))
 				position += length
 	return _finish(buffer, 0.2)
+
+
+## Schottis: oom on beats one and three, chords on two and four, a reedy
+## accordion lead with the dotted lilt, and a flute an octave below.
+static func _schottis() -> AudioStreamWAV:
+	var sixteenth := 60.0 / 148.0 / 4.0
+	var bar := sixteenth * 16.0
+	var buffer := _buffer(bar * SCHOTTIS_CHORDS.size())
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 31
+	for index in SCHOTTIS_CHORDS.size():
+		var chord: Array = SCHOTTIS_CHORDS[index]
+		var root: int = chord[0]
+		var minor: bool = chord[1]
+		var third := 3 if minor else 4
+		var t := index * bar
+		_chord(buffer, t, bar, root + 24, minor, 0.025, Voice.pad())
+		for beat in 4:
+			var at := t + beat * sixteenth * 4.0
+			if beat % 2 == 0:
+				_note(buffer, at, sixteenth * 3.5, root if beat == 0 else root + 7, 0.32, Voice.bass())
+				_note(buffer, at, sixteenth * 3.0, root, 0.14, Voice.sub())
+				_kick(buffer, at)
+			else:
+				for interval in [12, 12 + third, 19]:
+					_note(buffer, at, sixteenth * 2.5, root + interval + 12, 0.05, Voice.stab())
+				_snare(buffer, at, rng)
+			_bells(buffer, at, 0.03, rng)
+			_bells(buffer, at + sixteenth * 3.0, 0.02, rng)
+	_melody(buffer, SCHOTTIS_MELODY, sixteenth, 0.12, Voice.reed(2400.0), 0, 0.97)
+	_melody(buffer, SCHOTTIS_MELODY, sixteenth, 0.05, Voice.lead(), -12)
+	return _finish(buffer, 0.26)
+
+
+## A quick sledding waltz: bass on one, chords on two and three, a flute
+## lead over a music-box ostinato.
+static func _waltz() -> AudioStreamWAV:
+	var eighth := 60.0 / 176.0 / 2.0
+	var bar := eighth * 6.0
+	var buffer := _buffer(bar * WALTZ_CHORDS.size())
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 47
+	for index in WALTZ_CHORDS.size():
+		var chord: Array = WALTZ_CHORDS[index]
+		var root: int = chord[0]
+		var minor: bool = chord[1]
+		var third := 3 if minor else 4
+		var t := index * bar
+		_chord(buffer, t, bar, root + 24, minor, 0.03, Voice.pad())
+		_note(buffer, t, eighth * 1.9, root, 0.32, Voice.bass())
+		_note(buffer, t, eighth * 1.6, root, 0.15, Voice.sub())
+		_kick(buffer, t)
+		for beat in [1, 2]:
+			for interval in [12, 12 + third, 19]:
+				_note(buffer, t + beat * eighth * 2.0, eighth * 1.3, root + interval + 12, 0.04, Voice.stab())
+		for k in 6:
+			var arp: int = [0, third, 7, 12, 7, third][k]
+			_note(buffer, t + k * eighth, eighth * 1.5, root + 36 + arp, 0.035, Voice.bell())
+			_bells(buffer, t + k * eighth, 0.02, rng)
+	_melody(buffer, WALTZ_MELODY, eighth, 0.15, Voice.lead(), 0, 0.97)
+	return _finish(buffer, 0.3)
+
+
+## Driving minor-key storm: pumping octave bass, four on the floor, a
+## harmonica lead and a pad that swells underneath.
+static func _storm() -> AudioStreamWAV:
+	var eighth := 60.0 / 162.0 / 2.0
+	var bar := eighth * 8.0
+	var buffer := _buffer(bar * STORM_CHORDS.size())
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 53
+	for index in STORM_CHORDS.size():
+		var chord: Array = STORM_CHORDS[index]
+		var root: int = chord[0]
+		var minor: bool = chord[1]
+		var third := 3 if minor else 4
+		var t := index * bar
+		_chord(buffer, t, bar, root + 24, minor, 0.04, Voice.pad())
+		for k in 8:
+			var at := t + k * eighth
+			_note(buffer, at, eighth * 0.9, root + (12 if k % 2 == 1 else 0), 0.26, Voice.bass())
+			if k % 2 == 0:
+				_kick(buffer, at)
+			if k % 4 == 2:
+				_snare(buffer, at, rng)
+			_bells(buffer, at, 0.025, rng)
+			var arp: int = [0, 7, 12, third + 12][k % 4]
+			_note(buffer, at, eighth * 0.8, root + 36 + arp, 0.03, Voice.bell())
+	_melody(buffer, STORM_MELODY, eighth, 0.13, Voice.reed(2100.0), 0, 0.96)
+	_melody(buffer, STORM_MELODY, eighth, 0.04, Voice.lead(), 12)
+	return _finish(buffer, 0.28)
 
 
 static func _freq(midi: int) -> float:

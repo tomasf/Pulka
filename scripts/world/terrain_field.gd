@@ -24,10 +24,10 @@ const REGION_STYLE := {
 	Region.PARK: {"width": 27.0, "edge": Edge.BANK, "grip": 1.0, "rough": 0.15, "length": 300.0, "roads": false, "ramps": true},
 	Region.WOODS: {"width": 8.5, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.6, "length": 300.0, "roads": false, "ramps": false},
 	Region.MALL: {"width": 13.0, "edge": Edge.KERB, "grip": 1.0, "rough": 0.0, "length": 230.0, "roads": false, "ramps": false},
-	Region.RAIL: {"width": 14.0, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.3, "length": 280.0, "roads": false, "ramps": false},
+	Region.RAIL: {"width": 14.0, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.0, "length": 280.0, "roads": false, "ramps": false},
 	Region.AIRPORT: {"width": 22.0, "edge": Edge.KERB, "grip": 1.0, "rough": 0.05, "length": 280.0, "roads": false, "ramps": false},
 	Region.LAKE: {"width": 18.0, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.15, "length": 250.0, "roads": false, "ramps": false},
-	Region.HIGHWAY: {"width": 16.0, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.1, "length": 300.0, "roads": false, "ramps": false},
+	Region.HIGHWAY: {"width": 22.0, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.0, "length": 300.0, "roads": false, "ramps": false},
 	Region.BANDY: {"width": 24.0, "edge": Edge.KERB, "grip": 0.35, "rough": 0.0, "length": 200.0, "roads": false, "ramps": false},
 }
 
@@ -140,6 +140,35 @@ func _span_weight(span: Vector3, d: float) -> float:
 	return smoothstep(span.x, span.x + REGION_BLEND, d) * (1.0 - smoothstep(span.y - REGION_BLEND, span.y, d))
 
 
+# --- Swept corridors: rail yards and motorways ---
+
+const SWEEP_LENGTH := 90.0
+const SWEEP_REACH := 75.0
+## Half width of the strip the tracks or lanes occupy.
+const CORRIDOR := {Region.RAIL: 11.0, Region.HIGHWAY: 19.0}
+
+
+## Sideways offset of a swept region's tracks or lanes at distance d: far
+## out to one side at the start, centred in the middle, out the other side
+## at the end.
+func sweep(d: float) -> float:
+	var span := region_span(d)
+	if not CORRIDOR.has(int(span.z)):
+		return 0.0
+	var side := 1.0 if hash01(int(span.x), 51) < 0.5 else -1.0
+	var arriving := 1.0 - smoothstep(span.x, span.x + SWEEP_LENGTH, d)
+	var leaving := smoothstep(span.y - SWEEP_LENGTH, span.y, d)
+	return side * SWEEP_REACH * (arriving - leaving)
+
+
+## True within `margin` metres of the tracks or lanes of a swept region.
+func in_corridor(x: float, d: float, margin := 0.0) -> bool:
+	var kind := int(region_span(d).z)
+	if not CORRIDOR.has(kind):
+		return false
+	return absf(x - center_x(d) - sweep(d)) < float(CORRIDOR[kind]) + margin
+
+
 func style(kind: int) -> Dictionary:
 	return REGION_STYLE.get(kind, {})
 
@@ -188,13 +217,13 @@ func zone(d: float) -> Zone:
 	if cell <= 0:
 		return Zone.OPEN
 	var r := hash01(cell, 3)
-	if r < 0.26:
+	if r < 0.3:
 		return Zone.OPEN
-	if r < 0.48:
+	if r < 0.52:
 		return Zone.FOREST
-	if r < 0.64:
+	if r < 0.6:
 		return Zone.MOGULS
-	if r < 0.83:
+	if r < 0.82:
 		return Zone.VILLAGE
 	return Zone.WILDLIFE
 
@@ -209,7 +238,7 @@ func zone_weight(d: float, which: Zone) -> float:
 
 func bumpiness(d: float) -> float:
 	var wave := 0.5 + 0.5 * sin(d * 0.013 + _phases[3])
-	return wave * wave * wave
+	return wave * wave * wave * wave
 
 
 func base_height(d: float) -> float:
@@ -225,10 +254,13 @@ func height(x: float, d: float, with_ramps := true) -> float:
 	var rough: float = look.rough if weight > 0.0 else 1.0
 	var calm := 1.0 - weight * (1.0 - rough)
 	var h := base_height(d)
-	h += _noise.get_noise_2d(x, d) * (0.3 + 0.9 * bumpiness(d)) * calm
+	# Rails and roads run on smooth ground; the banks beside them stay.
+	if weight > 0.0 and in_corridor(x, d, 8.0):
+		calm = 0.0
+	h += _noise.get_noise_2d(x, d) * (0.25 + 0.55 * bumpiness(d)) * calm
 	var moguls := zone_weight(d, Zone.MOGULS) * (1.0 - weight)
 	if moguls > 0.0:
-		h += moguls * 0.65 * sin(x * 0.62 + d * 0.21) * sin(d * 0.47 - x * 0.18)
+		h += moguls * 0.45 * sin(x * 0.62 + d * 0.21) * sin(d * 0.47 - x * 0.18)
 	h += hump(d) * calm
 	var outside := absf(x - center_x(d)) - half_width(d)
 	if outside > 0.0:

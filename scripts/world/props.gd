@@ -347,7 +347,7 @@ static func house(variant: int) -> ArrayMesh:
 				kit.box(Vector3(0.22, wall_h - bottom, 0.22), Vector3(sx * width * 0.5, (wall_h + bottom) * 0.5, sz * depth * 0.5), trim)
 		var roof_h := 2.4 + width * 0.08
 		kit.prism(Vector3(depth + 0.9, roof_h, width + 0.7), Vector3(0, wall_h + roof_h * 0.5, 0), Color(0.22, 0.22, 0.26), Vector3(0, PI / 2, 0))
-		kit.prism(Vector3(depth + 1.0, roof_h * 0.55, width + 0.8), Vector3(0, wall_h + roof_h * 0.72 + 0.08, 0), Palette.SNOW, Vector3(0, PI / 2, 0))
+		roof_snow(kit, width + 0.8, depth + 0.9, roof_h, wall_h)
 		kit.box(Vector3(0.7, 1.6, 0.7), Vector3(width * 0.25, wall_h + roof_h * 0.75, 0.6), Color(0.55, 0.2, 0.15))
 		kit.box(Vector3(0.8, 0.2, 0.8), Vector3(width * 0.25, wall_h + roof_h * 0.75 + 0.85, 0.6), Palette.SNOW)
 		kit.box(Vector3(1.0, 2.0, 0.1), Vector3(0, 1.0, -depth * 0.5 - 0.03), Color(0.3, 0.2, 0.15))
@@ -492,9 +492,25 @@ static func town_house(variant: int) -> ArrayMesh:
 		var roof_h := 3.0
 		var roof := Color(0.45, 0.16, 0.12) if variant % 2 == 0 else Color(0.22, 0.22, 0.26)
 		kit.prism(Vector3(depth + 0.8, roof_h, width + 0.2), Vector3(0, wall_h + roof_h * 0.5, 0), roof, Vector3(0, PI / 2, 0))
-		kit.prism(Vector3(depth + 0.9, roof_h * 0.55, width + 0.3), Vector3(0, wall_h + roof_h * 0.72 + 0.08, 0), Palette.SNOW, Vector3(0, PI / 2, 0))
+		roof_snow(kit, width + 0.3, depth + 0.8, roof_h, wall_h)
 		kit.box(Vector3(0.7, 1.5, 0.7), Vector3(2.5, wall_h + roof_h * 0.8, 1.2), Color(0.5, 0.25, 0.2))
 		return kit.build())
+
+
+## A blanket of snow lying on both slopes of a gabled roof whose ridge runs
+## along X: `span` eave to eave, `rise` from eaves to ridge.
+static func roof_snow(kit: MeshKit, length: float, span: float, rise: float, eaves_y: float) -> void:
+	var thickness := 0.22
+	var slope := Vector2(span * 0.5, rise).length()
+	for side in [-1.0, 1.0]:
+		var normal := Vector3(0, span * 0.5, side * rise) / slope
+		var down := Vector3(0, -rise, side * span * 0.5) / slope
+		var middle := Vector3(0, eaves_y + rise * 0.5, side * span * 0.25)
+		var basis := Basis(Vector3.RIGHT, normal, Vector3.RIGHT.cross(normal))
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(length, thickness, slope + 0.1)
+		kit.add(mesh, Transform3D(basis, middle + normal * thickness * 0.5 + down * 0.05), Palette.SNOW)
+	kit.cylinder(thickness * 0.9, length, Vector3(0, eaves_y + rise + thickness * 0.35, 0), Palette.SNOW, 10, Vector3(0, 0, PI / 2))
 
 
 ## Christmas lights strung across the street, `span` metres wide.
@@ -730,59 +746,3 @@ static func wax() -> ArrayMesh:
 
 
 # --- The player ---
-
-static func vehicle(model: VehicleSpec.Model) -> ArrayMesh:
-	return cached_mesh("vehicle%d" % model, func() -> ArrayMesh:
-		var kit := MeshKit.new()
-		match model:
-			VehicleSpec.Model.PULKA:
-				var red := Color(0.9, 0.12, 0.12)
-				var rim := red.darkened(0.15)
-				kit.capsule(0.4, 1.45, Vector3(0, 0.1, 0.02), red, Vector3(-PI / 2, 0, 0), Vector3(1, 1, 0.32))
-				for side in [-1.0, 1.0]:
-					kit.capsule(0.05, 1.3, Vector3(0.37 * side, 0.2, 0.05), rim, Vector3(-PI / 2, 0, 0))
-				kit.capsule(0.06, 0.8, Vector3(0, 0.22, 0.66), rim, Vector3(0, 0, PI / 2))
-				kit.capsule(0.09, 0.82, Vector3(0, 0.26, -0.68), rim, Vector3(0, 0, PI / 2))
-				kit.capsule(0.015, 0.5, Vector3(0, 0.3, -0.85), Color(1.0, 0.85, 0.1), Vector3(-1.2, 0, 0))
-			VehicleSpec.Model.STJARTLAPP:
-				kit.box(Vector3(0.5, 0.04, 0.6), Vector3(0, 0.02, 0), Color(0.15, 0.5, 1.0))
-				kit.box(Vector3(0.3, 0.06, 0.06), Vector3(0, 0.06, -0.3), Color(1.0, 0.85, 0.1))
-			VehicleSpec.Model.SNOWRACER:
-				var metal := Color(0.75, 0.78, 0.8)
-				kit.box(Vector3(0.14, 0.05, 0.85), Vector3(0, 0.03, -0.95), metal)
-				kit.box(Vector3(0.14, 0.05, 0.25), Vector3(0, 0.08, -1.42), metal, Vector3(0.6, 0, 0))
-				for side in [-1.0, 1.0]:
-					kit.box(Vector3(0.14, 0.05, 1.05), Vector3(0.32 * side, 0.03, 0.25), metal)
-					kit.box(Vector3(0.06, 0.3, 0.06), Vector3(0.32 * side, 0.18, 0.25), Color(0.2, 0.2, 0.2))
-				kit.box(Vector3(0.28, 0.1, 1.85), Vector3(0, 0.3, -0.25), Color(0.9, 0.1, 0.1))
-				kit.box(Vector3(0.8, 0.08, 0.12), Vector3(0, 0.3, 0.25), Color(0.9, 0.1, 0.1))
-				kit.box(Vector3(0.42, 0.1, 0.55), Vector3(0, 0.4, 0.2), Color(0.12, 0.12, 0.14))
-				kit.cylinder(0.04, 0.5, Vector3(0, 0.5, -0.75), Color(0.2, 0.2, 0.2), 5, Vector3(-0.5, 0, 0))
-				kit.cylinder(0.2, 0.05, Vector3(0, 0.75, -0.65), Color(1.0, 0.82, 0.1), 10, Vector3(-1.0, 0, 0))
-			VehicleSpec.Model.TEFAT:
-				kit.cylinder(0.55, 0.06, Vector3(0, 0.05, 0), Color(0.2, 0.85, 0.35), 12)
-				kit.cylinder(0.6, 0.08, Vector3(0, 0.1, 0), Color(0.15, 0.7, 0.3), 12, Vector3.ZERO, 0.62)
-				for side in [-1.0, 1.0]:
-					kit.box(Vector3(0.18, 0.06, 0.06), Vector3(0.48 * side, 0.15, 0), Color(1.0, 0.85, 0.1))
-		return kit.build())
-
-
-static func rider(jacket: Color, hat: Color) -> ArrayMesh:
-	var kit := MeshKit.new()
-	var pants := Color(0.15, 0.17, 0.3)
-	for side in [-1.0, 1.0]:
-		kit.capsule(0.085, 0.62, Vector3(0.11 * side, 0.1, -0.28), pants, Vector3(-PI / 2, 0, 0))
-		kit.ellipsoid(Vector3(0.08, 0.1, 0.09), Vector3(0.11 * side, 0.14, -0.6), Color(0.2, 0.13, 0.1))
-		kit.capsule(0.06, 0.46, Vector3(0.25 * side, 0.44, -0.17), jacket, Vector3(0.9, 0, 0))
-		kit.sphere(0.07, Vector3(0.25 * side, 0.28, -0.36), hat)
-		kit.sphere(0.022, Vector3(0.055 * side, 0.89, -0.135), Color(0.05, 0.05, 0.05))
-		kit.sphere(0.03, Vector3(0.09 * side, 0.82, -0.12), Color(1.0, 0.6, 0.6))
-	kit.capsule(0.2, 0.62, Vector3(0, 0.4, 0.03), jacket, Vector3(0.12, 0, 0), Vector3(1, 1, 0.85))
-	kit.sphere(0.15, Vector3(0, 0.86, 0), Palette.SKIN)
-	kit.ellipsoid(Vector3(0.03, 0.035, 0.045), Vector3(0, 0.84, -0.15), Palette.SKIN.darkened(0.1))
-	kit.sphere(0.16, Vector3(0, 0.89, 0), hat, Vector3(1, 1.15, 1), 14, 6, true)
-	kit.cylinder(0.163, 0.07, Vector3(0, 0.91, 0), hat.darkened(0.2), 14)
-	kit.sphere(0.065, Vector3(0, 1.09, 0.02), Color(1, 1, 1))
-	kit.cylinder(0.14, 0.09, Vector3(0, 0.69, 0), Color(0.95, 0.95, 0.95), 14)
-	kit.capsule(0.045, 0.42, Vector3(0.1, 0.72, 0.26), Color(0.95, 0.95, 0.95), Vector3(1.2, 0.2, 0))
-	return kit.build()

@@ -159,41 +159,33 @@ static func _bogies(kit: MeshKit, length: float) -> void:
 				kit.cylinder(0.4, 0.15, Vector3(0.75 * side, 0.4, end * (length * 0.5 - 2.2) + axle), Color(0.08, 0.08, 0.08), 12, Vector3(0, 0, PI / 2))
 
 
+## Yellow board with a black arrow pointing straight on, facing +Z.
+static func arrow_board() -> ArrayMesh:
+	return Props.cached_mesh("arrow", func() -> ArrayMesh:
+		var kit := MeshKit.new()
+		for side in [-1.0, 1.0]:
+			kit.cylinder(0.07, 2.6, Vector3(side * 0.8, 1.3, 0), Color(0.5, 0.52, 0.55), 6)
+		kit.box(Vector3(2.0, 2.0, 0.08), Vector3(0, 2.6, 0), Color(1.0, 0.82, 0.05))
+		kit.box(Vector3(0.36, 1.0, 0.1), Vector3(0, 2.35, 0.03), Color(0.05, 0.05, 0.05))
+		kit.prism(Vector3(1.1, 0.7, 0.1), Vector3(0, 3.15, 0.03), Color(0.05, 0.05, 0.05))
+		kit.box(Vector3(2.1, 0.12, 0.25), Vector3(0, 3.65, 0), Palette.SNOW)
+		return kit.build())
+
+
 # --- Motorway ---
 
-## Four metres of steel guardrail along local Z.
-static func guardrail() -> ArrayMesh:
-	return Props.cached_mesh("guardrail", func() -> ArrayMesh:
-		var kit := MeshKit.new()
-		var steel := Color(0.7, 0.72, 0.75)
-		kit.box(Vector3(0.08, 0.32, 4.02), Vector3(0, 0.7, 0), steel)
-		kit.box(Vector3(0.12, 0.85, 0.12), Vector3(0.05, 0.42, 0), Color(0.45, 0.47, 0.5))
-		kit.box(Vector3(0.14, 0.06, 4.02), Vector3(0, 0.88, 0), Palette.SNOW)
-		return kit.build())
-
-
-## Four metres of concrete median barrier along local Z.
-static func median_barrier() -> ArrayMesh:
-	return Props.cached_mesh("median", func() -> ArrayMesh:
-		var kit := MeshKit.new()
-		kit.box(Vector3(0.7, 0.3, 4.02), Vector3(0, 0.15, 0), Color(0.78, 0.78, 0.76))
-		kit.box(Vector3(0.3, 0.6, 4.02), Vector3(0, 0.6, 0), Color(0.8, 0.8, 0.78))
-		kit.box(Vector3(0.34, 0.08, 4.02), Vector3(0, 0.94, 0), Palette.SNOW)
-		return kit.build())
-
-
-## Overhead sign gantry across the motorway, signs facing +Z (uphill).
-static func sign_gantry() -> ArrayMesh:
-	return Props.cached_mesh("gantry", func() -> ArrayMesh:
+## Overhead sign gantry `span` metres across the motorway, signs facing +Z.
+static func sign_gantry(span: int) -> ArrayMesh:
+	return Props.cached_mesh("gantry%d" % span, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var steel := Color(0.55, 0.58, 0.6)
+		var half := span * 0.5
 		for side in [-1.0, 1.0]:
-			kit.box(Vector3(0.4, 8.5, 0.4), Vector3(side * 9.2, 4.25, 0), steel)
-		kit.box(Vector3(19.0, 0.5, 0.5), Vector3(0, 8.5, 0), steel)
-		for side in [-1.0, 1.0]:
-			kit.box(Vector3(7.2, 2.6, 0.15), Vector3(side * 3.9, 7.3, 0.05), Color(0.1, 0.32, 0.7))
-			kit.box(Vector3(7.4, 0.1, 0.4), Vector3(side * 3.9, 8.66, 0.05), Palette.SNOW)
-		kit.box(Vector3(19.2, 0.15, 0.7), Vector3(0, 8.82, 0), Palette.SNOW)
+			kit.box(Vector3(0.45, 8.5, 0.45), Vector3(side * half, 4.25, 0), steel)
+			kit.box(Vector3(7.2, 2.6, 0.15), Vector3(side * 9.75, 7.3, 0.05), Color(0.1, 0.32, 0.7))
+			kit.box(Vector3(7.4, 0.1, 0.4), Vector3(side * 9.75, 8.66, 0.05), Palette.SNOW)
+		kit.box(Vector3(span, 0.5, 0.5), Vector3(0, 8.5, 0), steel)
+		kit.box(Vector3(span, 0.15, 0.7), Vector3(0, 8.82, 0), Palette.SNOW)
 		return kit.build())
 
 
@@ -218,29 +210,54 @@ static func truck(variant: int) -> ArrayMesh:
 
 # --- Airport ---
 
-## Airliner, nose towards -Z, wheels on the ground.
+## Airliner, nose towards -Z, wheels on the ground: a turned fuselage that
+## tapers up into the tail, swept wings and fin, engines under the wings.
 static func plane(variant: int) -> ArrayMesh:
 	return Props.cached_mesh("plane%d" % variant, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var white := Color(0.95, 0.96, 0.97)
-		var tail: Color = [Color(0.1, 0.3, 0.7), Color(0.85, 0.15, 0.15), Color(0.95, 0.7, 0.1)][variant % 3]
-		kit.capsule(1.9, 30.0, Vector3(0, 3.2, 0), white, Vector3(PI / 2, 0, 0))
-		kit.box(Vector3(0.1, 0.5, 22.0), Vector3(1.9, 3.6, 0), Color(0.2, 0.25, 0.35))
-		kit.box(Vector3(0.1, 0.5, 22.0), Vector3(-1.9, 3.6, 0), Color(0.2, 0.25, 0.35))
-		kit.ellipsoid(Vector3(1.4, 0.5, 0.8), Vector3(0, 4.1, -13.3), Color(0.15, 0.2, 0.3), Vector3(0.4, 0, 0))
-		kit.box(Vector3(30.0, 0.4, 5.0), Vector3(0, 2.6, 1.0), white, Vector3(0, 0, 0))
-		kit.box(Vector3(30.2, 0.42, 1.0), Vector3(0, 2.62, -1.0), tail)
+		var livery: Color = [Color(0.1, 0.3, 0.7), Color(0.85, 0.15, 0.15), Color(0.95, 0.7, 0.1)][variant % 3]
+		var grey := Color(0.72, 0.74, 0.78)
+		# Fuselage along -Z: turn the lathe so its axis (local Y) points forward.
+		var body := PackedVector2Array([
+			Vector2(0.0, -16.0), Vector2(0.9, -15.6), Vector2(1.5, -14.6), Vector2(1.85, -12.5),
+			Vector2(1.95, -9.0), Vector2(1.95, 8.0), Vector2(1.7, 11.5), Vector2(1.1, 14.5), Vector2(0.35, 16.5), Vector2(0.0, 16.8),
+		])
+		var along := Basis(Vector3.RIGHT, PI / 2.0)
+		kit.lathe(body, Transform3D(along, Vector3(0, 3.2, 0)), white, 18)
 		for side in [-1.0, 1.0]:
-			kit.cylinder(0.9, 3.4, Vector3(6.5 * side, 1.7, -0.5), Color(0.75, 0.77, 0.8), 14, Vector3(PI / 2, 0, 0))
-			kit.cylinder(0.7, 0.1, Vector3(6.5 * side, 1.7, -2.21), Color(0.1, 0.1, 0.1), 14, Vector3(PI / 2, 0, 0))
-			kit.box(Vector3(0.3, 1.3, 0.3), Vector3(2.0 * side, 0.65, 2.0), Color(0.2, 0.2, 0.22))
-			kit.cylinder(0.45, 0.5, Vector3(2.0 * side, 0.45, 2.0), Color(0.08, 0.08, 0.08), 12, Vector3(0, 0, PI / 2))
-		kit.box(Vector3(10.0, 0.3, 2.8), Vector3(0, 4.0, 14.0), white)
-		kit.box(Vector3(0.4, 6.0, 4.0), Vector3(0, 6.5, 14.5), tail, Vector3(-0.35, 0, 0))
-		kit.box(Vector3(0.25, 1.3, 0.25), Vector3(0, 0.65, -11.0), Color(0.2, 0.2, 0.22))
-		kit.cylinder(0.35, 0.4, Vector3(0, 0.35, -11.0), Color(0.08, 0.08, 0.08), 12, Vector3(0, 0, PI / 2))
-		kit.box(Vector3(2.0, 0.2, 26.0), Vector3(0, 5.15, 0), Palette.SNOW)
+			kit.box(Vector3(0.1, 0.45, 20.0), Vector3(1.9 * side, 3.65, -1.0), Color(0.2, 0.25, 0.35))
+			kit.box(Vector3(0.1, 0.25, 24.0), Vector3(1.88 * side, 3.05, -0.5), livery)
+		kit.ellipsoid(Vector3(1.2, 0.42, 0.9), Vector3(0, 4.05, -13.8), Color(0.15, 0.2, 0.3), Vector3(0.45, 0, 0))
+		# Swept wings (plan view in X/Z, extruded thin in Y).
+		var wing := PackedVector2Array([Vector2(1.5, -3.5), Vector2(15.0, 2.5), Vector2(15.0, 4.0), Vector2(1.5, 2.0)])
+		var flat := Basis(Vector3.RIGHT, PI / 2.0)
+		for side in [-1.0, 1.0]:
+			kit.slab(_mirrored(wing, side), 0.35, Transform3D(flat, Vector3(0, 2.4, 0)), white)
+			kit.cylinder(0.85, 3.2, Vector3(6.3 * side, 1.6, -2.0), grey, 14, Vector3(PI / 2, 0, 0))
+			kit.cylinder(0.65, 0.1, Vector3(6.3 * side, 1.6, -3.62), Color(0.1, 0.1, 0.1), 14, Vector3(PI / 2, 0, 0))
+			kit.box(Vector3(0.25, 0.9, 1.2), Vector3(6.3 * side, 2.2, -1.3), grey)
+			var stabiliser := PackedVector2Array([Vector2(0.5, 12.5), Vector2(6.0, 15.5), Vector2(6.0, 16.6), Vector2(0.5, 15.6)])
+			kit.slab(_mirrored(stabiliser, side), 0.25, Transform3D(flat, Vector3(0, 4.1, 0)), white)
+			kit.box(Vector3(0.3, 1.4, 0.3), Vector3(2.1 * side, 0.7, 1.5), Color(0.2, 0.2, 0.22))
+			kit.cylinder(0.5, 0.55, Vector3(2.1 * side, 0.5, 1.5), Color(0.08, 0.08, 0.08), 14, Vector3(0, 0, PI / 2))
+		# Swept fin, side view in Z/Y.
+		var fin := PackedVector2Array([Vector2(10.5, 0.0), Vector2(16.5, 0.0), Vector2(17.5, 6.5), Vector2(15.0, 6.5)])
+		kit.slab(fin, 0.35, Transform3D(Basis(Vector3.UP, -PI / 2.0), Vector3(0, 4.6, 0)), livery)
+		kit.box(Vector3(0.3, 1.5, 0.3), Vector3(0, 0.75, -11.5), Color(0.2, 0.2, 0.22))
+		kit.cylinder(0.38, 0.45, Vector3(0, 0.4, -11.5), Color(0.08, 0.08, 0.08), 12, Vector3(0, 0, PI / 2))
+		kit.box(Vector3(1.6, 0.15, 22.0), Vector3(0, 5.16, -1.0), Palette.SNOW)
 		return kit.build())
+
+
+## The polygon as is (side +1) or mirrored across X with its winding kept.
+static func _mirrored(polygon: PackedVector2Array, side: float) -> PackedVector2Array:
+	if side > 0.0:
+		return polygon
+	var flipped := PackedVector2Array()
+	for i in range(polygon.size() - 1, -1, -1):
+		flipped.append(Vector2(-polygon[i].x, polygon[i].y))
+	return flipped
 
 
 ## Baggage tractor pulling two carts, nose towards -Z.
@@ -273,7 +290,11 @@ static func cone() -> ArrayMesh:
 static func control_tower() -> ArrayMesh:
 	return Props.cached_mesh("tower", func() -> ArrayMesh:
 		var kit := MeshKit.new()
+		kit.cylinder(4.0, 4.0, Vector3(0, 2.0, 0), Color(0.8, 0.8, 0.82), 16)
+		kit.box(Vector3(0.5, 2.2, 0.1), Vector3(0, 1.1, -4.0), Color(0.3, 0.3, 0.35))
 		kit.cylinder(1.6, 22.0, Vector3(0, 11.0, 0), Color(0.88, 0.88, 0.9), 16, Vector3.ZERO, 1.2)
+		for i in 5:
+			kit.box(Vector3(0.6, 0.9, 0.1), Vector3(0, 5.0 + i * 3.5, -1.45), Color(0.3, 0.45, 0.6, 0.6))
 		kit.cylinder(3.4, 3.0, Vector3(0, 23.5, 0), Color(0.3, 0.45, 0.6, 0.4), 12, Vector3.ZERO, 3.8)
 		kit.cylinder(3.9, 0.5, Vector3(0, 25.2, 0), Color(0.85, 0.86, 0.88), 12)
 		kit.cylinder(3.9, 0.3, Vector3(0, 25.55, 0), Palette.SNOW, 12)

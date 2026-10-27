@@ -5,7 +5,9 @@ enum State { MENU, COUNTDOWN, PLAYING, PAUSED, GAME_OVER }
 
 const START_LIVES := 3
 const MAX_LIVES := 5
-const RESPAWN_DELAY := 2.4
+const RESPAWN_DELAY := 2.8
+## How long a crash line stays readable.
+const CRASH_LINE_HOLD := 3.4
 const START_D := 8.0
 
 const CRASH_LINES := {
@@ -78,6 +80,7 @@ var _start_event := ""
 var _director: EventDirector
 var _touch: TouchControls
 var _bonus_fraction := 0.0
+var _last_crash_line := ""
 var _start_vehicle := -1
 
 
@@ -489,7 +492,7 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		_remember_fullscreen()
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_APPLICATION_PAUSED:
-		if state == State.PLAYING:
+		if state == State.PLAYING and not _autopilot:
 			_set_paused(true)
 
 
@@ -518,30 +521,51 @@ func _on_volume_changed(channel: int, value: float) -> void:
 
 # --- Gameplay events ---
 
+## Velocity change (m/s, after the ride's protection) that knocks you off
+## balance, and that ends in a crash costing a mitten.
+const WIPEOUT_SEVERITY := 3.5
+## Height of the rider's chest above the collision probe.
+const RIDER_CHEST := 0.75
+const CRASH_SEVERITY := 7.5
+const WIPEOUT_LINES := ["Vurpa!", "Hoppla!", "Puh, klarade mig!", "Det där gjorde ont i stoltheten."]
+
+
 func _check_collisions() -> void:
 	var probe := _sled.position + Vector3.UP * 0.3
 	var d := _sled.distance()
 	for obstacle in _world.obstacles_near(d):
-		if not obstacle.visible:
+		if not obstacle.visible or obstacle.hit:
 			continue
 		if obstacle.is_vehicle() and _on_roof(obstacle, probe):
 			_roof_bounce(obstacle)
 			continue
-		if obstacle.is_creature() and not obstacle.hit and _on_head(obstacle, probe):
-			_head_hop(obstacle)
+		if obstacle.landable and _on_top(obstacle, probe):
+			_top_hop(obstacle)
 			continue
-		if _sled.invulnerable_time <= 0.0 and obstacle.overlaps(probe, Sled.RADIUS):
-			_hit_obstacle(obstacle)
+		var contact := _contact(obstacle, probe)
+		if _sled.invulnerable_time <= 0.0 and contact != Vector3.INF:
+			_impact(obstacle, contact)
 			if _sled.crashed:
 				return
 			continue
-		if obstacle.hit or obstacle.near_miss_done:
+		if obstacle.near_miss_done:
 			continue
-		if obstacle.clearance(probe) < 1.7 and probe.y < obstacle.position.y + obstacle.top + 0.8:
+		if obstacle.clearance(probe) < 1.7 and probe.y < obstacle.position.y + obstacle.height() + 0.8:
 			obstacle.close_call = true
 		if obstacle.close_call and -obstacle.position.z < d - 1.5:
 			obstacle.near_miss_done = true
 			_near_miss(obstacle)
+
+
+## Where the ride touches `obstacle`, or INF. Spruces are also checked at
+## the rider's chest, which brushes the low branches the sled slips under.
+func _contact(obstacle: Obstacle, probe: Vector3) -> Vector3:
+	if obstacle.overlaps(probe, Sled.RADIUS):
+		return probe
+	var chest := probe + Vector3.UP * RIDER_CHEST
+	if obstacle.kind == Obstacle.Kind.TREE and obstacle.overlaps(chest, Sled.RADIUS * 0.6):
+		return chest
+	return Vector3.INF
 
 
 ## Coming down from above onto a car is a trampoline, not a crash.
@@ -550,23 +574,27 @@ func _on_roof(obstacle: Obstacle, probe: Vector3) -> bool:
 	return _sled.velocity.y < 1.0 and probe.y > roof - 0.9 and probe.y < roof + 0.8 and obstacle.clearance(probe) < Sled.RADIUS
 
 
-## Coming down on someone's head (or a moose's back) from the air.
-func _on_head(obstacle: Obstacle, probe: Vector3) -> bool:
-	var top := obstacle.position.y + obstacle.top
-	return not _sled.on_ground and probe.y > top - obstacle.top * 0.45 and probe.y < top + 0.8 and obstacle.clearance(probe) < Sled.RADIUS
+## Coming down from the air onto the top of something (a head, a rock).
+func _on_top(obstacle: Obstacle, probe: Vector3) -> bool:
+	var top := obstacle.position.y + obstacle.height()
+	return not _sled.on_ground and _sled.velocity.y < 1.0 and probe.y > top - obstacle.height() * 0.45 and probe.y < top + 0.8 and obstacle.clearance(probe) < Sled.RADIUS
 
 
-## Not a crash: the creature tumbles over, you get a small hop and lose speed.
-func _head_hop(obstacle: Obstacle) -> void:
-	obstacle.react_to_hit(_sled.velocity)
+## Not a crash: people and animals topple, you get a small hop and lose a
+## little speed. Hard things just give you something to bounce off.
+func _top_hop(obstacle: Obstacle) -> void:
 	obstacle.near_miss_done = true
 	_sled.bounce(3.5)
-	_sled.velocity *= 0.85
-	_add_bonus(30)
-	_hud.popup("Hoppsan! +30", Hud.WARM)
-	_sound.play("moose" if obstacle.kind == Obstacle.Kind.MOOSE else "oops", 0.0, _rng.randf_range(1.0, 1.3))
-	_camera.add_shake(0.35)
+	_sled.velocity *= 0.88
+	_camera.add_shake(0.3)
 	_rumble(0.3, 0.3, 0.15)
+	if obstacle.is_creature():
+		obstacle.launch(_sled.travel_velocity() * 0.25 + Vector3.UP * 2.0)
+		_add_bonus(30)
+		_hud.popup("Hoppsan! +30", Hud.WARM)
+		_sound.play("moose" if obstacle.kind == Obstacle.Kind.MOOSE else "oops", 0.0, _rng.randf_range(1.0, 1.3))
+	else:
+		_sound.play("land", 0.0, 1.2)
 
 
 func _roof_bounce(obstacle: Obstacle) -> void:
@@ -594,12 +622,56 @@ func _near_miss(obstacle: Obstacle) -> void:
 	_camera.add_shake(0.2)
 
 
-func _hit_obstacle(obstacle: Obstacle) -> void:
-	if _no_crash and not obstacle.soft:
+## A collision, judged by physics: how fast you close on the obstacle,
+## shared out by the two masses and softened by the ride's protection.
+func _impact(obstacle: Obstacle, probe: Vector3) -> void:
+	if _no_crash and not obstacle.soft and not obstacle.harmless:
 		return
-	obstacle.react_to_hit(_sled.velocity)
+	var travel := _sled.travel_velocity()
+	var heading := Vector3(travel.x, 0.0, travel.z)
+	var normal := obstacle.push_normal(probe, -heading.normalized() if heading.length() > 0.1 else Vector3.BACK)
+	var relative := travel - obstacle.velocity
+	relative.y = 0.0
+	var closing := maxf(-relative.dot(normal), 0.0)
+	var rider := _sled.total_mass()
+	var share := 1.0 if is_inf(obstacle.mass) else obstacle.mass / (obstacle.mass + rider)
+	if obstacle.movable():
+		var thrown := travel * 0.35 - normal * closing * rider / (obstacle.mass + rider) * 1.6
+		obstacle.launch(thrown + Vector3.UP * (2.0 + closing * 0.25))
+	if obstacle.harmless:
+		_sound.play("poff", -6.0, 1.4)
+		return
 	if obstacle.soft:
-		if obstacle.kind == Obstacle.Kind.SNOWMAN:
+		_soft_hit(obstacle)
+		return
+	var severity := closing * share / _sled.spec.protection
+	if obstacle.in_branches(probe):
+		# Branches give way: the thick low ones a little, the top a lot.
+		severity *= obstacle.branch_give(probe)
+	var separation := Sled.RADIUS - obstacle.clearance(probe) + 0.05
+	if severity >= CRASH_SEVERITY:
+		_crash_into(obstacle)
+	elif severity >= WIPEOUT_SEVERITY:
+		_sled.knock(normal, closing * share * 1.2, separation, _rng.randf_range(1.0, 2.0) * (1.0 if _rng.randf() < 0.5 else -1.0))
+		_sled.velocity *= 0.45
+		_sled.bounce(2.0)
+		_sound.play("oops", 0.0, 0.9)
+		_sound.play("land", 2.0, 0.8)
+		_camera.add_shake(0.7)
+		_rumble(0.6, 0.7, 0.3)
+		_hud.popup(WIPEOUT_LINES[_rng.randi_range(0, WIPEOUT_LINES.size() - 1)], Hud.WARM, 52)
+	else:
+		_sled.knock(normal, closing * share * 1.3, separation)
+		_sled.velocity *= 0.92
+		_sound.play("land", -2.0, 1.1)
+		_camera.add_shake(clampf(severity * 0.1, 0.1, 0.4))
+		_rumble(0.3, 0.2, 0.1)
+
+
+func _soft_hit(obstacle: Obstacle) -> void:
+	obstacle.react_to_hit(_sled.velocity)
+	match obstacle.kind:
+		Obstacle.Kind.SNOWMAN:
 			Debris.burst(_world_root, _field, obstacle.position, _sled.velocity * 0.6, 14, 0.28)
 			_sound.play("poff", 2.0)
 			_sled.velocity *= 0.82
@@ -607,20 +679,22 @@ func _hit_obstacle(obstacle: Obstacle) -> void:
 			_hud.popup("Snögubbe-strike! +25", Hud.WARM)
 			_camera.add_shake(0.5)
 			_rumble(0.4, 0.2, 0.2)
-		elif obstacle.kind == Obstacle.Kind.LOG:
+		Obstacle.Kind.LOG:
 			_sled.bounce(4.5)
 			_sled.velocity *= 0.75
 			_sound.play("land", 2.0, 0.8)
 			_camera.add_shake(0.6)
 			_rumble(0.5, 0.6, 0.2)
-		else:
+		_:
 			_sound.play("oops")
 			_hud.popup("Haren hoppade undan!", Hud.COOL)
-		return
+
+
+func _crash_into(obstacle: Obstacle) -> void:
 	match obstacle.kind:
 		Obstacle.Kind.MOOSE:
 			_sound.play("moose", 2.0)
-		Obstacle.Kind.CAR, Obstacle.Kind.PLOW:
+		Obstacle.Kind.CAR, Obstacle.Kind.PLOW, Obstacle.Kind.TRUCK:
 			_sound.play("horn")
 		Obstacle.Kind.PERSON, Obstacle.Kind.KID:
 			_sound.play("oops", 0.0, 1.3)
@@ -641,7 +715,8 @@ func _crash(line: String) -> void:
 	_camera.add_shake(1.0)
 	_atmosphere.flash(Color(1, 1, 1), 0.55)
 	_rumble(0.8, 1.0, 0.45)
-	_hud.popup(line, Hud.HOT, 56)
+	_last_crash_line = line
+	_hud.popup(line, Hud.HOT, 56, CRASH_LINE_HOLD)
 
 
 func _after_crash() -> void:
@@ -669,7 +744,7 @@ func _game_over() -> void:
 	_save.best_score = maxi(_save.best_score, _score())
 	if not _autopilot:
 		_save.store()
-	_hud.show_game_over(GAME_OVER_LINES[_rng.randi_range(0, GAME_OVER_LINES.size() - 1)], _run_distance, _score(), _save.best_distance, record)
+	_hud.show_game_over(GAME_OVER_LINES[_rng.randi_range(0, GAME_OVER_LINES.size() - 1)], _last_crash_line, _run_distance, _score(), _save.best_distance, record)
 	_sound.set_music_ducked(true)
 	_input_cooldown = 0.8
 
@@ -760,7 +835,10 @@ func _on_landed(air_time: float, impact: float, spin: float) -> void:
 			_hud.popup("Luftfärd! %s s +%d" % [("%.1f" % air_time).replace(".", ","), points], Hud.WARM)
 
 
+## Test runs (autopilot, --mute, headless) never shake a connected pad.
 func _rumble(weak: float, strong: float, duration: float) -> void:
+	if _autopilot or _muted or DisplayServer.get_name() == "headless":
+		return
 	for device in Input.get_connected_joypads():
 		Input.start_joy_vibration(device, weak, strong, duration)
 

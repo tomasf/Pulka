@@ -25,7 +25,7 @@ func setup(world: SlopeWorld, span: Vector3) -> MotorwayTraffic:
 		var info: Array = RegionBuilder.MOTORWAY_LANES[lane]
 		var d := span.x + rng.randf_range(0.0, 30.0)
 		while d < span.y:
-			var lorry := rng.randf() < 0.3
+			var lorry := rng.randf() < 0.25
 			var mesh := RegionProps.truck(rng.randi_range(0, 2)) if lorry else Props.car(rng.randi_range(0, Palette.CARS.size() - 1))
 			var vehicle := Obstacle.new().configure(Obstacle.Kind.TRUCK if lorry else Obstacle.Kind.CAR, Props.Rig.of(mesh), world.field)
 			vehicle.follow_terrain = false
@@ -44,7 +44,7 @@ func setup(world: SlopeWorld, span: Vector3) -> MotorwayTraffic:
 			_ds.append(d)
 			_speeds.append(rng.randf_range(float(info[2]), float(info[3])))
 			_honked.append(false)
-			d += rng.randf_range(25.0, 60.0) + (12.0 if lorry else 0.0)
+			d += rng.randf_range(70.0, 150.0) + (15.0 if lorry else 0.0)
 	_place_all()
 	return self
 

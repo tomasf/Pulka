@@ -32,11 +32,12 @@ func place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, 
 		TerrainField.Region.PARK:
 			_place_park(chunk, decor, rng, lo, hi, span)
 		TerrainField.Region.WOODS:
-			_place_woods(decor, rng, lo, hi)
+			_place_woods(chunk, decor, rng, lo, hi)
 		TerrainField.Region.MALL:
 			_place_mall(chunk, decor, rng, lo, hi, span)
 		TerrainField.Region.RAIL:
 			_place_rail(chunk, decor, lo, hi, span)
+			_place_turn_off_arrows(decor, lo, hi, span)
 		TerrainField.Region.AIRPORT:
 			_place_airport(chunk, decor, rng, lo, hi, span)
 		TerrainField.Region.LAKE:
@@ -45,6 +46,7 @@ func place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, 
 			_place_bandy(chunk, decor, rng, lo, hi, span)
 		TerrainField.Region.HIGHWAY:
 			_place_motorway(chunk, decor, rng, lo, hi, span)
+			_place_turn_off_arrows(decor, lo, hi, span)
 
 
 func _place_town(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: float) -> void:
@@ -87,7 +89,7 @@ func _place_town(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo
 		lamp += 18.0
 
 
-func _place_woods(decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: float) -> void:
+func _place_woods(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: float) -> void:
 	for i in int((hi - lo) * 2.2):
 		var d := rng.randf_range(lo, hi)
 		var side := world.random_sign(rng)
@@ -95,7 +97,7 @@ func _place_woods(decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: 
 		gap = gap * gap / 30.0 + 0.9
 		var x := field.center_x(d) + side * (field.half_width(d) + gap)
 		var mesh: Mesh = Props.birch() if rng.randf() < 0.15 else Props.spruce(rng.randi_range(0, 2))
-		world.add_decor(decor, mesh, world.ground_xform(x, d, rng.randf() * TAU, rng.randf_range(1.0, 2.0), 0.2))
+		world.add_tree(chunk, decor, mesh, world.ground_xform(x, d, rng.randf() * TAU, rng.randf_range(1.0, 2.0), 0.2))
 	for i in int((hi - lo) / 12.0):
 		var d := rng.randf_range(lo, hi)
 		var side := world.random_sign(rng)
@@ -253,24 +255,16 @@ func ground_color(kind: TerrainField.Region, x: float, lx: float, d: float, hw: 
 const RAIL_LANES := [-8.0, -2.7, 2.7, 8.0]
 const TRAIN_LANES := [-8.0, 8.0]
 ## Motorway lanes: [offset from the median, direction (+1 downhill), speed range].
-const MOTORWAY_LANES := [[-5.6, 1.0, 13.0, 17.0], [-2.1, 1.0, 17.0, 22.0], [2.1, -1.0, 22.0, 27.0], [5.6, -1.0, 18.0, 23.0]]
-const MOTORWAY_EDGE := 7.8
-## Rail yards and motorways glide in from one side and leave to the other.
-const SWEEP_LENGTH := 90.0
-const SWEEP_REACH := 75.0
+## Right-hand traffic: downhill on the right (+x as you ride), slow lane outermost.
+const MOTORWAY_LANES := [[13.0, 1.0, 13.0, 17.0], [6.5, 1.0, 16.0, 21.0], [-6.5, -1.0, 21.0, 26.0], [-13.0, -1.0, 18.0, 23.0]]
+## Half width of the snowy median strip between the carriageways.
+const MOTORWAY_MEDIAN := 2.6
+const MOTORWAY_EDGE := 17.0
+const SWEEP_LENGTH := TerrainField.SWEEP_LENGTH
 
 
-## Sideways offset of a swept region's tracks or lanes at distance d: far
-## out to one side at the start, centred in the middle, out the other side
-## at the end.
 func sweep(d: float) -> float:
-	var span := field.region_span(d)
-	if span.z != TerrainField.Region.RAIL and span.z != TerrainField.Region.HIGHWAY:
-		return 0.0
-	var side := 1.0 if field.hash01(int(span.x), 51) < 0.5 else -1.0
-	var arriving := 1.0 - smoothstep(span.x, span.x + SWEEP_LENGTH, d)
-	var leaving := smoothstep(span.y - SWEEP_LENGTH, span.y, d)
-	return side * SWEEP_REACH * (arriving - leaving)
+	return field.sweep(d)
 
 
 ## World X of a lane (offset from the middle of the bundle) at distance d.
@@ -303,7 +297,7 @@ func obstacle_table(kind: TerrainField.Region) -> Array:
 		TerrainField.Region.MALL:
 			return [[Obstacle.Kind.PERSON, 5], [Obstacle.Kind.KID, 2], [Obstacle.Kind.CART, 1], [Obstacle.Kind.PLANT, 2]]
 		TerrainField.Region.RAIL:
-			return [[Obstacle.Kind.ROCK, 1], [Obstacle.Kind.PERSON, 1]]
+			return [[Obstacle.Kind.PERSON, 1]]
 		TerrainField.Region.AIRPORT:
 			return [[Obstacle.Kind.CONE, 4], [Obstacle.Kind.PERSON, 1]]
 		TerrainField.Region.LAKE:
@@ -311,7 +305,7 @@ func obstacle_table(kind: TerrainField.Region) -> Array:
 		TerrainField.Region.BANDY:
 			return [[Obstacle.Kind.PERSON, 1]]
 		TerrainField.Region.HIGHWAY:
-			return [[Obstacle.Kind.CONE, 3], [Obstacle.Kind.ROCK, 1]]
+			return [[Obstacle.Kind.CONE, 1]]
 	return []
 
 
@@ -418,6 +412,7 @@ func _spawn_traffic(kind: int, span: Vector3) -> void:
 				if d < span.y - 30.0:
 					world.add_free(AirportTaxiway.new().setup(world, d, rng, offset < 100.0))
 			world.add_free(Flyover.new().setup(world, span))
+			world.add_free(Takeoff.new().setup(world, span))
 
 
 # --- Mall ---
@@ -637,21 +632,36 @@ func _place_airport(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator,
 			world.add_decor(decor, RegionProps.edge_light(Color(0.3, 0.6, 1.0)), world.ground_xform(x, d, 0.0))
 		d += 15.0
 	var hw0 := field.half_width(span.x + 60.0)
-	# [distance, lateral, mesh, turn, follows the slope]
+	# [distance, lateral, mesh, turn, size, follows the slope]
 	var features := [
-		[span.x + 60.0, -(hw0 + 45.0), RegionProps.control_tower(), 0.0, false],
-		[span.x + 150.0, -(hw0 + 70.0), RegionProps.terminal(), -PI / 2.0, true],
-		[span.x + 30.0, hw0 + 9.0, RegionProps.windsock(), 0.0, false],
+		[span.x + 45.0, -(hw0 + 18.0), RegionProps.control_tower(), 0.0, 1.35, false],
+		[span.x + 150.0, -(hw0 + 34.0), RegionProps.terminal(), -PI / 2.0, 1.0, true],
+		[span.x + 30.0, hw0 + 9.0, RegionProps.windsock(), 0.0, 1.0, false],
 	]
 	for i in 3:
-		features.append([span.x + 60.0 + i * 70.0, hw0 + 38.0, RegionProps.plane(rng.randi_range(0, 2)), PI / 2.0, true])
+		features.append([span.x + 115.0 + i * 38.0, -(hw0 + 14.0), RegionProps.plane(rng.randi_range(0, 2)), -PI / 2.0, 1.0, true])
+		features.append([span.x + 60.0 + i * 70.0, hw0 + 24.0, RegionProps.plane(rng.randi_range(0, 2)), PI / 2.0, 1.0, true])
 	for feature: Array in features:
 		var at: float = feature[0]
 		if at >= lo and at < hi:
 			var x: float = field.center_x(at) + float(feature[1])
 			var turn: float = feature[3]
-			var xform := world.slope_xform(x, at, turn, 1.0, 0.5) if feature[4] else world.ground_xform(x, at, turn - world.street_yaw(at))
+			var size: float = feature[4]
+			var xform := world.slope_xform(x, at, turn, size, 0.5) if feature[5] else world.ground_xform(x, at, turn - world.street_yaw(at), size)
 			world.add_decor(decor, feature[2], xform)
+	var numbers := span.x + 44.0
+	if numbers >= lo and numbers < hi:
+		var label := Label3D.new()
+		label.text = "01"
+		label.font_size = 420
+		label.pixel_size = 0.022
+		label.outline_size = 0
+		label.modulate = Color(0.95, 0.95, 0.92)
+		label.shaded = true
+		label.double_sided = false
+		var flat := Transform3D(Basis(Vector3.RIGHT, -PI / 2.0), Vector3(0, 0.07, 0))
+		label.transform = world.slope_xform(field.center_x(numbers), numbers, 0.0) * flat
+		chunk.add_child(label)
 
 
 func _runway_paint(lx: float, d: float, hw: float) -> Color:
@@ -785,6 +795,19 @@ func _rink_paint(lx: float, d: float, hw: float) -> Color:
 	return ice
 
 
+## Arrows pointing straight down the hill where the tracks or lanes start
+## to veer away, on whichever edges are clear of them.
+func _place_turn_off_arrows(decor: Dictionary, lo: float, hi: float, span: Vector3) -> void:
+	for offset in [12.0, 32.0, 52.0]:
+		var at: float = span.y - SWEEP_LENGTH + offset
+		if at < lo or at >= hi:
+			continue
+		for side in [-1.0, 1.0]:
+			var x: float = field.center_x(at) + side * (field.half_width(at) + 3.0)
+			if not field.in_corridor(x, at, 3.0):
+				world.add_decor(decor, RegionProps.arrow_board(), world.ground_xform(x, at, -world.street_yaw(at)))
+
+
 # --- Motorway ---
 
 const MOTORWAY_SIGNS := [
@@ -797,25 +820,23 @@ func _place_motorway(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator
 	var asphalt := Color(0.33, 0.34, 0.37)
 	var white := Color(0.92, 0.92, 0.9)
 	chunk.add_child(_ribbon(lo, hi, -MOTORWAY_EDGE - 0.4, MOTORWAY_EDGE + 0.4, 0.03, asphalt))
-	for edge in [-MOTORWAY_EDGE + 0.3, MOTORWAY_EDGE - 0.3]:
-		var e: float = edge
-		chunk.add_child(_ribbon(lo, hi, e - 0.12, e + 0.12, 0.05, white))
-	for divider in [-3.85, 3.85]:
-		var v: float = divider
-		chunk.add_child(_ribbon(lo, hi, v - 0.1, v + 0.1, 0.05, white, 3.0, 6.0))
-	var d := ceilf(lo / 4.0) * 4.0
-	while d < hi:
-		for lane in [-MOTORWAY_EDGE - 0.6, MOTORWAY_EDGE + 0.6]:
-			var l: float = lane
-			world.add_decor(decor, RegionProps.guardrail(), Transform3D(lane_basis(l, d), lane_point(l, d)))
-		world.add_decor(decor, RegionProps.median_barrier(), Transform3D(lane_basis(0.0, d), lane_point(0.0, d)))
-		d += 4.0
+	# Swedish markings, all white: a wide broken edge line (1 m + 2 m) by the
+	# hard shoulder, a solid line along the median and 3 m + 9 m lane lines.
+	chunk.add_child(_ribbon(lo, hi, -MOTORWAY_MEDIAN, MOTORWAY_MEDIAN, 0.04, Color(0.86, 0.88, 0.93)))
+	for side in [-1.0, 1.0]:
+		var s: float = side
+		var shoulder := s * (MOTORWAY_EDGE - 0.6)
+		chunk.add_child(_ribbon(lo, hi, shoulder - 0.15, shoulder + 0.15, 0.05, white, 1.0, 2.0))
+		var inner := s * (MOTORWAY_MEDIAN + 0.5)
+		chunk.add_child(_ribbon(lo, hi, inner - 0.1, inner + 0.1, 0.05, white))
+		var divider := s * 9.75
+		chunk.add_child(_ribbon(lo, hi, divider - 0.08, divider + 0.08, 0.05, white, 3.0, 9.0))
 	var gantry := ceilf((lo - span.x) / 75.0) * 75.0 + span.x
 	while gantry < hi:
 		var local := gantry - span.x
 		if local > SWEEP_LENGTH and local < span.y - span.x - SWEEP_LENGTH:
 			var xform := Transform3D(lane_basis(0.0, gantry), lane_point(0.0, gantry))
-			world.add_decor(decor, RegionProps.sign_gantry(), xform)
+			world.add_decor(decor, RegionProps.sign_gantry(int(MOTORWAY_EDGE * 2.0 + 3.0)), xform)
 			var texts: Array = MOTORWAY_SIGNS[rng.randi_range(0, MOTORWAY_SIGNS.size() - 1)]
 			for k in 2:
 				var sign := Label3D.new()
@@ -825,7 +846,7 @@ func _place_motorway(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator
 				sign.outline_size = 0
 				sign.shaded = false
 				sign.double_sided = false
-				sign.transform = xform * Transform3D(Basis.IDENTITY, Vector3(-3.9 if k == 0 else 3.9, 7.3, 0.12))
+				sign.transform = xform * Transform3D(Basis.IDENTITY, Vector3(9.75 if k == 0 else -9.75, 7.3, 0.12))
 				chunk.add_child(sign)
 		gantry += 75.0
 

@@ -26,6 +26,10 @@ var visual_spin := 0.0
 var air_spin := 5.0
 var air_gravity := 1.0
 var seat_height := 0.22
+## Weight of the ride itself (the rider adds Sled.RIDER_MASS).
+var mass := 5.0
+## How well the ride shields you in a hit: above 1 shrugs off more.
+var protection := 1.0
 var unlock_distance := 0.0
 var stat_speed := 0.5
 var stat_handling := 0.5
@@ -48,6 +52,8 @@ static func all() -> Array[VehicleSpec]:
 	pulka.jump = 6.5
 	pulka.self_align = 1.2
 	pulka.seat_height = 0.16
+	pulka.mass = 5.0
+	pulka.protection = 1.25
 	pulka.stat_speed = 0.55
 	pulka.stat_handling = 0.6
 	pulka.stat_grip = 0.65
@@ -68,6 +74,8 @@ static func all() -> Array[VehicleSpec]:
 	lapp.wobble = 1.3
 	lapp.air_spin = 7.0
 	lapp.seat_height = 0.05
+	lapp.mass = 0.5
+	lapp.protection = 0.8
 	lapp.stat_speed = 0.8
 	lapp.stat_handling = 0.75
 	lapp.stat_grip = 0.25
@@ -88,6 +96,8 @@ static func all() -> Array[VehicleSpec]:
 	racer.air_spin = 4.0
 	racer.air_gravity = 1.15
 	racer.seat_height = 0.42
+	racer.mass = 12.0
+	racer.protection = 1.45
 	racer.stat_speed = 0.6
 	racer.stat_handling = 0.5
 	racer.stat_grip = 0.95
@@ -109,6 +119,8 @@ static func all() -> Array[VehicleSpec]:
 	saucer.visual_spin = 2.5
 	saucer.air_spin = 9.0
 	saucer.seat_height = 0.12
+	saucer.mass = 1.5
+	saucer.protection = 0.75
 	saucer.unlock_distance = 1500.0
 	saucer.stat_speed = 0.95
 	saucer.stat_handling = 0.4

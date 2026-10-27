@@ -12,6 +12,7 @@ signal skimmed(speed: float)
 signal sank
 
 const GRAVITY := 15.0
+const RIDER_MASS := 60.0
 const RADIUS := 0.55
 const MAX_STEP := 1.0 / 120.0
 ## Below this speed (m/s) open water swallows you instead of throwing you on.
@@ -68,8 +69,8 @@ func _ready() -> void:
 
 func set_vehicle(new_spec: VehicleSpec, rng: RandomNumberGenerator) -> void:
 	spec = new_spec
-	_vehicle_mesh.mesh = Props.vehicle(spec.model)
-	_rider.mesh = Props.rider(Palette.pick(Palette.JACKETS, rng), Palette.pick(Palette.JACKETS, rng))
+	_vehicle_mesh.mesh = RideModels.vehicle(spec.model)
+	_rider.mesh = RideModels.rider(Palette.pick(Palette.JACKETS, rng), Palette.pick(Palette.JACKETS, rng), spec.model)
 	_reset_rider()
 
 
@@ -248,6 +249,18 @@ func _touch_water() -> void:
 	skimmed.emit(current)
 
 
+func total_mass() -> float:
+	return RIDER_MASS + spec.mass
+
+
+## Bumped by something: pushed along `normal` (away from what was hit),
+## nudged out of it, optionally spun round.
+func knock(normal: Vector3, push: float, separation: float, spin := 0.0) -> void:
+	velocity += normal * push
+	position += normal * separation
+	yaw += spin
+
+
 ## Springs the ride back into the air, e.g. off a car roof.
 func bounce(upward: float) -> void:
 	velocity.y = maxf(velocity.y, 0.0) + upward
@@ -315,14 +328,16 @@ func _update_visual(delta: float) -> void:
 	basis = Basis(right, _up, -ahead)
 	_body.rotation.z = -steer_visual * 0.22
 	_body.rotation.x = 0.0 if on_ground else clampf(velocity.y * 0.02, -0.3, 0.3)
-	if spec and spec.visual_spin > 0.0:
-		# Only the saucer itself spins; the rider keeps facing downhill.
-		_visual_spin += spec.visual_spin * delta
-		_vehicle_mesh.rotation.y = _visual_spin
+	# The ride's pose is rebuilt from scratch every frame so nothing a
+	# previous ride left behind can turn it. Only the saucer spins; its rider
+	# keeps facing downhill.
+	var spinning := spec != null and spec.visual_spin > 0.0
+	_visual_spin = wrapf(_visual_spin + spec.visual_spin * delta, 0.0, TAU) if spinning else 0.0
+	_vehicle_mesh.transform = Transform3D(Basis(Vector3.UP, _visual_spin), Vector3.ZERO)
 	if not crashed and _rider:
 		_rider.rotation.z = -steer_visual * 0.25
 		_rider.rotation.x = 0.0
-		_rider.rotation.y = sin(_visual_spin * 0.5) * 0.12 if spec and spec.visual_spin > 0.0 else 0.0
+		_rider.rotation.y = sin(_visual_spin * 0.5) * 0.12 if spinning else 0.0
 	_body.visible = invulnerable_time <= 0.0 or fmod(invulnerable_time, 0.2) < 0.12
 
 

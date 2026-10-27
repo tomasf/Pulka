@@ -13,7 +13,40 @@ func _run() -> void:
 		_simulate(digital)
 	print("--- holding a full turn for 6 s")
 	_hold_turn()
+	print("--- switching rides after the saucer")
+	_switch_rides()
 	quit()
+
+
+## Changing ride must never leave the new one turned from where you face,
+## whatever the previous ride (the saucer spins) left behind.
+func _switch_rides() -> void:
+	var field := TerrainField.new(7)
+	var sled := Sled.new()
+	root.add_child(sled)
+	sled.field = field
+	var saucer: VehicleSpec
+	for spec in VehicleSpec.all():
+		if spec.visual_spin > 0.0:
+			saucer = spec
+	var failures := 0
+	for spec in VehicleSpec.all():
+		sled.set_vehicle(saucer, RandomNumberGenerator.new())
+		sled.place_at(8.0, 0.0, 9.0)
+		sled.frozen = false
+		for frame in 47:
+			sled.step(1.0 / 60.0, 0.0, 0.0, false)
+		sled.set_vehicle(spec, RandomNumberGenerator.new())
+		sled.place_at(8.0, 0.0, 9.0)
+		sled.step(1.0 / 60.0, 0.0, 0.0, false)
+		var ride: Node3D = sled.get("_vehicle_mesh")
+		var nose := -ride.global_basis.z
+		var off := rad_to_deg(nose.signed_angle_to(sled.forward(), Vector3.UP))
+		var turned := spec.visual_spin == 0.0 and absf(off) > 15.0
+		failures += int(turned)
+		print("%-10s ride nose vs facing=%4d°  %s" % [spec.title, int(off), "TURNED" if turned else "ok"])
+	print("heading test: ", "all passed" if failures == 0 else "%d FAILED" % failures)
+	sled.queue_free()
 
 
 ## A player holding one direction must never end up facing uphill.

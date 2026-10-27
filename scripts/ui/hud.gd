@@ -69,6 +69,7 @@ var _menu_best: Label
 var _pause: Control
 var _over: Control
 var _over_title: Label
+var _over_cause: Label
 var _over_body: Label
 var _over_record: Label
 var _time := 0.0
@@ -384,7 +385,7 @@ func show_center(text: String, color := WARM) -> void:
 	tween.tween_property(_center, "modulate:a", 0.0, 0.25)
 
 
-func popup(text: String, color := WARM, size := 44) -> void:
+func popup(text: String, color := WARM, size := 44, hold := POPUP_HOLD) -> void:
 	var note := label(text, size, color, 12)
 	note.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -394,7 +395,7 @@ func popup(text: String, color := WARM, size := 44) -> void:
 	for i in _slot_free_at.size():
 		if _slot_free_at[i] < _slot_free_at[slot]:
 			slot = i
-	_slot_free_at[slot] = now + POPUP_HOLD + 0.5
+	_slot_free_at[slot] = now + hold + 0.5
 	var y := 170.0 + slot * 62.0
 	note.offset_top = y
 	note.offset_bottom = y + 60.0
@@ -403,7 +404,7 @@ func popup(text: String, color := WARM, size := 44) -> void:
 	note.scale = Vector2.ONE * 1.5
 	var tween := note.create_tween()
 	tween.tween_property(note, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_interval(POPUP_HOLD)
+	tween.tween_interval(hold)
 	tween.set_parallel(true)
 	tween.tween_property(note, "modulate:a", 0.0, 0.6)
 	tween.tween_property(note, "offset_top", y - 40.0, 0.6)
@@ -519,6 +520,9 @@ func _build_game_over() -> void:
 	_over = _full_rect()
 	_dim(_over, 0.45)
 	var column := _centered_column(_over, 18)
+	_over_cause = label("", 40, HOT, 12)
+	_over_cause.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(_over_cause)
 	_over_title = label("", 84, WARM, 20)
 	_over_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	column.add_child(_over_title)
@@ -545,7 +549,10 @@ func _button_row(entries: Array) -> CenterContainer:
 	return center
 
 
-func show_game_over(title: String, distance: float, score: int, best_distance: float, record: bool) -> void:
+## `cause` is the line from the final crash, shown above the title.
+func show_game_over(title: String, cause: String, distance: float, score: int, best_distance: float, record: bool) -> void:
+	_over_cause.text = cause
+	_over_cause.visible = cause != ""
 	_over_title.text = title
 	_over_body.text = "Du åkte %s m\n%s poäng\nRekord: %s m" % [group_digits(int(distance)), group_digits(score), group_digits(int(best_distance))]
 	_over_record.visible = record

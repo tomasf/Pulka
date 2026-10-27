@@ -17,18 +17,45 @@ func setup(world: SlopeWorld, at_d: float, rng: RandomNumberGenerator, with_plan
 	_d = at_d
 	var field := world.field
 	_center = field.center_x(at_d)
-	var kit := MeshKit.new()
-	var y := field.height(_center, at_d, false) + 0.03
-	kit.box(Vector3(REACH * 2.0, 0.04, 14.0), Vector3(_center, y, -at_d), Color(0.38, 0.4, 0.44))
-	kit.box(Vector3(REACH * 2.0, 0.05, 0.35), Vector3(_center, y + 0.01, -at_d), Color(1.0, 0.8, 0.1))
-	var strip := MeshInstance3D.new()
-	strip.mesh = kit.build()
-	add_child(strip)
+	add_child(_surface(field, -7.0, 7.0, 0.04, Color(0.38, 0.4, 0.44)))
+	add_child(_surface(field, -0.18, 0.18, 0.06, Color(1.0, 0.8, 0.1)))
 	if with_plane:
 		_add(Obstacle.Kind.PLANE, RegionProps.plane(rng.randi_range(0, 2)), rng.randf_range(-REACH, REACH), 6.0 * (1.0 if rng.randf() < 0.5 else -1.0), -1.5)
 	for i in 2:
 		_add(Obstacle.Kind.TUG, RegionProps.tug(), rng.randf_range(-REACH, REACH), 10.0 * (1.0 if i == 0 else -1.0), 3.5 * (1.0 if i == 0 else -1.0))
 	return self
+
+
+## A strip across the slope between two distance offsets, following the
+## ground (the slope drops several metres across a taxiway's width).
+func _surface(field: TerrainField, from: float, to: float, lift: float, color: Color) -> MeshInstance3D:
+	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var colors := PackedColorArray()
+	var linear := color.srgb_to_linear()
+	linear.a = 1.0
+	var x := -REACH
+	while x < REACH:
+		var corners: Array[Vector3] = []
+		for offset in [from, to]:
+			for step in [0.0, 4.0]:
+				var px: float = _center + x + step
+				var d: float = _d + offset
+				corners.append(Vector3(px, field.height(px, d, false) + lift, -d))
+		_world.triangle(vertices, normals, colors, corners[0], corners[1], corners[2], linear)
+		_world.triangle(vertices, normals, colors, corners[1], corners[3], corners[2], linear)
+		x += 4.0
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_COLOR] = colors
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	mesh.surface_set_material(0, Palette.surface())
+	var instance := MeshInstance3D.new()
+	instance.mesh = mesh
+	return instance
 
 
 func _add(kind: Obstacle.Kind, mesh: Mesh, lateral: float, speed: float, lane: float) -> void:
