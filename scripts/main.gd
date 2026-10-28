@@ -14,8 +14,13 @@ const CRASH_LINES := {
 	Obstacle.Kind.TREE: ["Granen vann.", "Trädkramare!", "Barr i munnen.", "Granen stod där först."],
 	Obstacle.Kind.ROCK: ["Stenhårt!", "Stenen rörde sig inte en millimeter.", "Aj, aj, sten!"],
 	Obstacle.Kind.STUMP: ["Stubben var där först.", "Stubbad!"],
-	Obstacle.Kind.PERSON: ["Ursäkta! Ursäkta!", "Farbror Bengt såg dig inte komma.", "Mormor tappade termosen!"],
-	Obstacle.Kind.KID: ["Barnet skrattade. Du grät.", "Lilla Elsa vann den duellen."],
+	Obstacle.Kind.PERSON: [
+		"Ursäkta! Ursäkta!", "%s såg dig inte komma.", "%s tappade termosen!", "%s spillde ut hela kaffet.",
+		"Förlåt, %s!", "%s ska ringa kommunen om det här.", "%s skakar på huvudet.", "%s hade precis borstat av sig.",
+		"Strike på %s!", "%s skriver ett argt inlägg i Facebookgruppen."],
+	Obstacle.Kind.KID: [
+		"Barnet skrattade. Du grät.", "%s vann den duellen.", "%s ska skvallra för fröken.", "%s vill åka en gång till!",
+		"%s tappade vanten.", "%s står kvar. Du ligger ner."],
 	Obstacle.Kind.DOG: ["Voff!", "Hunden trodde du var en pinne.", "Taxen tog ingen skada. Du däremot..."],
 	Obstacle.Kind.MOOSE: ["Älgen är okej. Det är inte du.", "Skogens konung vinner alltid.", "Du blev älgad."],
 	Obstacle.Kind.DEER: ["Rådjuret blev mest förvånat.", "Bambi: 1, Du: 0"],
@@ -33,6 +38,18 @@ const CRASH_LINES := {
 	Obstacle.Kind.GOAL: ["Självmål!", "Rakt i nätet!"],
 	Obstacle.Kind.TENT: ["Pimpelfiskaren är inte glad.", "Abborrarna skrattar åt dig."],
 }
+## Who you ran into: filled into the `%s` of a person's or child's crash line.
+const PERSON_NAMES := [
+	"Farbror Bengt", "Mormor", "Morfar", "Tant Gunnel", "Farmor Ingrid", "Gunnar från bastuklubben", "Kent-Åke",
+	"Stig-Helmer", "Birgitta i kiosken", "Lasse från lagret", "Rektorn", "Pastor Lennart", "Kerstin med staven",
+	"Sture", "Agneta", "Leif-Olle", "Grannen Ulla", "Ronny", "Lisbeth", "Börje", "Åsa-Nisse", "Göran från styrelsen",
+	"Tant Margit", "Kalle på macken", "Yvonne", "Benny", "Morbror Jan", "Gudrun", "Lars-Erik", "Pirjo", "Ahmed",
+	"Jukka", "Svetlana", "Pappa", "Mamma", "Liftskötaren Roger", "Konditorn Sven", "Fiskaren Torbjörn",
+]
+const KID_NAMES := [
+	"Lilla Elsa", "Lilla Alice", "Lille Nils", "Saga", "Wilma", "Elton", "Liam", "Maja", "Hugo", "Ebba",
+	"Theo", "Selma", "Olle", "Lilla My", "Vincent", "Freja", "Melvin", "Tindra", "Noah", "Alva", "Kevin", "Isak",
+]
 const GAME_OVER_LINES := [
 	"Pulkan har talat.", "Nu får du gå upp igen.", "Snö i nacken, snö i själen.",
 	"Mamma ropar på middag!", "Vantarna är slut.", "Det var ändå ett bra åk.",
@@ -781,7 +798,11 @@ func _crash_into(obstacle: Obstacle) -> void:
 		Obstacle.Kind.PERSON, Obstacle.Kind.KID:
 			_sound.play("oops", 0.0, 1.3)
 	var lines: Array = CRASH_LINES.get(obstacle.kind, ["Krasch!"])
-	_crash(lines[_rng.randi_range(0, lines.size() - 1)])
+	var line: String = lines[_rng.randi_range(0, lines.size() - 1)]
+	if line.contains("%s"):
+		var names: Array = KID_NAMES if obstacle.kind == Obstacle.Kind.KID else PERSON_NAMES
+		line = line % names[_rng.randi_range(0, names.size() - 1)]
+	_crash(line)
 
 
 func _crash(line: String) -> void:

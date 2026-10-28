@@ -124,6 +124,12 @@ static func catenary_mast(reach: int) -> ArrayMesh:
 		return kit.build())
 
 
+## Wooden sleeper under a track, laid out by the thousand.
+static func sleeper() -> ArrayMesh:
+	return Props.cached_mesh("sleeper", func() -> ArrayMesh:
+		return MeshKit.new().box(Vector3(2.4, 0.12, 0.25), Vector3.ZERO, Color(0.35, 0.27, 0.2)).build())
+
+
 static func locomotive() -> ArrayMesh:
 	return Props.cached_mesh("loco", func() -> ArrayMesh:
 		var kit := MeshKit.new()

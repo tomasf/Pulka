@@ -54,6 +54,9 @@ var _free_obstacles: Array[Obstacle] = []
 var _chunks: Dictionary = {}
 ## Chunk index -> ChunkBuild for chunks still being built.
 var _building: Dictionary = {}
+## Budget (microseconds) that must be left this frame to start a building
+## step that cannot be split: scenery, roads and obstacles.
+var _heavy_budget := 0.0
 var _columns := PackedFloat32Array()
 var _chunks_ahead := Quality.chunks_ahead()
 
@@ -100,6 +103,7 @@ func update_world(player_distance: float, delta: float, build_ms := BUILD_MS) ->
 			_building.erase(key)
 	# Nearest first; the ones right ahead are finished whatever it costs.
 	var deadline := Time.get_ticks_usec() + int(build_ms * 1000.0)
+	_heavy_budget = build_ms * 600.0
 	for i in range(current - CHUNKS_BEHIND, current + _chunks_ahead + 1):
 		var urgent := i <= current + URGENT_AHEAD
 		if not urgent and Time.get_ticks_usec() >= deadline:
@@ -184,6 +188,10 @@ func _build(index: int, deadline: float) -> void:
 		var chunk := build.chunk
 		var d0 := build.d0
 		var d1 := build.d1
+		# Scenery, roads and obstacles go in one piece each: start one only
+		# with most of the frame's budget left, or it runs over.
+		if build.stage >= 2 and deadline - Time.get_ticks_usec() < _heavy_budget:
+			return
 		match build.stage:
 			0:
 				if _terrain_heights(build, deadline):

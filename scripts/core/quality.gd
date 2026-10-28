@@ -70,13 +70,13 @@ static func base_fog() -> float:
 ## chase camera in and narrow the view so the ride and what is ahead look big.
 static func camera_zoom() -> float:
 	if is_tv():
-		return 0.85
+		return 0.7
 	return 0.78 if is_mobile() else 1.0
 
 
 static func fov_scale() -> float:
 	if is_tv():
-		return 0.9
+		return 0.8
 	return 0.86 if is_mobile() else 1.0
 
 

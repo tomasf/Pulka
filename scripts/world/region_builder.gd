@@ -260,6 +260,8 @@ func ground_color(kind: TerrainField.Region, x: float, lx: float, d: float, hw: 
 # --- Obstacles ---
 
 const RAIL_LANES := [-8.0, -2.7, 2.7, 8.0]
+## Length of the straight pieces the rails are made of.
+const RAIL_STEP := 2.0
 const TRAIN_LANES := [-8.0, 8.0]
 ## Motorway lanes: [offset from the median, direction (+1 downhill), speed range].
 ## Right-hand traffic: downhill on the right (+x as you ride), slow lane outermost.
@@ -589,7 +591,7 @@ func _floor(lo: float, hi: float, painter: Callable) -> MeshInstance3D:
 # --- Rail yard ---
 
 func _place_rail(chunk: Chunk, decor: Dictionary, lo: float, hi: float, _span: Vector3) -> void:
-	chunk.add_child(_track_mesh(lo, hi))
+	chunk.add_child(_track_mesh(decor, lo, hi))
 	var mast := ceilf(lo / 25.0) * 25.0
 	while mast < hi:
 		for side in [-1.0, 1.0]:
@@ -602,27 +604,38 @@ func _place_rail(chunk: Chunk, decor: Dictionary, lo: float, hi: float, _span: V
 		mast += 25.0
 
 
-## Continuous rails and sleepers that follow the ground, sampled every metre
-## on whole-metre distances so neighbouring chunks join seamlessly.
-func _track_mesh(lo: float, hi: float) -> MeshInstance3D:
+## Continuous rails that follow the ground, with batched sleepers underneath.
+func _track_mesh(decor: Dictionary, lo: float, hi: float) -> MeshInstance3D:
 	var steel := Color(0.5, 0.52, 0.55).srgb_to_linear()
 	steel.a = 1.0
 	var vertices := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
-	var sleepers := MeshKit.new()
-	var sleeper := BoxMesh.new()
-	sleeper.size = Vector3(2.4, 0.12, 0.25)
-	var first := floorf(lo)
-	var last := ceilf(hi)
+	var sleeper := RegionProps.sleeper()
+	# Rails are cut every RAIL_STEP metres from multiples of it, so
+	# neighbouring chunks join seamlessly; the ground under a rail yard is
+	# smooth enough for that.
+	var first := floorf(lo / RAIL_STEP) * RAIL_STEP
+	var last := ceilf(hi / RAIL_STEP) * RAIL_STEP
+	var steps := int(last - first) + 3
 	for lane: float in RAIL_LANES:
+		# Track points every metre, from a metre before `first`.
+		var points := PackedVector3Array()
+		points.resize(steps)
+		for i in steps:
+			points[i] = _track_point(lane, first + i - 1)
 		var previous: Array[Vector3] = []
-		var d := first
-		while d <= last:
-			var center := _track_point(lane, d)
-			var ahead := (_track_point(lane, d + 0.5) - _track_point(lane, d - 0.5)).normalized()
+		for i in range(1, steps - 1):
+			var center := points[i]
+			var ahead := (points[i + 1] - points[i - 1]).normalized()
 			var across := ahead.cross(Vector3.UP).normalized()
 			var up := across.cross(ahead).normalized()
+			if i < steps - 2:
+				var facing := Basis.looking_at(ahead, up)
+				for half in 2:
+					world.add_decor(decor, sleeper, Transform3D(facing, center.lerp(points[i + 1], half * 0.5) - up * 0.02))
+			if (i - 1) % int(RAIL_STEP) != 0:
+				continue
 			# Rail profile: left/right top corners and feet for both rails.
 			var profile: Array[Vector3] = []
 			for side in [-0.72, 0.72]:
@@ -642,11 +655,6 @@ func _track_mesh(lo: float, hi: float) -> MeshInstance3D:
 						world.triangle(vertices, normals, colors, a, c, b, steel)
 						world.triangle(vertices, normals, colors, b, c, e, steel)
 			previous = profile
-			if d < last:
-				for offset in [0.0, 0.5]:
-					var at := _track_point(lane, d + offset) - up * 0.02
-					sleepers.add(sleeper, Transform3D(Basis.looking_at(ahead, up), at), Color(0.35, 0.27, 0.2))
-			d += 1.0
 	var instance := MeshInstance3D.new()
 	if vertices.is_empty():
 		return instance
@@ -655,7 +663,7 @@ func _track_mesh(lo: float, hi: float) -> MeshInstance3D:
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_COLOR] = colors
-	var mesh := sleepers.build()
+	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	mesh.surface_set_material(mesh.get_surface_count() - 1, Palette.surface())
 	instance.mesh = mesh

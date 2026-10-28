@@ -7,10 +7,16 @@ var _vertices := PackedVector3Array()
 var _normals := PackedVector3Array()
 var _colors := PackedColorArray()
 var _indices := PackedInt32Array()
+## Arrays of primitives already added, so one added many times (sleepers,
+## fence posts) is only generated once.
+var _arrays := {}
 
 
 func add(mesh: PrimitiveMesh, xform: Transform3D, color: Color) -> MeshKit:
-	var arrays := mesh.get_mesh_arrays()
+	var arrays: Array = _arrays.get(mesh, [])
+	if arrays.is_empty():
+		arrays = mesh.get_mesh_arrays()
+		_arrays[mesh] = arrays
 	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
