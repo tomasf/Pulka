@@ -1,7 +1,7 @@
 extends SceneTree
 ## Renders one model from three angles side by side.
 ## Run: Godot --path . --script res://tools/mesh_preview.gd -- <name> <out.png>
-## Names: plane, truck, pulka, stjartlapp, snowracer, tefat, wok, rider.
+## Names: plane, truck, loco, pulka, stjartlapp, snowracer, tefat, wok, rider.
 
 
 func _initialize() -> void:
@@ -15,6 +15,8 @@ func _model(name: String) -> Node3D:
 			node.mesh = RegionProps.plane(0)
 		"truck":
 			node.mesh = RegionProps.truck(0)
+		"loco":
+			node.mesh = RegionProps.locomotive()
 		"rider":
 			node.mesh = RideModels.rider(Color(0.9, 0.3, 0.6), Color(0.95, 0.8, 0.1))
 		_:
@@ -46,9 +48,12 @@ func _run() -> void:
 	sun.rotation_degrees = Vector3(-45, 35, 0)
 	sun.shadow_enabled = true
 	world.add_child(sun)
-	var size := 40.0 if name == "plane" or name == "truck" else 1.6
+	var size := 40.0 if name == "plane" or name == "truck" else (12.0 if name == "loco" else 1.6)
 	var image := Image.create(1800, 600, false, Image.FORMAT_RGBA8)
 	var angles := [Vector3(1.0, 0.5, 1.0), Vector3(-1.2, 0.35, -0.6), Vector3(0.0, 0.9, 0.9)]
+	if name == "loco":
+		# Its cab faces -Z: three-quarter, side and straight at the front.
+		angles = [Vector3(1.0, 0.3, -1.0), Vector3(1.0, 0.15, 0.0), Vector3(0.0, 0.15, -1.0)]
 	var model := _model(name)
 	world.add_child(model)
 	var camera := Camera3D.new()

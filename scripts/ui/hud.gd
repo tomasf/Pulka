@@ -371,10 +371,8 @@ func splat() -> void:
 	_popups.add_child(blot)
 	var tween := blot.create_tween()
 	tween.tween_interval(1.0)
-	tween.set_parallel(true)
 	tween.tween_property(blot, "modulate:a", 0.0, 1.2)
-	tween.tween_property(blot, "position:y", blot.position.y + 80.0, 1.2)
-	tween.set_parallel(false)
+	tween.parallel().tween_property(blot, "position:y", blot.position.y + 80.0, 1.2)
 	tween.tween_callback(blot.queue_free)
 
 
@@ -410,10 +408,8 @@ func popup(text: String, color := WARM, size := 44, hold := POPUP_HOLD) -> void:
 	var tween := note.create_tween()
 	tween.tween_property(note, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_interval(hold)
-	tween.set_parallel(true)
 	tween.tween_property(note, "modulate:a", 0.0, 0.6)
-	tween.tween_property(note, "offset_top", y - 40.0, 0.6)
-	tween.set_parallel(false)
+	tween.parallel().tween_property(note, "offset_top", y - 40.0, 0.6)
 	tween.tween_callback(note.queue_free)
 
 

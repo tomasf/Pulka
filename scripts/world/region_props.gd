@@ -130,17 +130,36 @@ static func sleeper() -> ArrayMesh:
 		return MeshKit.new().box(Vector3(2.4, 0.12, 0.25), Vector3.ZERO, Color(0.35, 0.27, 0.2)).build())
 
 
+## Electric locomotive with its cab facing -Z: a flat nose that leans back
+## a little, a raked windscreen, buffers and lamps, a pantograph on the roof.
 static func locomotive() -> ArrayMesh:
 	return Props.cached_mesh("loco", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var paint := Color(0.75, 0.12, 0.12)
-		kit.box(Vector3(3.0, 3.2, 15.0), Vector3(0, 2.3, 0.5), paint)
-		kit.box(Vector3(3.0, 2.2, 1.6), Vector3(0, 1.8, -7.6), paint, Vector3(-0.35, 0, 0))
-		kit.box(Vector3(2.6, 0.9, 0.1), Vector3(0, 3.1, -7.06), Color(0.2, 0.28, 0.38))
-		kit.box(Vector3(3.05, 0.5, 0.2), Vector3(0, 1.2, -8.3), Color(1.0, 0.85, 0.1))
+		var glass := Color(0.2, 0.28, 0.38)
+		var dark := Color(0.12, 0.12, 0.13)
+		# Side profile (z, y), extruded across the width.
+		var profile := PackedVector2Array([
+			Vector2(8.0, 0.7), Vector2(8.0, 3.9), Vector2(-6.6, 3.9),
+			Vector2(-7.4, 2.7), Vector2(-7.6, 1.1), Vector2(-7.5, 0.7),
+		])
+		kit.slab(profile, 3.0, Transform3D(Basis(Vector3.UP, -PI / 2.0), Vector3.ZERO), paint)
+		# Windscreen on the raked part, side windows of the cab.
+		kit.box(Vector3(2.5, 1.0, 0.06), Vector3(0, 3.3, -7.03), glass, Vector3(0.588, 0, 0))
+		kit.box(Vector3(3.04, 0.8, 1.1), Vector3(0, 3.15, -5.9), glass)
+		# A white stripe along the sides and a yellow one across the nose.
+		kit.box(Vector3(3.04, 0.14, 13.8), Vector3(0, 1.75, 0.9), Color(0.95, 0.95, 0.95))
+		kit.box(Vector3(2.9, 0.42, 0.06), Vector3(0, 1.6, -7.56), Color(1.0, 0.85, 0.1), Vector3(0.124, 0, 0))
 		for side in [-1.0, 1.0]:
-			kit.box(Vector3(0.35, 0.25, 0.1), Vector3(0.95 * side, 1.65, -8.35), Palette.HEADLIGHT)
-		kit.box(Vector3(3.1, 0.25, 15.2), Vector3(0, 3.95, 0.5), Palette.SNOW)
+			kit.box(Vector3(0.36, 0.22, 0.08), Vector3(1.0 * side, 1.05, -7.6), Palette.HEADLIGHT)
+			kit.cylinder(0.17, 0.4, Vector3(1.05 * side, 0.6, -7.75), Color(0.25, 0.25, 0.27), 10, Vector3(PI / 2.0, 0, 0))
+		kit.box(Vector3(0.3, 0.2, 0.08), Vector3(0, 3.78, -6.68), Palette.HEADLIGHT)
+		kit.box(Vector3(3.0, 0.35, 0.3), Vector3(0, 0.6, -7.45), dark)
+		kit.box(Vector3(3.1, 0.25, 14.8), Vector3(0, 4.0, 0.7), Palette.SNOW)
+		# Pantograph, folded half up towards the overhead line.
+		kit.box(Vector3(1.2, 0.15, 1.2), Vector3(0, 4.15, 2.5), dark)
+		kit.box(Vector3(0.08, 1.5, 0.08), Vector3(0, 4.85, 2.15), dark, Vector3(-0.55, 0, 0))
+		kit.box(Vector3(1.7, 0.06, 0.12), Vector3(0, 5.5, 1.8), dark)
 		_bogies(kit, 15.0)
 		return kit.build())
 
