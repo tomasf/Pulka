@@ -52,6 +52,7 @@ var _rider_velocity := Vector3.ZERO
 var _rider_spin := Vector3.ZERO
 var _spray: GPUParticles3D
 var _puff: GPUParticles3D
+var _trail: SnowTrail
 var _visual_spin := 0.0
 ## The ground under the ride (normal, height) and where it was sampled; the
 ## physics and the visuals ask for the same spot several times a frame.
@@ -71,11 +72,14 @@ func _ready() -> void:
 	add_child(_spray)
 	_puff = _make_snow_particles(60, 0.8, true)
 	add_child(_puff)
+	_trail = SnowTrail.new()
+	add_child(_trail)
 
 
 func set_vehicle(new_spec: VehicleSpec, rng: RandomNumberGenerator) -> void:
 	spec = new_spec
 	_vehicle_mesh.mesh = RideModels.vehicle(spec.model)
+	_trail.set_model(spec.model)
 	_rider.mesh = RideModels.rider(Palette.pick(Palette.JACKETS, rng), Palette.pick(Palette.JACKETS, rng), spec.model)
 	_reset_rider()
 
@@ -114,6 +118,7 @@ func place_at(d: float, lateral := 0.0, start_speed := 0.0) -> void:
 	_lean = 0.0
 	_ground_time = 1.0
 	_up = field.normal_world(position.x, position.z)
+	_trail.clear()
 	_reset_rider()
 	_update_visual(1.0)
 
@@ -137,6 +142,7 @@ func step(delta: float, steer: float, tuck: float, jump: bool) -> void:
 	invulnerable_time = maxf(0.0, invulnerable_time - delta)
 	_update_visual(delta)
 	_update_particles()
+	_update_trail()
 
 
 func _step_physics(dt: float, steer: float, tuck: float, jump: bool) -> void:
@@ -382,6 +388,21 @@ func _update_particles() -> void:
 	process.direction = (-velocity.normalized() + Vector3.UP * 0.8).normalized() * global_basis
 	process.initial_velocity_min = current * 0.05
 	process.initial_velocity_max = current * 0.15
+
+
+## Tracks in the snow wherever the ride touches it, but not on water or
+## the mall's tiled floor. Ice only takes faint scratches.
+func _update_trail() -> void:
+	var d := distance()
+	if not on_ground or crashed or field.is_water(d) or field.region(d) == TerrainField.Region.MALL:
+		_trail.lift()
+		return
+	# A spinning ride smears along where it is going, not where it points.
+	var along := forward()
+	if spec.spins and Vector2(velocity.x, velocity.z).length() > 1.0:
+		along = Vector3(velocity.x, 0.0, velocity.z).normalized()
+	var up := _surface_normal()
+	_trail.record(position, along.cross(up).normalized(), up, 0.4 if on_ice else 1.0)
 
 
 func puff() -> void:

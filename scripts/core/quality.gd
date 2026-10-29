@@ -66,20 +66,6 @@ static func base_fog() -> float:
 	return 0.0042 if reduced_effects() else 0.0028
 
 
-## Phones have small screens and a TV is far away across the room: pull the
-## chase camera in and narrow the view so the ride and what is ahead look big.
-static func camera_zoom() -> float:
-	if is_tv():
-		return 0.7
-	return 0.78 if is_mobile() else 1.0
-
-
-static func fov_scale() -> float:
-	if is_tv():
-		return 0.8
-	return 0.86 if is_mobile() else 1.0
-
-
 ## Share of the screen resolution the 3D scene renders at, the interface
 ## staying sharp. Apple TV 4K would otherwise draw four times the pixels of
 ## 1080p; lower graphics levels go below that.

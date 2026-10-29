@@ -606,6 +606,9 @@ func _place_rail(chunk: Chunk, decor: Dictionary, lo: float, hi: float, _span: V
 
 ## Continuous rails that follow the ground, with batched sleepers underneath.
 func _track_mesh(decor: Dictionary, lo: float, hi: float) -> MeshInstance3D:
+	# A chunk can end before the yard's tracks start, or start after they end.
+	if hi <= lo:
+		return MeshInstance3D.new()
 	var steel := Color(0.5, 0.52, 0.55).srgb_to_linear()
 	steel.a = 1.0
 	var vertices := PackedVector3Array()

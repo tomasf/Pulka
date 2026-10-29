@@ -55,10 +55,11 @@ func _update_chase(delta: float) -> void:
 	dir = dir.lerp(target.forward(), 0.3).normalized()
 	_look_dir = _look_dir.lerp(dir, 1.0 - exp(-5.0 * delta)).normalized()
 	var sf := _speed_factor()
-	var zoom := Quality.camera_zoom()
-	var distance := lerpf(6.8, 5.0, minf(sf, 1.0)) * zoom
+	# Close in, so the ride and what is ahead look big even on a phone or
+	# a TV across the room.
+	var distance := lerpf(4.4, 3.25, minf(sf, 1.0))
 	# High enough that the rider sits low in the frame and the way ahead shows.
-	var height := lerpf(4.5, 3.6, minf(sf, 1.0)) * zoom
+	var height := lerpf(2.9, 2.35, minf(sf, 1.0))
 	var desired := target.position - _look_dir * distance + Vector3.UP * height
 	desired.y = maxf(desired.y, field.height_world(desired.x, desired.z) + 1.0)
 	var follow := 1.0 - exp(-12.0 * delta)
@@ -67,8 +68,8 @@ func _update_chase(delta: float) -> void:
 	if position.distance_squared_to(look) > 0.01:
 		look_at(look, Vector3.UP)
 	rotate_object_local(Vector3.BACK, -target.steer_visual * 0.06 * minf(sf, 1.0))
-	var boost := 10.0 if target.boost_time > 0.0 else 0.0
-	var wide := (68.0 + 34.0 * pow(minf(sf, 1.2), 1.3) + boost) * Quality.fov_scale()
+	var boost := 8.0 if target.boost_time > 0.0 else 0.0
+	var wide := 53.0 + 26.5 * pow(minf(sf, 1.2), 1.3) + boost
 	fov = lerpf(fov, wide, 1.0 - exp(-3.0 * delta))
 	# Rumble grows with speed, so a ride standing still (countdown) is calm.
 	var bumps := 0.04 if target.on_ground and field.bumpiness(target.distance()) > 0.5 else 0.0
