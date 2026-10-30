@@ -7,7 +7,7 @@ const START_LIVES := 3
 const MAX_LIVES := 5
 const RESPAWN_DELAY := 2.8
 ## How long a crash line stays readable.
-const CRASH_LINE_HOLD := 3.4
+const CRASH_LINE_HOLD := 2.3
 const START_D := 8.0
 
 const CRASH_LINES := {
@@ -50,6 +50,7 @@ const KID_NAMES := [
 	"Lilla Elsa", "Lilla Alice", "Lille Nils", "Saga", "Wilma", "Elton", "Liam", "Maja", "Hugo", "Ebba",
 	"Theo", "Selma", "Olle", "Lilla My", "Vincent", "Freja", "Melvin", "Tindra", "Noah", "Alva", "Kevin", "Isak",
 ]
+const BIRCH_CRASH_LINES := ["Björken vann.", "Trädkramare!", "Näver i munnen.", "Björken stod där först.", "Björken rörde inte en kvist."]
 const GAME_OVER_LINES := [
 	"Pulkan har talat.", "Nu får du gå upp igen.", "Snö i nacken, snö i själen.",
 	"Mamma ropar på middag!", "Vantarna är slut.", "Det var ändå ett bra åk.",
@@ -427,7 +428,7 @@ func _check_cliff(before: float) -> void:
 	if _sled.crashed or before >= edge or _sled.distance() < edge:
 		return
 	_over_cliff = true
-	_hud.popup("AAAAAAAH!", Hud.HOT, 84, 2.5)
+	_hud.popup("AAAAAAAH!", Hud.HOT, 84, 1.7)
 	_sound.play("whoosh", 0.0, 0.7)
 	_camera.add_shake(0.25)
 
@@ -797,12 +798,16 @@ func _crash_into(obstacle: Obstacle) -> void:
 			_sound.play("horn")
 		Obstacle.Kind.PERSON, Obstacle.Kind.KID:
 			_sound.play("oops", 0.0, 1.3)
-	var lines: Array = CRASH_LINES.get(obstacle.kind, ["Krasch!"])
+	var lines := _crash_lines(obstacle)
 	var line: String = lines[_rng.randi_range(0, lines.size() - 1)]
 	if line.contains("%s"):
 		var names: Array = KID_NAMES if obstacle.kind == Obstacle.Kind.KID else PERSON_NAMES
 		line = line % names[_rng.randi_range(0, names.size() - 1)]
 	_crash(line)
+
+
+func _crash_lines(obstacle: Obstacle) -> Array:
+	return BIRCH_CRASH_LINES if obstacle.birch else CRASH_LINES.get(obstacle.kind, ["Krasch!"])
 
 
 func _crash(line: String) -> void:
@@ -928,7 +933,7 @@ func _on_landed(air_time: float, impact: float, spin: float) -> void:
 		_over_cliff = false
 		var points := CLIFF_BONUS + int(air_time * 40.0)
 		_add_bonus(points)
-		_hud.popup("Du överlevde stupet! +%d" % points, Hud.WARM, 60, 3.0)
+		_hud.popup("Du överlevde stupet! +%d" % points, Hud.WARM, 60, 2.0)
 		_sound.play("trick")
 		_camera.add_shake(0.8)
 		_sled.puff()

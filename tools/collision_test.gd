@@ -55,6 +55,7 @@ func _run() -> void:
 		_check("brushing a spruce's top branches is survived", not await _try(main, sled, Obstacle.Kind.TREE, Props.Rig.of(Props.spruce(0)), 5.0, false, false, 20.0))
 		_check("riding through a spruce's low branches only rustles", not await _try(main, sled, Obstacle.Kind.TREE, Props.Rig.of(Props.spruce(0)), 0.0, true, false, 15.0, 1.6) and not _touched and _brushed)
 		_check("trees beside the track can be hit", _edge_trees_are_solid(main))
+		_check("a birch has no spruce branches or spruce crash lines", _birch_is_not_a_spruce(main))
 		_check("cones are harmless", not await _try(main, sled, Obstacle.Kind.CONE, Props.Rig.of(RegionProps.cone()), 0.0, true, false, 25.0) and _flew)
 		_check("landing on a rock is survived", not await _try(main, sled, Obstacle.Kind.ROCK, Props.Rig.of(Props.rock(0)), 0.8, false))
 		_check("a pulka shrugs off what floors a tefat", await _protection_matters(main, sled))
@@ -109,6 +110,26 @@ func _try(main: Node, sled: Sled, kind: Obstacle.Kind, rig: Props.Rig, height: f
 
 
 ## The batched trees just outside the track edge carry colliders too.
+func _birch_is_not_a_spruce(main: Node) -> bool:
+	var world: SlopeWorld = main.get("_world")
+	var chunk := Chunk.new()
+	world.add_child(chunk)
+	var d := world.player_d
+	var at := Vector3(world.field.center_x(d), 0.0, -d)
+	world.add_tree(chunk, {}, Props.birch(), Transform3D(Basis.IDENTITY, at))
+	world.add_tree(chunk, {}, Props.spruce(0), Transform3D(Basis.IDENTITY, at))
+	var birch: Obstacle = chunk.obstacles[0]
+	var spruce: Obstacle = chunk.obstacles[1]
+	var beside := at + Vector3(1.0, 1.5, 0.0)
+	var lines: Array = main.call("_crash_lines", birch)
+	var pine_free := true
+	for line: String in lines:
+		pine_free = pine_free and not line.contains("Barr") and not line.contains("Gran")
+	var passed := birch.birch and not spruce.birch and pine_free and not birch.in_branches(beside) and birch.clearance(beside) > 0.5 and spruce.clearance(beside) == 0.0
+	chunk.free()
+	return passed
+
+
 func _edge_trees_are_solid(main: Node) -> bool:
 	var field: TerrainField = main.get("_field")
 	var world: SlopeWorld = main.get("_world")

@@ -19,5 +19,5 @@ void fragment() {
 	float rays = 0.55 + 0.45 * sin(UV.x * 160.0 + wave * 6.0 + TIME * 0.8);
 	vec3 color = mix(vec3(0.1, 1.0, 0.45), vec3(0.55, 0.25, 1.0), smoothstep(0.65, 0.1, UV.y));
 	float edge = smoothstep(0.0, 0.08, UV.x) * smoothstep(1.0, 0.92, UV.x);
-	ALBEDO = color * band * rays * edge * strength * 1.4;
+	ALBEDO = color * band * rays * edge * strength * 0.85;
 }

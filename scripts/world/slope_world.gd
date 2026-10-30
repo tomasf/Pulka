@@ -345,6 +345,8 @@ func add_tree(chunk: Chunk, decor: Dictionary, mesh: Mesh, xform: Transform3D) -
 	var collider := Obstacle.new().configure(Obstacle.Kind.TREE, Props.Rig.new(), field)
 	collider.position = xform.origin
 	collider.scale = Vector3.ONE * xform.basis.get_scale().x
+	if mesh == Props.birch():
+		collider.make_birch()
 	# Skirting the forest edge is not a near miss every few metres.
 	collider.near_miss_done = true
 	chunk.add_child(collider)

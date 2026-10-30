@@ -30,6 +30,7 @@ var landable := true
 var flying := false
 ## Set once the ride has rustled through this spruce's branches.
 var brushed := false
+var birch := false
 var radius := 0.6
 var top := 2.0
 ## Non-zero for box colliders: half size along local x and z.
@@ -174,9 +175,17 @@ func height() -> float:
 	return top * (scale.y if kind == Kind.TREE else 1.0)
 
 
+## A tree that is a birch rather than a spruce: a slim bare trunk with no
+## skirt of branches to ride through.
+func make_birch() -> void:
+	birch = true
+	radius = 0.22
+	top = 5.0
+
+
 ## True if p is up among a spruce's branches rather than at its trunk.
 func in_branches(p: Vector3) -> bool:
-	return kind == Kind.TREE and p.y - position.y > BRANCHES_FROM * scale.y
+	return kind == Kind.TREE and not birch and p.y - position.y > BRANCHES_FROM * scale.y
 
 
 ## Horizontal direction from the obstacle towards p (the way a hit pushes).
@@ -273,7 +282,7 @@ func clearance(p: Vector3) -> float:
 	if kind == Kind.TREE:
 		var h := (p.y - position.y) / scale.y
 		var reach := radius * scale.x
-		if h > BRANCHES_FROM:
+		if h > BRANCHES_FROM and not birch:
 			reach = 1.6 * scale.x * maxf(1.0 - (h - BRANCHES_FROM) / (top - BRANCHES_FROM), 0.0)
 		return maxf(sqrt(dx * dx + dz * dz) - reach, 0.0)
 	if half_extents != Vector2.ZERO:

@@ -8,7 +8,14 @@ const HOT := Color(1.0, 0.35, 0.2)
 const COOL := Color(0.6, 0.9, 1.0)
 const INK := Color(0.08, 0.1, 0.2)
 ## Seconds a pop-up message stays fully visible before fading.
-const POPUP_HOLD := 2.4
+const POPUP_HOLD := 1.6
+## Pop-ups stack in at most this many rows, so they never cover the game.
+const POPUP_ROWS := 3
+const POPUP_TOP := 170.0
+const POPUP_ROW_SPACING := 54.0
+const POPUP_ROW_HEIGHT := 52.0
+## Share of a pop-up's asked-for font size it is drawn at.
+const POPUP_TEXT_SCALE := 0.85
 
 
 class Mittens extends Control:
@@ -27,6 +34,13 @@ class Mittens extends Control:
 			draw_rect(Rect2(origin + Vector2(4, 16), Vector2(30, 3)), stripe)
 			draw_rect(Rect2(origin + Vector2(4, 23), Vector2(30, 3)), stripe)
 			draw_circle(origin + Vector2(36, 20), 6.0, color)
+
+
+## One pop-up line and what is animating it.
+class PopupNote extends RefCounted:
+	var label: Label
+	var life: Tween
+	var slide: Tween
 
 
 ## A splat of snow on the "lens" after a snowball hit.
@@ -61,7 +75,8 @@ var _speed_unit: Label
 var _mittens: Mittens
 var _center: Label
 var _popups: Control
-var _slot_free_at: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0]
+## The pop-ups on screen, oldest (top row) first.
+var _notes: Array[PopupNote] = []
 
 var _menu: Control
 var _menu_vehicle: Label
@@ -392,29 +407,51 @@ func show_center(text: String, color := WARM) -> void:
 	tween.tween_property(_center, "modulate:a", 0.0, 0.25)
 
 
+## Shows a callout under the ones already up, the oldest at the top. A full
+## stack pushes its oldest out, and the rest move up as each one leaves.
 func popup(text: String, color := WARM, size := 44, hold := POPUP_HOLD) -> void:
-	var note := label(text, size, color, 12)
-	note.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	# Use the slot that frees up first so long-lived notes never overlap.
-	var now := Time.get_ticks_msec() / 1000.0
-	var slot := 0
-	for i in _slot_free_at.size():
-		if _slot_free_at[i] < _slot_free_at[slot]:
-			slot = i
-	_slot_free_at[slot] = now + hold + 0.5
-	var y := 170.0 + slot * 62.0
-	note.offset_top = y
-	note.offset_bottom = y + 60.0
-	_popups.add_child(note)
-	note.pivot_offset = Vector2(get_viewport().get_visible_rect().size.x * 0.5, 30)
-	note.scale = Vector2.ONE * 1.5
-	var tween := note.create_tween()
-	tween.tween_property(note, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_interval(hold)
-	tween.tween_property(note, "modulate:a", 0.0, 0.6)
-	tween.parallel().tween_property(note, "offset_top", y - 40.0, 0.6)
-	tween.tween_callback(note.queue_free)
+	if _notes.size() >= POPUP_ROWS:
+		_retire_note(_notes[0])
+	var note := PopupNote.new()
+	note.label = label(text, roundi(size * POPUP_TEXT_SCALE), color, 10)
+	note.label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	note.label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var y := _note_y(_notes.size())
+	note.label.offset_top = y
+	note.label.offset_bottom = y + POPUP_ROW_HEIGHT
+	_popups.add_child(note.label)
+	_notes.append(note)
+	note.label.pivot_offset = Vector2(get_viewport().get_visible_rect().size.x * 0.5, POPUP_ROW_HEIGHT * 0.5)
+	note.label.scale = Vector2.ONE * 1.5
+	note.life = note.label.create_tween()
+	note.life.tween_property(note.label, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	note.life.tween_interval(hold)
+	note.life.tween_callback(_retire_note.bind(note))
+
+
+## Takes a note out of the stack: it fades away upwards as the rest close up.
+func _retire_note(note: PopupNote) -> void:
+	_notes.erase(note)
+	note.life.kill()
+	note.label.scale = Vector2.ONE
+	_slide_note(note, note.label.offset_top - POPUP_ROW_HEIGHT, 0.4)
+	note.life = note.label.create_tween()
+	note.life.tween_property(note.label, "modulate:a", 0.0, 0.4)
+	note.life.tween_callback(note.label.queue_free)
+	for i in _notes.size():
+		_slide_note(_notes[i], _note_y(i), 0.2)
+
+
+func _slide_note(note: PopupNote, y: float, seconds: float) -> void:
+	if note.slide != null:
+		note.slide.kill()
+	note.slide = note.label.create_tween()
+	note.slide.tween_property(note.label, "offset_top", y, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	note.slide.parallel().tween_property(note.label, "offset_bottom", y + POPUP_ROW_HEIGHT, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+func _note_y(row: int) -> float:
+	return POPUP_TOP + row * POPUP_ROW_SPACING
 
 
 # --- Menu ---
