@@ -884,7 +884,7 @@ func _check_pickups() -> void:
 				_cookie_timer = 1.5
 				_add_bonus(10 * mini(_cookie_streak, 6))
 				_sound.play("coin", -4.0, 1.0 + 0.06 * mini(_cookie_streak, 8))
-			Pickup.Kind.COCOA:
+			Pickup.Kind.MITTEN:
 				_lives = mini(_lives + 1, MAX_LIVES)
 				_sound.play("cocoa")
 			Pickup.Kind.WAX:

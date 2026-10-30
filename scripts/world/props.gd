@@ -726,13 +726,27 @@ static func gingerbread() -> ArrayMesh:
 		return kit.build())
 
 
-static func cocoa() -> ArrayMesh:
-	return cached_mesh("cocoa", func() -> ArrayMesh:
+## A red knitted mitten like the ones counting your lives: a rounded palm,
+## a thumb sticking out, white stripes and a fluffy cuff.
+static func mitten() -> ArrayMesh:
+	return cached_mesh("mitten", func() -> ArrayMesh:
 		var kit := MeshKit.new()
-		kit.cylinder(0.25, 0.45, Vector3.ZERO, Color(0.9, 0.15, 0.2), 8)
-		kit.cylinder(0.22, 0.02, Vector3(0, 0.22, 0), Color(0.4, 0.22, 0.1), 8)
-		kit.sphere(0.12, Vector3(0.05, 0.27, 0), Color(1, 1, 1), Vector3(1, 0.6, 1), 6, 3)
-		kit.box(Vector3(0.08, 0.28, 0.06), Vector3(0.3, 0, 0), Color(0.95, 0.95, 0.95))
+		var wool := Color(0.92, 0.18, 0.2)
+		var white := Color(1, 1, 1)
+		kit.ellipsoid(Vector3(0.21, 0.25, 0.12), Vector3(0, 0.1, 0), wool)
+		kit.ellipsoid(Vector3(0.185, 0.18, 0.11), Vector3(0, -0.06, 0), wool)
+		kit.capsule(0.065, 0.26, Vector3(0.21, 0.03, 0), wool, Vector3(0, 0, -0.55))
+		# Stripes wrap round the hand, poking just through its surface.
+		kit.ellipsoid(Vector3(0.216, 0.038, 0.124), Vector3(0, 0.1, 0), white)
+		kit.ellipsoid(Vector3(0.208, 0.038, 0.12), Vector3(0, 0.0, 0), white)
+		# A straight ribbed cuff, flattened like the hand.
+		var cuff := CylinderMesh.new()
+		cuff.top_radius = 1.0
+		cuff.bottom_radius = 1.0
+		cuff.height = 0.14
+		cuff.radial_segments = 16
+		cuff.rings = 1
+		kit.add(cuff, Transform3D(Basis.from_scale(Vector3(0.2, 1.0, 0.125)), Vector3(0, -0.21, 0)), white)
 		return kit.build())
 
 

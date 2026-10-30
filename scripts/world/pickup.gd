@@ -1,9 +1,9 @@
 class_name Pickup
 extends Node3D
-## Collectibles: gingerbread for points, hot cocoa for an extra life and
+## Collectibles: gingerbread for points, a mitten for an extra life and
 ## turbo wax for a burst of speed.
 
-enum Kind { GINGERBREAD, COCOA, WAX }
+enum Kind { GINGERBREAD, MITTEN, WAX }
 
 const RADIUS := 1.3
 
@@ -23,9 +23,10 @@ func configure(which: Kind, at: Vector3) -> Pickup:
 	match which:
 		Kind.GINGERBREAD:
 			_visual.mesh = Props.gingerbread()
-		Kind.COCOA:
-			_visual.mesh = Props.cocoa()
+		Kind.MITTEN:
+			_visual.mesh = Props.mitten()
 			_visual.scale = Vector3.ONE * 1.6
+			_visual.rotation.z = 0.2
 		Kind.WAX:
 			_visual.mesh = Props.wax()
 			_visual.scale = Vector3.ONE * 1.6

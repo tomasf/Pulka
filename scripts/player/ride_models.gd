@@ -206,29 +206,30 @@ static func rider(jacket: Color, hat: Color, model := VehicleSpec.Model.PULKA) -
 	return kit.build()
 
 
+## A simple round cartoon face: dark oval eyes with a glint, a small nose
+## and smile, hair round the back and a beanie that sits above the eyes.
 static func _head(kit: MeshKit, at: Vector3, hat: Color) -> void:
 	var skin := Palette.SKIN
 	kit.sphere(0.15, at, skin, Vector3(1.0, 1.02, 0.97), 16, 10)
+	kit.ellipsoid(Vector3(0.152, 0.125, 0.122), at + Vector3(0, 0.012, 0.042), HAIR)
 	for side in [-1.0, 1.0]:
-		kit.sphere(0.035, at + Vector3(0.148 * side, -0.01, 0.0), skin.darkened(0.05), Vector3(0.6, 1, 1), 8, 5)
-		var eye := at + Vector3(0.055 * side, 0.02, -0.128)
-		kit.sphere(0.03, eye, Color(1, 1, 1), Vector3(1, 1.1, 0.6), 10, 6)
-		kit.sphere(0.018, eye + Vector3(0, -0.002, -0.014), INK, Vector3.ONE, 8, 5)
-		kit.sphere(0.006, eye + Vector3(-0.007 * side, 0.008, -0.03), Color(1, 1, 1, 0.0), Vector3.ONE, 6, 4)
-		kit.box(Vector3(0.05, 0.012, 0.015), eye + Vector3(0.0, 0.045, -0.002), HAIR, Vector3(0, 0, -0.18 * side))
-		kit.sphere(0.03, at + Vector3(0.095 * side, -0.045, -0.105), Color(1.0, 0.58, 0.58), Vector3(1, 0.7, 0.5), 8, 5)
-		kit.ellipsoid(Vector3(0.05, 0.03, 0.04), at + Vector3(0.12 * side, 0.03, 0.04), HAIR)
-	kit.ellipsoid(Vector3(0.028, 0.032, 0.04), at + Vector3(0, -0.015, -0.15), skin.darkened(0.08))
-	for k in 5:
-		var t := (k - 2) / 2.0
-		kit.sphere(0.008, at + Vector3(t * 0.035, -0.07 + t * t * 0.015, -0.135), INK, Vector3.ONE, 6, 4)
+		kit.sphere(0.032, at + Vector3(0.147 * side, -0.02, 0.012), skin.darkened(0.05), Vector3(0.55, 1, 0.9), 8, 5)
+		var eye := at + Vector3(0.056 * side, 0.002, -0.13)
+		kit.ellipsoid(Vector3(0.017, 0.024, 0.01), eye, INK)
+		kit.sphere(0.006, eye + Vector3(0.005, 0.009, -0.009), Color(1, 1, 1, 0.0), Vector3.ONE, 6, 4)
+		kit.box(Vector3(0.042, 0.009, 0.012), at + Vector3(0.058 * side, 0.042, -0.128), HAIR)
+		kit.sphere(0.03, at + Vector3(0.088 * side, -0.042, -0.097), skin.lerp(Color(1.0, 0.5, 0.5), 0.45), Vector3(1, 0.65, 0.3), 8, 5)
+	kit.ellipsoid(Vector3(0.019, 0.017, 0.022), at + Vector3(0, -0.022, -0.146), skin.lerp(Color(1.0, 0.55, 0.5), 0.2))
+	for k in 6:
+		var t := (k - 2.5) / 2.5
+		kit.box(Vector3(0.0135, 0.0075, 0.006), at + Vector3(t * 0.03, -0.07 + t * t * 0.012, -0.128 + t * t * 0.006), INK, Vector3(0, 0, atan(0.8 * t)))
 	# Beanie with a folded cuff and a fluffy pom-pom.
-	kit.sphere(0.162, at + Vector3(0, 0.035, 0.005), hat, Vector3(1, 1.18, 1), 16, 8, true)
-	kit.cylinder(0.166, 0.075, at + Vector3(0, 0.055, 0.005), hat.darkened(0.2), 20)
+	kit.sphere(0.15, at + Vector3(0, 0.072, 0.003), hat, Vector3(1, 1.12, 1), 16, 8, true)
+	kit.cylinder(0.153, 0.066, at + Vector3(0, 0.09, 0.003), hat.darkened(0.2), 20)
 	for i in 8:
 		var angle := TAU * i / 8.0
-		kit.box(Vector3(0.012, 0.07, 0.01), at + Vector3(cos(angle) * 0.167, 0.055, sin(angle) * 0.167), hat.darkened(0.3), Vector3(0, -angle, 0))
-	var pom := at + Vector3(0, 0.235, 0.01)
+		kit.box(Vector3(0.008, 0.062, 0.006), at + Vector3(cos(angle) * 0.153, 0.09, 0.003 + sin(angle) * 0.153), hat.darkened(0.3), Vector3(0, -angle, 0))
+	var pom := at + Vector3(0, 0.26, 0.01)
 	for offset in [Vector3.ZERO, Vector3(0.03, -0.01, 0), Vector3(-0.025, 0.0, 0.02), Vector3(0, 0.02, -0.025)]:
 		kit.sphere(0.045, pom + offset, Color(1, 1, 1), Vector3.ONE, 8, 5)
 

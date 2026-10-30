@@ -22,6 +22,10 @@ class Mittens extends Control:
 			draw_rect(Rect2(origin + Vector2(4, 30), Vector2(30, 10)), Color(1, 1, 1) if i < lives else color)
 			draw_circle(origin + Vector2(19, 14), 15.0, color)
 			draw_rect(Rect2(origin + Vector2(4, 14), Vector2(30, 18)), color)
+			# The same white stripes as the mittens you pick up on the slope.
+			var stripe := Color(1, 1, 1) if i < lives else color.lightened(0.3)
+			draw_rect(Rect2(origin + Vector2(4, 16), Vector2(30, 3)), stripe)
+			draw_rect(Rect2(origin + Vector2(4, 23), Vector2(30, 3)), stripe)
 			draw_circle(origin + Vector2(36, 20), 6.0, color)
 
 
