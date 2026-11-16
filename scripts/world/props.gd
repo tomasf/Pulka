@@ -399,6 +399,11 @@ static func moose() -> Rig:
 	return cached_rig("moose", func() -> Rig: return Rig.creature("moose", {}, 2.6))
 
 
+## A brown bear, lumbering across the slope.
+static func bear() -> Rig:
+	return cached_rig("bear", func() -> Rig: return Rig.creature("bear", {}, 1.5))
+
+
 static func deer() -> Rig:
 	return cached_rig("deer", func() -> Rig: return Rig.creature("deer", {}, 1.6))
 

@@ -167,6 +167,56 @@ class ModelKit:
             parts.append(ModelKit.ellipsoid("pom", h + (Vector((0, 0.27, 0.01)) + Vector(offset)) * r, (0.045 * r,) * 3, "white", segments=10, rings=6))
         return ModelKit.join(parts, "face")
 
+    @staticmethod
+    def sculpt(objects, name, voxel=0.02, smoothing=6, roughness=0.0, keep=0.25):
+        """Melts overlapping shapes into one smooth body, like clay: a voxel
+        remesh joins them, smoothing rounds off the joins, a little noise
+        (`roughness`, in metres) roughs up the surface like fur, and
+        decimation (`keep`, the share of faces kept) thins it out."""
+        obj = ModelKit.join(objects, name)
+        remesh = obj.modifiers.new("remesh", "REMESH")
+        remesh.mode = "VOXEL"
+        remesh.voxel_size = voxel
+        smooth = obj.modifiers.new("smooth", "SMOOTH")
+        smooth.iterations = smoothing
+        smooth.factor = 0.6
+        if roughness > 0.0:
+            texture = bpy.data.textures.new(name + "_fur", "CLOUDS")
+            texture.noise_scale = 0.06
+            displace = obj.modifiers.new("fur", "DISPLACE")
+            displace.texture = texture
+            displace.strength = roughness
+            displace.mid_level = 0.5
+        decimate = obj.modifiers.new("decimate", "DECIMATE")
+        decimate.ratio = keep
+        ModelKit._apply_modifiers(obj)
+        obj.data.materials.clear()
+        bpy.ops.object.shade_smooth()
+        return obj
+
+    @staticmethod
+    def paint(obj, name, shade):
+        """Colours a body vertex by vertex: `shade(position)` gives the sRGB
+        colour at each Godot-space position. The body gets a material
+        `name` that shows those colours."""
+        mesh = obj.data
+        layer = mesh.color_attributes.new("Col", "FLOAT_COLOR", "POINT")
+        for v in mesh.vertices:
+            world = obj.matrix_world @ v.co
+            r, gg, b = shade(Vector((world.x, world.z, -world.y)))
+            linear = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in (r, gg, b)]
+            layer.data[v.index].color = (linear[0], linear[1], linear[2], 1.0)
+        mat = bpy.data.materials.new(name)
+        mat.use_nodes = True
+        nodes = mat.node_tree.nodes
+        bsdf = nodes.get("Principled BSDF")
+        colour = nodes.new("ShaderNodeVertexColor")
+        colour.layer_name = "Col"
+        mat.node_tree.links.new(colour.outputs["Color"], bsdf.inputs["Base Color"])
+        bsdf.inputs["Roughness"].default_value = 0.9
+        mesh.materials.append(mat)
+        return obj
+
     # --- Rigging ---
 
     @staticmethod

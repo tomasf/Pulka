@@ -28,6 +28,14 @@ func _init(kind: String) -> void:
 		var mesh := node as MeshInstance3D
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		_meshes.append(mesh)
+		# Painted bodies (a bear's shaded coat) carry their colours in the
+		# vertices; the import leaves the material ignoring them.
+		for surface in mesh.mesh.get_surface_count():
+			var original := mesh.mesh.surface_get_material(surface) as StandardMaterial3D
+			if original != null and mesh.mesh.surface_get_format(surface) & Mesh.ARRAY_FORMAT_COLOR:
+				var painted := original.duplicate() as StandardMaterial3D
+				painted.vertex_color_use_as_albedo = true
+				mesh.set_surface_override_material(surface, painted)
 	for name: String in LOOPS:
 		if _player.has_animation(name):
 			_player.get_animation(name).loop_mode = Animation.LOOP_LINEAR
@@ -129,6 +137,7 @@ func bake(animation: StringName, fraction: float) -> ArrayMesh:
 			plain[Mesh.ARRAY_VERTEX] = vertices
 			plain[Mesh.ARRAY_NORMAL] = normals
 			plain[Mesh.ARRAY_INDEX] = arrays[Mesh.ARRAY_INDEX]
+			plain[Mesh.ARRAY_COLOR] = arrays[Mesh.ARRAY_COLOR]
 			baked.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, plain)
 			var material := mesh.get_surface_override_material(surface)
 			baked.surface_set_material(baked.get_surface_count() - 1, material if material != null else mesh.mesh.surface_get_material(surface))

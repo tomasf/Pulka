@@ -126,9 +126,17 @@ static func _entries(group: String) -> Array:
 		["new tefat", func() -> Node3D: return _ride3d(VehicleSpec.Model.TEFAT)],
 	]
 	groups["creatures"] = []
-	for kind in ["person", "moose", "deer", "reindeer", "dog", "hare"]:
+	for kind in ["person", "moose", "deer", "reindeer", "dog", "hare", "bear"]:
 		for anim in [["walk", 0.0], ["walk", 0.5], ["idle", 0.3], ["wave", 0.2], ["gallop", 0.3], ["hop", 0.5], ["flail", 0.3]]:
 			groups["creatures"].append(["%s %s" % [kind, anim[0]], func() -> Node3D: return _creature(kind, anim[0], anim[1])])
+	groups["bear"] = []
+	for anim in [["walk", 0.0], ["walk", 0.5], ["idle", 0.3], ["flail", 0.3]]:
+		groups["bear"].append(["bear %s" % anim[0], func() -> Node3D: return _creature("bear", anim[0], anim[1])])
+	groups["bear"].append(["bear face", func() -> Node3D: return _viewed(_creature("bear", "idle", 0.0), Vector3(0.25, 0.1, -1))])
+	groups["bear"].append(["bear paw", func() -> Node3D:
+		var bear := _creature("bear", "idle", 0.0)
+		bear.set_meta("frame", AABB(Vector3(-0.5, 0, -1.0), Vector3(1.0, 0.5, 1.0)))
+		return _viewed(bear, Vector3(-0.6, 0.35, -1))])
 	groups["shops"] = []
 	for i in Shops.MALL.size():
 		groups["shops"].append(["mall%d" % i, func() -> Node3D: return _front(Shops.mall_front(i))])

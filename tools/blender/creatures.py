@@ -218,6 +218,41 @@ class QuadrupedModel:
             ]
         rig = K.armature(spec["name"], bones)
 
+        if spec.get("sculpt"):
+            coat = spec["sculpt"](spec)
+            legs = []
+        else:
+            coat, legs = QuadrupedModel.tubes(spec)
+
+        rigid = []
+        for name, s, end in QuadrupedModel.LEGS:
+            z = front_z if end == "front" else back_z
+            if spec.get("paws"):
+                rigid.append((QuadrupedModel.paw(spec, width * s, z), "leg_%s_lower" % name))
+                continue
+            hoof = K.ellipsoid("hoof", (width * s, spec["hoof_height"] * 0.5 + 0.01, z - 0.01), (spec["ankle_r"] * 1.15, spec["hoof_height"] * 0.5 + 0.01, spec["ankle_r"] * 1.4), spec.get("hoof", "hoof"), segments=10, rings=6)
+            rigid.append((hoof, "leg_%s_lower" % name))
+        head_parts = spec["extras"]()
+        rigid.append((K.join(head_parts, "head_parts"), "head"))
+        K.weigh(rig, [coat] + legs, rigid)
+
+        K.animate(rig, "walk", 24, lambda r, t: QuadrupedModel.trot(r, t, spec))
+        K.animate(rig, "idle", 60, QuadrupedModel.idle)
+        if spec.get("gallop"):
+            K.animate(rig, "gallop", 16, QuadrupedModel.gallop)
+        if spec.get("hop"):
+            K.animate(rig, "hop", 20, QuadrupedModel.hop)
+        K.animate(rig, "flail", 16, QuadrupedModel.flail)
+        return rig
+
+    @staticmethod
+    def tubes(spec):
+        """The plain way to make a coat: the body one smooth chain from rump
+        to nose, legs and tail apart (see build)."""
+        width = spec["leg_width"]
+        front_z, back_z = spec["front_z"], spec["back_z"]
+        hip_y, knee_y = spec["hip_y"], spec["knee_y"]
+        body = spec["body"]
         # The body is one smooth chain from rump to nose. Each leg and the
         # tail are their own smooth parts, starting inside the body so the
         # joins are hidden; a paler sock covers the lower leg where the
@@ -241,24 +276,21 @@ class QuadrupedModel:
         tail = spec["tail"]
         tail_root = Vector(tail[0]) + (Vector(tail[0]) - Vector(tail[1])).normalized() * tail[2] * 1.5
         legs.append(K.skin("tail", [tuple(tail_root), tail[0], tail[1]], [(0, 1), (1, 2)], [(tail[2] * 0.8, tail[2] * 0.8), (tail[2], tail[2]), (tail[3], tail[3])], spec.get("tail_material", "fur"), subdivisions=1))
+        return coat, legs
 
-        rigid = []
-        for name, s, end in QuadrupedModel.LEGS:
-            z = front_z if end == "front" else back_z
-            hoof = K.ellipsoid("hoof", (width * s, spec["hoof_height"] * 0.5 + 0.01, z - 0.01), (spec["ankle_r"] * 1.15, spec["hoof_height"] * 0.5 + 0.01, spec["ankle_r"] * 1.4), spec.get("hoof", "hoof"), segments=10, rings=6)
-            rigid.append((hoof, "leg_%s_lower" % name))
-        head_parts = spec["extras"]()
-        rigid.append((K.join(head_parts, "head_parts"), "head"))
-        K.weigh(rig, [coat] + legs, rigid)
-
-        K.animate(rig, "walk", 24, lambda r, t: QuadrupedModel.trot(r, t, spec))
-        K.animate(rig, "idle", 60, QuadrupedModel.idle)
-        if spec.get("gallop"):
-            K.animate(rig, "gallop", 16, QuadrupedModel.gallop)
-        if spec.get("hop"):
-            K.animate(rig, "hop", 20, QuadrupedModel.hop)
-        K.animate(rig, "flail", 16, QuadrupedModel.flail)
-        return rig
+    @staticmethod
+    def paw(spec, x, z):
+        """A big furry foot: a rounded paw reaching a little forward of the
+        leg, a dark pad under it and four short claws at the front."""
+        r = spec["ankle_r"]
+        h = spec["hoof_height"]
+        parts = [K.ellipsoid("paw", (x, h * 0.75, z - r * 0.35), (r * 1.2, h * 0.85, r * 1.55), spec.get("paw", "fur"), segments=14, rings=8)]
+        parts.append(K.ellipsoid("pad", (x, h * 0.18, z - r * 0.3), (r * 1.05, h * 0.2, r * 1.35), "hoof", segments=12, rings=4))
+        for k in range(4):
+            across = (k - 1.5) * r * 0.5
+            tip = (x + across, h * 0.12, z - r * 1.85)
+            parts.append(K.tube("claw", (x + across, h * 0.45, z - r * 1.5), tip, r * 0.13, "claw", end_radius=r * 0.03, vertices=6))
+        return K.join(parts, "paw")
 
     @staticmethod
     def trot(rig, t, spec):
@@ -459,6 +491,89 @@ class Animals:
         }
 
 
+class Bear:
+    """A brown bear: heavy and low, a hump over the shoulders, a big head
+    with a pale-tipped muzzle and round ears, thick legs on dark paws.
+    Its body is sculpted: many overlapping masses melted into one."""
+
+    @staticmethod
+    def sculpt(spec):
+        width = spec["leg_width"]
+        parts = []
+        # Torso: a long barrel, the masses that make it a bear on top.
+        parts.append(K.skin("torso", [(0, 0.92, 0.82), (0, 0.97, 0.4), (0, 0.98, -0.08), (0, 0.97, -0.45), (0, 1.0, -0.8)], [(0, 1), (1, 2), (2, 3), (3, 4)], [(0.33, 0.33), (0.42, 0.42), (0.44, 0.44), (0.42, 0.42), (0.28, 0.28)], "fur", subdivisions=1))
+        parts.append(K.ellipsoid("hump", (0, 1.22, -0.42), (0.3, 0.2, 0.36), "fur"))
+        parts.append(K.ellipsoid("withers", (0, 1.12, -0.15), (0.34, 0.18, 0.3), "fur"))
+        parts.append(K.ellipsoid("belly", (0, 0.72, 0.05), (0.34, 0.2, 0.52), "fur"))
+        parts.append(K.ellipsoid("chest", (0, 0.76, -0.48), (0.31, 0.26, 0.26), "fur"))
+        parts.append(K.ellipsoid("rump", (0, 1.0, 0.72), (0.36, 0.3, 0.34), "fur"))
+        for side in (-1, 1):
+            parts.append(K.ellipsoid("haunch", (0.2 * side, 0.9, 0.62), (0.18, 0.3, 0.3), "fur", rotation=(0.2, 0, 0)))
+            parts.append(K.ellipsoid("shoulder", (0.23 * side, 0.92, -0.48), (0.16, 0.28, 0.24), "fur", rotation=(-0.15, 0, 0)))
+        # Neck and head: a thick scruff, a broad skull with a brow and full
+        # cheeks, a tapering muzzle, small round ears.
+        parts.append(K.ellipsoid("scruff", (0, 1.06, -0.82), (0.29, 0.26, 0.24), "fur"))
+        parts.append(K.ellipsoid("skull", (0, 1.08, -1.1), (0.22, 0.2, 0.21), "fur"))
+        parts.append(K.ellipsoid("brow", (0, 1.15, -1.2), (0.16, 0.07, 0.08), "fur"))
+        for side in (-1, 1):
+            parts.append(K.ellipsoid("cheek", (0.14 * side, 1.0, -1.08), (0.11, 0.12, 0.12), "fur"))
+            parts.append(K.ellipsoid("ear", (0.16 * side, 1.25, -1.02), (0.07, 0.07, 0.05), "fur"))
+        parts.append(K.tube("muzzle", (0, 1.02, -1.2), (0, 0.95, -1.43), 0.105, "fur", end_radius=0.075, vertices=16))
+        parts.append(K.ellipsoid("tail", (0, 1.0, 1.12), (0.07, 0.06, 0.08), "fur"))
+        # Legs as thick columns down to the paws, where the rig puts them.
+        for name, s, end in QuadrupedModel.LEGS:
+            z = spec["front_z"] if end == "front" else spec["back_z"]
+            lean = spec.get("hock", 0.0) if end == "back" else -spec.get("knee", 0.0)
+            top = (width * s * 0.8, spec["hip_y"] + 0.1, z)
+            knee = (width * s, spec["knee_y"], z + lean)
+            ankle = (width * s, spec["hoof_height"] + 0.02, z - 0.02)
+            parts.append(K.skin("leg", [top, knee, ankle], [(0, 1), (1, 2)], [(spec["thigh"], spec["thigh"]), (spec["knee_r"], spec["knee_r"]), (spec["ankle_r"] * 1.1, spec["ankle_r"] * 1.1)], "fur", subdivisions=1))
+        body = K.sculpt(parts, "coat", voxel=0.018, smoothing=8, roughness=0.018, keep=0.18)
+
+        def shade(p):
+            fur = Vector((0.36, 0.24, 0.15))
+            # Darker down the legs, grizzled lighter over the hump and back,
+            # a warmer brown on the face, a pale tip to the muzzle.
+            legs = max(0.0, min(1.0, (0.6 - p.y) / 0.45))
+            back = max(0.0, min(1.0, (p.y - 1.05) / 0.2))
+            face = max(0.0, min(1.0, (-p.z - 0.95) / 0.2))
+            snout = max(0.0, min(1.0, (-p.z - 1.3) / 0.1))
+            colour = fur.lerp(Vector((0.2, 0.13, 0.08)), legs * 0.8)
+            colour = colour.lerp(Vector((0.52, 0.39, 0.26)), back * 0.6)
+            colour = colour.lerp(Vector((0.42, 0.29, 0.18)), face * 0.5)
+            colour = colour.lerp(Vector((0.6, 0.47, 0.34)), snout)
+            return colour
+
+        return K.paint(body, "fur_shaded", shade)
+
+    @staticmethod
+    def spec():
+        colors = {"fur": (0.36, 0.24, 0.15), "dark": (0.22, 0.14, 0.09), "muzzle": (0.55, 0.42, 0.3), "hoof": (0.16, 0.11, 0.08), "ink": (0.03, 0.03, 0.03), "white": (1, 1, 1), "claw": (0.85, 0.8, 0.7), "paw": (0.21, 0.135, 0.085)}
+
+        def extras():
+            K.colors = colors
+            parts = [K.ellipsoid("nose", (0, 0.97, -1.455), (0.05, 0.04, 0.035), "ink", segments=10, rings=6)]
+            for s in (-1, 1):
+                # Small dark eyes set on the face either side of the muzzle.
+                parts.append(K.ellipsoid("eye", (0.11 * s, 1.11, -1.27), (0.026, 0.026, 0.02), "ink", segments=10, rings=6))
+                parts.append(K.ellipsoid("glint", (0.117 * s, 1.12, -1.285), (0.007, 0.007, 0.005), "white", segments=6, rings=4))
+                parts.append(K.ellipsoid("ear_inner", (0.16 * s, 1.25, -1.07), (0.04, 0.04, 0.02), "dark", segments=10, rings=6))
+            return parts
+
+        return {
+            "name": "bear", "colors": colors, "extras": extras, "lower": "fur", "hoof": "hoof", "paws": True, "paw": "paw", "sculpt": Bear.sculpt,
+            "front_z": -0.55, "back_z": 0.55, "hip_y": 0.78, "knee_y": 0.38, "hoof_height": 0.09, "leg_width": 0.26,
+            "upper_drop": 0.12, "thigh": 0.21, "knee_r": 0.14, "ankle_r": 0.12, "hock": 0.08, "knee": 0.02, "swing": 0.32,
+            "body": [
+                ((0, 0.92, 0.78), (0.36, 0.38)), ((0, 0.98, 0.4), (0.44, 0.47)), ((0, 1.0, -0.05), (0.46, 0.5)),
+                ((0, 1.02, -0.48), (0.42, 0.48)), ((0, 0.98, -0.85), (0.24, 0.26)), ((0, 1.0, -1.12), (0.25, 0.24)),
+                ((0, 0.92, -1.32), (0.12, 0.11)),
+            ],
+            "rump_joint": 1, "chest_joint": 3, "neck_joint": 4,
+            "tail": ((0, 0.98, 0.95), (0, 0.94, 1.02), 0.06, 0.04),
+        }
+
+
 class Creatures:
     """Builds and exports every creature into a folder."""
 
@@ -466,8 +581,8 @@ class Creatures:
     def export_all(folder):
         PersonModel.build()
         K.export(os.path.join(folder, "person.glb"))
-        for name in ("moose", "deer", "reindeer", "dog", "hare"):
-            QuadrupedModel.build(getattr(Animals, name)())
+        for name in ("moose", "deer", "reindeer", "dog", "hare", "bear"):
+            QuadrupedModel.build(Bear.spec() if name == "bear" else getattr(Animals, name)())
             K.export(os.path.join(folder, name + ".glb"))
             print("Wrote", name)
 
@@ -479,7 +594,7 @@ if __name__ == "__main__":
         PersonModel.build()
         K.export(os.path.join(out, "person.glb"))
     elif only:
-        QuadrupedModel.build(getattr(Animals, only)())
+        QuadrupedModel.build(Bear.spec() if only == "bear" else getattr(Animals, only)())
         K.export(os.path.join(out, only + ".glb"))
     else:
         Creatures.export_all(out)

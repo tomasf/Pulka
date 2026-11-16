@@ -34,6 +34,9 @@ const CRASH_LINES := {
 	Obstacle.Kind.DOG: ["Voff!", "Hunden trodde du var en pinne.", "Taxen tog ingen skada. Du däremot..."],
 	Obstacle.Kind.MOOSE: ["Älgen är okej. Det är inte du.", "Skogens konung vinner alltid.", "Du blev älgad."],
 	Obstacle.Kind.DEER: ["Rådjuret blev mest förvånat.", "Bambi: 1, Du: 0"],
+	Obstacle.Kind.BEAR: [
+		"Du väckte björnen. Grattis.", "Björnen ville bara sova.", "Det var inte Nalle Puh.",
+		"Skogens tyngsta kram.", "Björnen har inte gått i ide än. Nu vet du varför.", "Mästerbrumm vann."],
 	Obstacle.Kind.CAR: ["Tuuut! Bilen hade företräde.", "Titta åt båda hållen nästa gång!", "Pulka mot Volvo. Volvo vann."],
 	Obstacle.Kind.PLOW: ["Plogbilen plogade dig.", "Du blev en snövall."],
 	Obstacle.Kind.BIN: ["Soptunnan tog hand om dig.", "Rätt i återvinningen!"],
@@ -105,6 +108,8 @@ var _start_event := ""
 var _director: EventDirector
 var _touch: TouchControls
 var _start_vehicle := -1
+## Testing aid: a kind of obstacle made common (Obstacle.Kind), or -1.
+var _spawn_kind := -1
 ## Everyone riding: one player alone, two in a split-screen race.
 var _players: Array[Player] = []
 ## Two-player mode is chosen on the menu; a race is on while it is set.
@@ -162,6 +167,7 @@ func _ready() -> void:
 	_world.horn_sound = _sound.stream("train_horn")
 	_world.jet_sound = _sound.stream("jet")
 	_world.car_horn_sound = _sound.stream("horn")
+	_world.forced_kind = _spawn_kind
 	_world_root.add_child(_world)
 	var camera := ChaseCamera.new()
 	var first := _make_player(0, camera, PlayerControls.everything())
@@ -240,6 +246,13 @@ func _parse_args() -> void:
 				push_warning("--speed-multiplier requires a positive, finite number; ignoring '%s'." % value)
 		elif arg.begins_with("--vehicle="):
 			_start_vehicle = int(arg.get_slice("=", 1))
+		elif arg.begins_with("--spawn="):
+			# Testing aid: makes a kind of obstacle common (--spawn=bear).
+			var wanted := arg.get_slice("=", 1).to_upper()
+			if Obstacle.Kind.has(wanted):
+				_spawn_kind = Obstacle.Kind[wanted]
+			else:
+				push_warning("--spawn: no obstacle called '%s'; try one of %s." % [wanted.to_lower(), ", ".join(Obstacle.Kind.keys()).to_lower()])
 		elif arg == "--players=2":
 			_two_players = true
 		elif arg.begins_with("--race-length="):
@@ -1227,7 +1240,7 @@ func _top_hop(p: Player, obstacle: Obstacle) -> void:
 		obstacle.launch(p.sled.travel_velocity() * 0.25 + Vector3.UP * 2.0)
 		_add_bonus(p, 30)
 		p.say("Hoppsan! +30", Hud.WARM)
-		_sound.play("moose" if obstacle.kind == Obstacle.Kind.MOOSE else "oops", 0.0, _rng.randf_range(1.0, 1.3))
+		_sound.play("moose" if obstacle.kind == Obstacle.Kind.MOOSE or obstacle.kind == Obstacle.Kind.BEAR else "oops", 0.0, _rng.randf_range(0.6, 0.7) if obstacle.kind == Obstacle.Kind.BEAR else _rng.randf_range(1.0, 1.3))
 	else:
 		_sound.play("land", 0.0, 1.2)
 
@@ -1338,6 +1351,8 @@ func _crash_into(p: Player, obstacle: Obstacle) -> void:
 	match obstacle.kind:
 		Obstacle.Kind.MOOSE:
 			_sound.play("moose", 2.0)
+		Obstacle.Kind.BEAR:
+			_sound.play("moose", 4.0, 0.6)
 		Obstacle.Kind.CAR, Obstacle.Kind.PLOW, Obstacle.Kind.TRUCK:
 			_sound.play("horn")
 		Obstacle.Kind.PERSON, Obstacle.Kind.KID:

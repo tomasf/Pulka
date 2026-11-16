@@ -247,7 +247,7 @@ class RiderModel:
         # A zip down the front, knitted cuffs at the wrists and a hood folded
         # down at the back of the neck.
         seams = [RiderModel.ellipsoid("hood", RiderModel.g(0, 0.64, 0.12), (0.14, 0.07, 0.09), "jacket", rotation=(math.radians(25), 0, 0), segments=16, rings=8)]
-        seams += [RiderModel.cylinder("zip", RiderModel.g(0, 0.34, -0.118), 0.01, 0.4, "jacket_trim", rotation=(math.radians(-5), 0, 0), vertices=8)]
+        seams += [RiderModel.cylinder("zip", RiderModel.g(0, 0.43, -0.135), 0.01, 0.24, "jacket_trim", rotation=(math.radians(-8), 0, 0), vertices=8)]
         for tag, side in (("L", -1), ("R", 1)):
             cuff_at = joints["hand." + tag] * 0.85 + joints["elbow." + tag] * 0.15
             seams.append(RiderModel.ellipsoid("cuff", RiderModel.g(*cuff_at), (0.064, 0.064, 0.064), "jacket_trim", segments=12, rings=6))

@@ -50,6 +50,8 @@ var regions: RegionBuilder
 ## With two players this is the one in front; `rider_ds` has them all.
 var player_d := 0.0
 var rider_ds := PackedFloat32Array()
+## Testing aid (--spawn=bear): half of all obstacles are this kind, or -1.
+var forced_kind := -1
 ## Moving things that are not tied to one chunk (trains run through many).
 var _free: Array[Node] = []
 var _free_obstacles: Array[Obstacle] = []
@@ -599,6 +601,8 @@ func obstacle_rig(kind: Obstacle.Kind, rng: RandomNumberGenerator) -> Props.Rig:
 			return Props.moose()
 		Obstacle.Kind.DEER:
 			return Props.deer()
+		Obstacle.Kind.BEAR:
+			return Props.bear()
 		Obstacle.Kind.BIN:
 			return Props.Rig.of(Props.bin())
 		Obstacle.Kind.TENT:
@@ -622,6 +626,8 @@ func obstacle_rig(kind: Obstacle.Kind, rng: RandomNumberGenerator) -> Props.Rig:
 
 
 func _pick_kind(zone: TerrainField.Zone, kind: TerrainField.Region, rng: RandomNumberGenerator) -> Obstacle.Kind:
+	if forced_kind >= 0 and rng.randf() < 0.5:
+		return forced_kind as Obstacle.Kind
 	var table := regions.obstacle_table(kind)
 	if table.is_empty():
 		match zone:
@@ -632,7 +638,8 @@ func _pick_kind(zone: TerrainField.Zone, kind: TerrainField.Region, rng: RandomN
 			TerrainField.Zone.VILLAGE:
 				table = [[Obstacle.Kind.PERSON, 4], [Obstacle.Kind.KID, 3], [Obstacle.Kind.SNOWMAN, 3], [Obstacle.Kind.DOG, 2]]
 			TerrainField.Zone.WILDLIFE:
-				table = [[Obstacle.Kind.MOOSE, 2], [Obstacle.Kind.DEER, 3], [Obstacle.Kind.HARE, 4], [Obstacle.Kind.TREE, 2]]
+				# A bear only now and then.
+				table = [[Obstacle.Kind.MOOSE, 10], [Obstacle.Kind.DEER, 15], [Obstacle.Kind.HARE, 20], [Obstacle.Kind.TREE, 10], [Obstacle.Kind.BEAR, 2]]
 			_:
 				table = [[Obstacle.Kind.ROCK, 3], [Obstacle.Kind.SNOWMAN, 3], [Obstacle.Kind.TREE, 2], [Obstacle.Kind.PERSON, 1], [Obstacle.Kind.STUMP, 1]]
 	var total := 0
@@ -702,6 +709,8 @@ func _setup_obstacle(obstacle: Obstacle, rng: RandomNumberGenerator, cx: float, 
 			obstacle.patrol(rng.randf_range(1.5, 2.6) * random_sign(rng), cx - hw - 10.0, cx + hw + 10.0)
 		Obstacle.Kind.DEER:
 			obstacle.patrol(rng.randf_range(4.0, 6.5) * random_sign(rng), cx - hw - 6.0, cx + hw + 6.0)
+		Obstacle.Kind.BEAR:
+			obstacle.patrol(rng.randf_range(1.2, 2.0) * random_sign(rng), cx - hw - 8.0, cx + hw + 8.0)
 		Obstacle.Kind.HARE:
 			obstacle.patrol(rng.randf_range(2.5, 4.5) * random_sign(rng), cx - hw, cx + hw)
 		Obstacle.Kind.CAR, Obstacle.Kind.CART, Obstacle.Kind.CONE, Obstacle.Kind.PLANT:

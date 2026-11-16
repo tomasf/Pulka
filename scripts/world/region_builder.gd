@@ -325,7 +325,7 @@ func obstacle_table(kind: TerrainField.Region) -> Array:
 		TerrainField.Region.PARK:
 			return [[Obstacle.Kind.PERSON, 2], [Obstacle.Kind.SNOWMAN, 2], [Obstacle.Kind.KID, 1]]
 		TerrainField.Region.WOODS:
-			return [[Obstacle.Kind.LOG, 3], [Obstacle.Kind.TREE, 1], [Obstacle.Kind.STUMP, 1], [Obstacle.Kind.DEER, 1], [Obstacle.Kind.MOOSE, 1], [Obstacle.Kind.HARE, 2]]
+			return [[Obstacle.Kind.LOG, 9], [Obstacle.Kind.TREE, 3], [Obstacle.Kind.STUMP, 3], [Obstacle.Kind.DEER, 3], [Obstacle.Kind.MOOSE, 3], [Obstacle.Kind.HARE, 6], [Obstacle.Kind.BEAR, 1]]
 		TerrainField.Region.MALL:
 			return [[Obstacle.Kind.PERSON, 5], [Obstacle.Kind.KID, 2], [Obstacle.Kind.CART, 1], [Obstacle.Kind.PLANT, 2]]
 		TerrainField.Region.RAIL:
