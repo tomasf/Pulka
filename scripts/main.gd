@@ -1,7 +1,9 @@
 extends Node3D
 ## Game flow: menu → countdown → run (crashes cost a mitten) → game over.
+## With two players: menu → lobby (each picks a ride) → countdown → a
+## split-screen race to the finish line, where crashes only cost time.
 
-enum State { MENU, COUNTDOWN, PLAYING, PAUSED, GAME_OVER }
+enum State { MENU, COUNTDOWN, PLAYING, PAUSED, GAME_OVER, LOBBY }
 
 const START_LIVES := 3
 const MAX_LIVES := 5
@@ -9,6 +11,14 @@ const RESPAWN_DELAY := 2.8
 ## How long a crash line stays readable.
 const CRASH_LINE_HOLD := 2.3
 const START_D := 8.0
+## Two-player races: metres from the start to the finish line.
+const RACE_LENGTH := 3000.0
+## Once the winner is home, how long the other has before the results.
+const FINISH_GRACE := 20.0
+## Slipstream: close behind the other rider you are pulled along.
+const DRAFT_RANGE := 30.0
+const DRAFT_WIDTH := 3.5
+const DRAFT_PUSH := 3.0
 
 const CRASH_LINES := {
 	Obstacle.Kind.TREE: ["Granen vann.", "Trädkramare!", "Barr i munnen.", "Granen stod där först."],
@@ -66,23 +76,14 @@ var _rng := RandomNumberGenerator.new()
 var _field: TerrainField
 var _world_root: Node3D
 var _world: SlopeWorld
-var _sled: Sled
-var _camera: ChaseCamera
 var _atmosphere: Atmosphere
 var _sound: SoundBank
 var _hud: Hud
 
-var _lives := START_LIVES
-var _bonus := 0
-var _run_distance := 0.0
 var _countdown := 0.0
 var _countdown_step := 0
-var _crash_timer := 0.0
 var _input_cooldown := 0.0
-var _cookie_streak := 0
-var _cookie_timer := 0.0
 ## Set when the ride goes over a cliff edge, until it lands.
-var _over_cliff := false
 var _elapsed := 0.0
 
 var _autopilot := false
@@ -103,9 +104,33 @@ var _start_d := START_D
 var _start_event := ""
 var _director: EventDirector
 var _touch: TouchControls
-var _bonus_fraction := 0.0
-var _last_crash_line := ""
 var _start_vehicle := -1
+## Everyone riding: one player alone, two in a split-screen race.
+var _players: Array[Player] = []
+## Two-player mode is chosen on the menu; a race is on while it is set.
+var _two_players := false
+var _racing := false
+var _race_length := RACE_LENGTH
+var _race_time := 0.0
+## Seconds left for the second rider once the first is home, or -1.
+var _grace := -1.0
+var _ready_flags: Array[bool] = [false, false]
+var _lobby_steer: Array[float] = [0.0, 0.0]
+var _split: CanvasLayer
+var _finish_line: Node3D
+
+## The first player's ride, camera and lives (tests reach in for these).
+var _sled: Sled:
+	get:
+		return _players[0].sled
+var _camera: ChaseCamera:
+	get:
+		return _players[0].camera
+var _lives: int:
+	get:
+		return _players[0].lives
+	set(value):
+		_players[0].lives = value
 
 
 func _ready() -> void:
@@ -138,27 +163,23 @@ func _ready() -> void:
 	_world.jet_sound = _sound.stream("jet")
 	_world.car_horn_sound = _sound.stream("horn")
 	_world_root.add_child(_world)
-	_sled = Sled.new()
-	_sled.speed_multiplier = _speed_multiplier
-	_world_root.add_child(_sled)
-	_sled.jumped.connect(_on_jumped)
-	_sled.landed.connect(_on_landed)
-	_sled.skimmed.connect(_on_skimmed)
-	_sled.sank.connect(_on_sank)
+	var camera := ChaseCamera.new()
+	var first := _make_player(0, camera, PlayerControls.everything())
 	_director = EventDirector.new()
-	_director.sled = _sled
+	_director.sled = first.sled
+	_director.sleds = [first.sled]
 	_director.atmosphere = _atmosphere
 	_director.sound = _sound
 	_world_root.add_child(_director)
 	_director.snowball_hit.connect(_on_snowball_hit)
 	_director.gift_collected.connect(_on_gift_collected)
-	_camera = ChaseCamera.new()
-	_camera.target = _sled
-	_world_root.add_child(_camera)
-	_camera.current = true
+	camera.target = first.sled
+	_world_root.add_child(camera)
+	camera.current = true
 	_hud = Hud.new()
 	add_child(_hud)
 	_hud.pressed.connect(_on_hud_pressed)
+	first.hud = _hud
 	_touch = TouchControls.new()
 	add_child(_touch)
 	_touch.mode_changed.connect(_hud.set_touch_mode)
@@ -219,6 +240,10 @@ func _parse_args() -> void:
 				push_warning("--speed-multiplier requires a positive, finite number; ignoring '%s'." % value)
 		elif arg.begins_with("--vehicle="):
 			_start_vehicle = int(arg.get_slice("=", 1))
+		elif arg == "--players=2":
+			_two_players = true
+		elif arg.begins_with("--race-length="):
+			_race_length = maxf(float(arg.get_slice("=", 1)), 50.0)
 
 
 ## Browsers require fullscreen requests to run inside the input event itself.
@@ -252,11 +277,15 @@ func _process(delta: float) -> void:
 	var started := Time.get_ticks_usec()
 	_elapsed += delta
 	_input_cooldown = maxf(0.0, _input_cooldown - delta)
+	for p in _players:
+		p.controls.poll()
 	_update_settings_input()
 	_update_go_back()
 	match state:
 		State.MENU:
 			_update_menu(delta)
+		State.LOBBY:
+			_update_lobby(delta)
 		State.COUNTDOWN:
 			_update_countdown(delta)
 		State.PLAYING:
@@ -266,14 +295,56 @@ func _process(delta: float) -> void:
 		State.GAME_OVER:
 			_update_game_over(delta)
 	if state != State.PAUSED:
-		var playing := state == State.PLAYING and not _sled.crashed
+		var lead := _leader()
+		var playing := state == State.PLAYING and not lead.sled.crashed
+		_director.sled = lead.sled
 		_director.update(delta, playing)
-		_atmosphere.indoor = _world.regions.indoors(_sled.distance())
-		_camera.update_camera(delta)
-		_atmosphere.update_atmosphere(delta, _camera, _sled.distance(), _sled.speed() / 45.0 if playing else 0.0, _sled.boost_time > 0.0)
-		_sound.set_motion(delta, _sled.speed(), _sled.on_ground, playing)
+		_atmosphere.indoor = _world.regions.indoors(lead.sled.distance())
+		for p in _players:
+			p.camera.update_camera(delta)
+		var rush := lead.sled.speed() / 45.0 if playing and not _racing else 0.0
+		_atmosphere.update_atmosphere(delta, _players[0].camera, lead.sled.distance(), rush, lead.sled.boost_time > 0.0 and not _racing)
+		_atmosphere.follow_second_view(_players[1].camera if _players.size() > 1 else null)
+		_sound.set_motion(delta, lead.sled.speed(), lead.sled.on_ground, state == State.PLAYING and not lead.sled.crashed)
 	FpsMeter.record_logic(Time.get_ticks_usec() - started)
 	_maybe_screenshot()
+
+
+## The rider out in front: the one events follow and the weather is for.
+func _leader() -> Player:
+	var lead := _players[0]
+	for p in _players:
+		if p.sled.distance() > lead.sled.distance():
+			lead = p
+	return lead
+
+
+func _player_of(sled: Sled) -> Player:
+	for p in _players:
+		if p.sled == sled:
+			return p
+	return _players[0]
+
+
+## A rider with their sled in the world. The camera is placed by the caller.
+func _make_player(index: int, camera: ChaseCamera, controls: PlayerControls) -> Player:
+	var sled := Sled.new()
+	sled.speed_multiplier = _speed_multiplier
+	_world_root.add_child(sled)
+	var p := Player.new(index, sled, camera, controls)
+	p.atmosphere = _atmosphere
+	p.rumbles = not (_autopilot or _muted or DisplayServer.get_name() == "headless")
+	p.vehicle = _vehicle
+	sled.jumped.connect(_on_jumped.bind(p))
+	sled.landed.connect(_on_landed.bind(p))
+	sled.skimmed.connect(_on_skimmed.bind(p))
+	sled.sank.connect(_on_sank.bind(p))
+	camera.target = sled
+	if _field:
+		sled.field = _field
+		camera.field = _field
+	_players.append(p)
+	return p
 
 
 # --- States ---
@@ -281,23 +352,31 @@ func _process(delta: float) -> void:
 func _new_world() -> void:
 	_field = TerrainField.new(_rng.randi())
 	_world.reset(_field, START_D)
-	_sled.field = _field
-	_camera.field = _field
+	for p in _players:
+		p.sled.field = _field
+		p.camera.field = _field
 	_director.field = _field
 
 
 func _enter_menu() -> void:
 	get_tree().paused = false
+	# With two players the menu is the split screen where each picks a ride.
+	if _two_players and not _autopilot:
+		_hud.close_settings()
+		_enter_lobby()
+		return
 	if _director.field:
 		_director.reset(START_D)
 		_director.stop()
 	_hud.close_settings()
+	_leave_split()
 	state = State.MENU
 	_new_world()
-	_sled.set_vehicle(_specs[_vehicle], _rng)
-	_sled.frozen = true
-	_sled.place_at(START_D)
-	_camera.mode = ChaseCamera.Mode.ORBIT
+	var p := _players[0]
+	p.sled.set_vehicle(_specs[_vehicle], _rng)
+	p.sled.frozen = true
+	p.sled.place_at(START_D)
+	p.camera.mode = ChaseCamera.Mode.ORBIT
 	_hud.show_screen("menu")
 	_refresh_menu()
 	_sound.set_music_ducked(false)
@@ -314,8 +393,8 @@ func _is_unlocked(spec: VehicleSpec) -> bool:
 
 
 func _update_menu(delta: float) -> void:
-	_world.update_world(_sled.distance(), delta)
-	_sled.step(delta, 0.0, 0.0, false)
+	_world.update_world(_players[0].sled.distance(), delta)
+	_players[0].sled.step(delta, 0.0, 0.0, false)
 	if _input_cooldown > 0.0 or _hud.settings_open:
 		return
 	if Input.is_action_just_pressed(&"menu_left"):
@@ -327,14 +406,19 @@ func _update_menu(delta: float) -> void:
 
 
 func _change_vehicle(step: int) -> void:
+	var p := _players[0]
 	_vehicle = (_vehicle + step + _specs.size()) % _specs.size()
-	_sled.set_vehicle(_specs[_vehicle], _rng)
-	_sled.place_at(START_D)
+	p.vehicle = _vehicle
+	p.sled.set_vehicle(_specs[_vehicle], _rng)
+	p.sled.place_at(START_D)
 	_refresh_menu()
 	_sound.play("whoosh", -6.0, 1.4)
 
 
 func _start_run() -> void:
+	if _two_players:
+		_start_race()
+		return
 	get_tree().paused = false
 	var spec := _specs[_vehicle]
 	if not _is_unlocked(spec):
@@ -348,23 +432,17 @@ func _start_run() -> void:
 	if _start_region != "":
 		_start_d = _find_region(_start_region) - 120.0
 		_world.reset(_field, _start_d)
-	_sled.set_vehicle(spec, _rng)
-	_sled.frozen = true
-	_sled.place_at(_start_d)
-	_sled.invulnerable_time = 0.0
-	_over_cliff = false
-	_lives = START_LIVES
-	_bonus = 0
-	_bonus_fraction = 0.0
+	var p := _players[0]
+	p.sled.set_vehicle(spec, _rng)
+	p.sled.frozen = true
+	p.sled.place_at(_start_d)
+	p.sled.invulnerable_time = 0.0
+	_reset_player(p)
 	_director.reset(_start_d)
-	if _start_event != "":
-		var kinds := {"blizzard": EventDirector.Kind.BLIZZARD, "snowballs": EventDirector.Kind.SNOWBALLS, "santa": EventDirector.Kind.SANTA, "aurora": EventDirector.Kind.AURORA}
-		_director.force_next(kinds.get(_start_event, EventDirector.Kind.BLIZZARD), _start_d)
-	_run_distance = 0.0
-	_cookie_streak = 0
+	_force_event()
 	_touch.reset()
-	_camera.mode = ChaseCamera.Mode.CHASE
-	_camera.snap()
+	p.camera.mode = ChaseCamera.Mode.CHASE
+	p.camera.snap()
 	_countdown = 3.0
 	_countdown_step = 4
 	state = State.COUNTDOWN
@@ -372,127 +450,542 @@ func _start_run() -> void:
 	_sound.set_music_ducked(false)
 
 
+func _reset_player(p: Player) -> void:
+	p.over_cliff = false
+	p.lives = START_LIVES
+	p.bonus = 0
+	p.bonus_fraction = 0.0
+	p.run_distance = 0.0
+	p.cookie_streak = 0
+	p.cookie_timer = 0.0
+	p.crash_timer = 0.0
+	p.finish_time = -1.0
+	p.sled.draft = 0.0
+	p.sled.brake = 0.0
+	p.camera.centered = false
+
+
+func _force_event() -> void:
+	if _start_event != "":
+		var kinds := {"blizzard": EventDirector.Kind.BLIZZARD, "snowballs": EventDirector.Kind.SNOWBALLS, "santa": EventDirector.Kind.SANTA, "aurora": EventDirector.Kind.AURORA}
+		_director.force_next(kinds.get(_start_event, EventDirector.Kind.BLIZZARD), _start_d)
+
+
 func _update_countdown(delta: float) -> void:
 	# The countdown stands still, so it can afford to build more ahead.
-	_world.update_world(_sled.distance(), delta, 8.0)
-	_sled.step(delta, 0.0, 0.0, false)
+	_world.update_world(_players[0].sled.distance(), delta, 8.0)
+	for p in _players:
+		p.sled.step(delta, 0.0, 0.0, false)
 	_countdown -= delta
 	var step := ceili(_countdown)
 	if step != _countdown_step and step > 0:
 		_countdown_step = step
-		_hud.show_center(str(step))
+		_show_center(str(step))
 		_sound.play("beep")
 	if _countdown <= 0.0:
 		state = State.PLAYING
-		_sled.frozen = false
-		_sled.velocity = _field.track_dir(_start_d) * 9.0
-		_hud.show_center("ÅK!", Hud.HOT)
+		for p in _players:
+			p.sled.frozen = false
+			p.sled.velocity = _field.track_dir(_start_d) * 9.0
+		_show_center("ÅK!", Hud.HOT)
 		_sound.play("go")
 	_update_hud()
+
+
+## Big text in the middle of every player's screen.
+func _show_center(text: String, color := Hud.WARM) -> void:
+	if _racing:
+		for p in _players:
+			p.race_hud.show_center(text, color)
+	else:
+		_hud.show_center(text, color)
 
 
 func _update_playing(delta: float) -> void:
 	if Input.is_action_just_pressed(&"pause"):
 		_set_paused(true)
 		return
-	var steer := clampf(Input.get_axis(&"steer_left", &"steer_right") + _touch.steer, -1.0, 1.0)
-	var tuck := maxf(Input.get_action_strength(&"tuck"), _touch.tuck())
-	var jump := Input.is_action_just_pressed(&"jump") or _touch.consume_jump()
-	if _autopilot:
-		steer = _autopilot_steer()
-		tuck = 1.0
-	var before := _sled.distance()
-	_sled.step(delta, steer, tuck, jump)
-	_world.update_world(_sled.distance(), delta)
-	_check_cliff(before)
-	_cookie_timer = maxf(0.0, _cookie_timer - delta)
-	if _cookie_timer == 0.0:
-		_cookie_streak = 0
-	if _sled.crashed:
-		_crash_timer -= delta
-		if _crash_timer <= 0.0:
-			_after_crash()
+	if _racing:
+		_race_time += delta
+		_update_drafts()
+	var before: Array[float] = []
+	for p in _players:
+		before.append(p.sled.distance())
+		var steer := p.controls.steer()
+		var tuck := p.controls.tuck()
+		var jump := p.controls.jump()
+		if p.finished():
+			_coast_home(p, delta)
+			continue
+		if not _racing:
+			steer = clampf(steer + _touch.steer, -1.0, 1.0)
+			tuck = maxf(tuck, _touch.tuck())
+			jump = jump or _touch.consume_jump()
+		if _autopilot:
+			steer = _autopilot_steer(p)
+			tuck = 1.0
+		p.sled.step(delta, steer, tuck, jump)
+	_update_world(delta)
+	for i in _players.size():
+		_update_player(_players[i], before[i], delta)
+	if _racing:
+		_bump_riders()
+		_update_race(delta)
 	else:
-		var travelled := maxf(_sled.distance() - _start_d, _run_distance)
-		_add_distance_bonus(travelled - _run_distance)
-		_run_distance = travelled
-		_check_collisions()
-		_check_pickups()
-		_check_bounds()
-	_update_hud()
+		_update_hud()
+
+
+func _update_world(delta: float, build_ms := SlopeWorld.BUILD_MS) -> void:
+	var lead := _leader()
+	var others := PackedFloat32Array()
+	for p in _players:
+		if p != lead:
+			others.append(p.sled.distance())
+	_world.update_world(lead.sled.distance(), delta, build_ms, others)
+
+
+func _update_player(p: Player, before: float, delta: float) -> void:
+	if p.finished():
+		return
+	_check_cliff(p, before)
+	p.cookie_timer = maxf(0.0, p.cookie_timer - delta)
+	if p.cookie_timer == 0.0:
+		p.cookie_streak = 0
+	if p.sled.crashed:
+		p.crash_timer -= delta
+		if p.crash_timer <= 0.0:
+			_after_crash(p)
+	else:
+		var travelled := maxf(p.sled.distance() - _start_d, p.run_distance)
+		_add_distance_bonus(p, travelled - p.run_distance)
+		p.run_distance = travelled
+		_check_collisions(p)
+		_check_pickups(p)
+		_check_bounds(p)
 
 
 ## Going over a cliff edge: a scream, and a reward if you land it.
-func _check_cliff(before: float) -> void:
+func _check_cliff(p: Player, before: float) -> void:
 	var edge := _field.cliff_edge(before)
-	if _sled.crashed or before >= edge or _sled.distance() < edge:
+	if p.sled.crashed or before >= edge or p.sled.distance() < edge:
 		return
-	_over_cliff = true
-	_hud.popup("AAAAAAAH!", Hud.HOT, 84, 1.7)
+	p.over_cliff = true
+	p.say("AAAAAAAH!", Hud.HOT, 84, 1.7)
 	_sound.play("whoosh", 0.0, 0.7)
-	_camera.add_shake(0.25)
+	p.camera.add_shake(0.25)
 
 
 func _update_hud() -> void:
-	_hud.update_game(_run_distance, _score(), _sled.speed(), _lives, maxi(START_LIVES, _lives), _director.multiplier)
+	if _racing:
+		_update_race_hud()
+		return
+	var p := _players[0]
+	_hud.update_game(p.run_distance, p.score(), p.sled.speed(), p.lives, maxi(START_LIVES, p.lives), _director.multiplier)
 
 
-func _add_bonus(points: int) -> void:
-	_bonus += roundi(points * _director.multiplier)
+# --- Two-player race ---
+
+## Where each rider stands across the slope at the start.
+func _lane(p: Player) -> float:
+	return -2.2 if p.index == 0 else 2.2
+
+
+## Before a race: both riders stand side by side, each on their own half of
+## the screen, picking a ride and saying when they are ready.
+func _enter_lobby() -> void:
+	get_tree().paused = false
+	_build_split()
+	_new_world()
+	_director.reset(START_D)
+	_director.stop()
+	state = State.LOBBY
+	_ready_flags = [false, false]
+	_lobby_steer = [0.0, 0.0]
+	for p in _players:
+		p.sled.set_vehicle(_specs[p.vehicle], _rng, Player.COLORS[p.index])
+		p.sled.frozen = true
+		p.sled.place_at(START_D, _lane(p))
+		p.camera.mode = ChaseCamera.Mode.ORBIT
+		p.race_hud.clear()
+		_show_lobby(p)
+	_hud.show_screen("lobby")
+	_input_cooldown = 0.4
+
+
+func _update_lobby(delta: float) -> void:
+	_update_world(delta)
+	for p in _players:
+		p.sled.step(delta, 0.0, 0.0, false)
+	if _input_cooldown > 0.0 or _hud.settings_open:
+		return
+	if Input.is_action_just_pressed(&"back") or Input.is_action_just_pressed(&"pause"):
+		_back_to_solo()
+		return
+	for p in _players:
+		var steer := p.controls.steer()
+		var was := _lobby_steer[p.index]
+		_lobby_steer[p.index] = steer
+		if not _ready_flags[p.index]:
+			if steer < -0.6 and was >= -0.6:
+				_pick(p, -1)
+			elif steer > 0.6 and was <= 0.6:
+				_pick(p, 1)
+		if p.controls.jump():
+			_ready_flags[p.index] = not _ready_flags[p.index]
+			_sound.play("beep" if _ready_flags[p.index] else "whoosh", -4.0, 1.3)
+			_show_lobby(p)
+	if not _ready_flags.has(false):
+		_start_race()
+
+
+## From the split-screen menu back to the menu for one.
+func _back_to_solo() -> void:
+	_two_players = false
+	_sound.play("whoosh", -6.0, 0.9)
+	_enter_menu()
+
+
+## The next (or previous) ride this player has unlocked.
+func _pick(p: Player, step: int) -> void:
+	p.vehicle = _next_unlocked(p.vehicle, step)
+	p.sled.set_vehicle(_specs[p.vehicle], _rng, Player.COLORS[p.index])
+	p.sled.place_at(START_D, _lane(p))
+	_show_lobby(p)
+	_sound.play("whoosh", -6.0, 1.4)
+
+
+func _next_unlocked(from: int, step: int) -> int:
+	var index := from
+	for i in _specs.size():
+		index = (index + step + _specs.size()) % _specs.size()
+		if _is_unlocked(_specs[index]):
+			return index
+	return from
+
+
+func _show_lobby(p: Player) -> void:
+	p.race_hud.show_lobby(_specs[p.vehicle], p.controls.describe(), _ready_flags[p.index])
+
+
+## Splits the screen in two, left for the first player and right for the
+## second, each with their own camera on the same world and their own HUD.
+func _build_split() -> void:
+	if _split != null:
+		return
+	if _players.size() < 2:
+		var second := _make_player(1, ChaseCamera.new(), PlayerControls.for_two(1))
+		second.vehicle = _next_unlocked(_vehicle, 1)
+		second.hud = _hud
+	_players[0].controls = PlayerControls.for_two(0)
+	_split = CanvasLayer.new()
+	_split.layer = 0
+	var backing := ColorRect.new()
+	backing.color = Color(0.02, 0.02, 0.05)
+	backing.set_anchors_preset(Control.PRESET_FULL_RECT)
+	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_split.add_child(backing)
+	var row := HBoxContainer.new()
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.add_theme_constant_override("separation", 6)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_split.add_child(row)
+	var world := get_viewport().find_world_3d()
+	for p in _players:
+		var half := Control.new()
+		half.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		half.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var container := SubViewportContainer.new()
+		container.stretch = true
+		container.set_anchors_preset(Control.PRESET_FULL_RECT)
+		container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var view := SubViewport.new()
+		view.world_3d = world
+		view.audio_listener_enable_3d = p.index == 0
+		view.scaling_3d_mode = Quality.scaling_mode()
+		view.scaling_3d_scale = Quality.render_scale()
+		view.msaa_3d = get_viewport().msaa_3d
+		view.screen_space_aa = get_viewport().screen_space_aa
+		container.add_child(view)
+		half.add_child(container)
+		if p.camera.get_parent() != null:
+			p.camera.get_parent().remove_child(p.camera)
+		view.add_child(p.camera)
+		p.camera.current = true
+		p.race_hud = RaceHud.new().setup(p.index, Player.COLORS[p.index])
+		half.add_child(p.race_hud)
+		row.add_child(half)
+	add_child(_split)
+	_racing = true
+	_hud.racing = true
+	var sleds: Array[Sled] = []
+	for p in _players:
+		sleds.append(p.sled)
+	_director.sleds = sleds
+
+
+## Back to one player on the whole screen.
+func _leave_split() -> void:
+	if _finish_line != null:
+		_finish_line.queue_free()
+		_finish_line = null
+	if _split == null:
+		return
+	var first := _players[0]
+	first.camera.get_parent().remove_child(first.camera)
+	_world_root.add_child(first.camera)
+	first.camera.current = true
+	first.controls = PlayerControls.everything()
+	first.race_hud = null
+	while _players.size() > 1:
+		var other: Player = _players.pop_back()
+		other.sled.queue_free()
+		other.camera.queue_free()
+	_split.queue_free()
+	_split = null
+	_racing = false
+	_hud.racing = false
+	_director.sleds = [first.sled]
+
+
+func _start_race() -> void:
+	get_tree().paused = false
+	_build_split()
+	_new_world()
+	_start_d = START_D
+	if _start_region != "":
+		_start_d = _find_region(_start_region) - 120.0
+		_world.reset(_field, _start_d)
+	for p in _players:
+		p.sled.set_vehicle(_specs[p.vehicle], _rng, Player.COLORS[p.index])
+		p.sled.frozen = true
+		p.sled.place_at(_start_d, _lane(p))
+		p.sled.invulnerable_time = 0.0
+		_reset_player(p)
+		p.camera.mode = ChaseCamera.Mode.CHASE
+		p.camera.snap()
+		p.race_hud.clear()
+		p.race_hud.hide_lobby()
+	_director.reset(_start_d)
+	_force_event()
+	_race_time = 0.0
+	_grace = -1.0
+	_place_finish_line()
+	_countdown = 3.0
+	_countdown_step = 4
+	state = State.COUNTDOWN
+	_hud.show_screen("race")
+	_sound.set_music_ducked(false)
+
+
+## An inflatable arch across the track at the finish.
+func _place_finish_line() -> void:
+	if _finish_line != null:
+		_finish_line.queue_free()
+	var goal := _start_d + _race_length
+	var x := _field.center_x(goal)
+	var dir := _field.track_dir(goal)
+	var width := int(_field.half_width(goal) * 2.0 + 3.0)
+	_finish_line = Node3D.new()
+	_finish_line.position = Vector3(x, _field.height(x, goal), -goal)
+	_finish_line.rotation.y = atan2(-dir.x, -dir.z)
+	var arch := MeshInstance3D.new()
+	arch.mesh = Props.finish_arch(width)
+	_finish_line.add_child(arch)
+	for face in [0.0, PI]:
+		var label := Shops.label("MÅL", 160, 0.012, Color(1, 1, 1))
+		label.outline_size = 24
+		label.outline_modulate = Color(0.1, 0.1, 0.15)
+		label.transform = Transform3D(Basis(Vector3.UP, face), Vector3(0, 5.9, 0.45 if face == 0.0 else -0.45))
+		_finish_line.add_child(label)
+	_world_root.add_child(_finish_line)
+
+
+## Close behind the other rider and in line with them, you are pulled along
+## in their slipstream.
+func _update_drafts() -> void:
+	for p in _players:
+		var pull := 0.0
+		for other in _players:
+			if other == p or other.sled.crashed or p.sled.crashed or not p.sled.on_ground or p.finished():
+				continue
+			var gap := other.sled.distance() - p.sled.distance()
+			if gap > 1.5 and gap < DRAFT_RANGE and absf(other.sled.position.x - p.sled.position.x) < DRAFT_WIDTH:
+				pull = DRAFT_PUSH * (1.0 - 0.5 * gap / DRAFT_RANGE)
+		if pull > 0.0 and p.sled.draft == 0.0 and _race_time - p.draft_said > 6.0:
+			p.draft_said = _race_time
+			p.say("Bakvind!", Hud.COOL, 36, 0.8)
+		p.sled.draft = pull
+
+
+func _update_race(delta: float) -> void:
+	var goal := _start_d + _race_length
+	for p in _players:
+		if p.finished() or p.sled.distance() < goal:
+			continue
+		p.finish_time = _race_time
+		var first := _finished_count() == 1
+		p.race_hud.show_center("VINST!" if first else "I mål!", Hud.HOT if first else Hud.WARM, 1.6)
+		p.flash(Hud.WARM, 0.5)
+		p.rumble(0.5, 0.6, 0.3)
+		_sound.play("trick" if first else "go")
+		if first:
+			_grace = FINISH_GRACE
+			for other in _players:
+				if other != p:
+					other.say("Spelare %d är i mål! %d s kvar" % [p.index + 1, int(FINISH_GRACE)], Hud.HOT, 44, 2.5)
+	if _grace > 0.0:
+		_grace -= delta
+	_update_race_hud()
+	if _finished_count() == _players.size() or (_grace <= 0.0 and _grace > -1.0):
+		_end_race()
+
+
+## Past the finish the race is run: the rider steers for their own side of
+## the track (out of the way of the other) and brakes to a stop, and the
+## camera swings round to them.
+func _coast_home(p: Player, delta: float) -> void:
+	if p.sled.crashed:
+		return
+	p.sled.brake = 16.0
+	p.sled.draft = 0.0
+	var d := p.sled.distance()
+	var look := d + 12.0
+	var side := _field.center_x(look) + _lane(p) * 1.5
+	var steer := clampf(wrapf(atan2(side - p.sled.position.x, look - d) - p.sled.yaw, -PI, PI) * 2.5, -1.0, 1.0)
+	p.sled.step(delta, steer, 0.0, false)
+	if p.sled.speed() < 3.0 and p.camera.mode != ChaseCamera.Mode.ORBIT:
+		p.camera.centered = true
+		p.camera.mode = ChaseCamera.Mode.ORBIT
+
+
+## Riders who meet bounce off each other: a shove, not a crash.
+func _bump_riders() -> void:
+	var a := _players[0]
+	var b := _players[1]
+	if a.sled.crashed or b.sled.crashed:
+		return
+	var apart := a.sled.position - b.sled.position
+	var flat := Vector3(apart.x, 0.0, apart.z)
+	var reach := Sled.RADIUS * 2.0
+	if flat.length() >= reach or absf(apart.y) > 1.0:
+		return
+	var normal := flat.normalized() if flat.length() > 0.01 else Vector3.RIGHT
+	var closing := maxf((b.sled.velocity - a.sled.velocity).dot(normal), 0.0)
+	var push := 1.5 + closing * 0.6
+	var separation := (reach - flat.length()) * 0.5 + 0.02
+	a.sled.knock(normal, push, separation)
+	b.sled.knock(-normal, push, separation)
+	if closing > 1.0:
+		_sound.play("land", -2.0, 1.2)
+		for p in [a, b]:
+			p.camera.add_shake(0.25)
+			p.rumble(0.3, 0.3, 0.12)
+
+
+func _finished_count() -> int:
+	var count := 0
+	for p in _players:
+		if p.finished():
+			count += 1
+	return count
+
+
+## 1 for the rider in front: home first, or further down the hill.
+func _place_of(p: Player) -> int:
+	var place := 1
+	for other in _players:
+		if other == p:
+			continue
+		if other.finished():
+			if not p.finished() or other.finish_time < p.finish_time:
+				place += 1
+		elif not p.finished() and other.sled.distance() > p.sled.distance():
+			place += 1
+	return place
+
+
+func _update_race_hud() -> void:
+	var goal := _start_d + _race_length
+	for p in _players:
+		p.race_hud.update_race(goal - p.sled.distance(), p.sled.speed(), _place_of(p), p.finished())
+
+
+func _end_race() -> void:
+	state = State.GAME_OVER
+	_director.stop()
+	var order := _players.duplicate()
+	order.sort_custom(func(a: Player, b: Player) -> bool: return _place_of(a) < _place_of(b))
+	var winner: Player = order[0]
+	var goal := _start_d + _race_length
+	var lines: Array[String] = []
+	for p: Player in order:
+		var result := _race_clock(p.finish_time) if p.finished() else "%s m kvar" % Hud.group_digits(int(goal - p.sled.distance()))
+		lines.append("%d. Spelare %d – %s" % [_place_of(p), p.index + 1, result])
+	_hud.show_race_result("Spelare %d vinner!" % (winner.index + 1), "\n".join(lines))
+	_sound.set_music_ducked(true)
+	_input_cooldown = 0.8
+
+
+## A race time as minutes, seconds and tenths: 1:23,4.
+static func _race_clock(seconds: float) -> String:
+	var tenths := int(roundf(seconds * 10.0))
+	return "%d:%02d,%d" % [tenths / 600, (tenths / 10) % 60, tenths % 10]
+
+
+func _add_bonus(p: Player, points: int) -> void:
+	p.bonus += roundi(points * _director.multiplier)
 
 
 ## Distance counts extra while a score multiplier is active.
-func _add_distance_bonus(metres: float) -> void:
-	_bonus_fraction += metres * (_director.multiplier - 1.0)
-	var whole := floori(_bonus_fraction)
-	_bonus += whole
-	_bonus_fraction -= whole
+func _add_distance_bonus(p: Player, metres: float) -> void:
+	p.bonus_fraction += metres * (_director.multiplier - 1.0)
+	var whole := floori(p.bonus_fraction)
+	p.bonus += whole
+	p.bonus_fraction -= whole
 
 
-func _on_snowball_hit() -> void:
-	_hud.splat()
+func _on_snowball_hit(sled: Sled) -> void:
+	var p := _player_of(sled)
+	p.splat()
 	_sound.play("splat", 2.0, _rng.randf_range(0.9, 1.3))
-	_sled.velocity *= 0.92
-	_camera.add_shake(0.35)
-	_rumble(0.3, 0.3, 0.15)
+	p.sled.velocity *= 0.92
+	p.camera.add_shake(0.35)
+	p.rumble(0.3, 0.3, 0.15)
 
 
 ## What is in one of Santa's parcels: usually something useful, now and
 ## then a bag of points, once in a while a lump of coal.
-func _on_gift_collected() -> void:
+func _on_gift_collected(sled: Sled) -> void:
+	var p := _player_of(sled)
 	var roll := _rng.randf()
-	if roll < 0.25 and _lives < MAX_LIVES:
-		_lives += 1
-		_hud.popup("Ett par vantar! Extraliv!", Hud.HOT)
+	if roll < 0.25 and p.lives < MAX_LIVES and not _racing:
+		p.lives += 1
+		p.say("Ett par vantar! Extraliv!", Hud.HOT)
 		_sound.play("cocoa")
 	elif roll < 0.5:
-		_sled.boost_time = maxf(_sled.boost_time, 2.5)
-		_hud.popup("Turbovalla!", Hud.COOL)
+		p.sled.boost_time = maxf(p.sled.boost_time, 2.5)
+		p.say("Turbovalla!", Hud.COOL)
 		_sound.play("boost")
-		_atmosphere.flash(Color(0.6, 0.85, 1.0), 0.35)
-		_camera.add_shake(0.4)
+		p.flash(Color(0.6, 0.85, 1.0), 0.35)
+		p.camera.add_shake(0.4)
 	elif roll < 0.68:
-		_sled.invulnerable_time = maxf(_sled.invulnerable_time, 5.0)
-		_hud.popup("Tomtens skydd! Inget kan stoppa dig.", Hud.COOL)
+		p.sled.invulnerable_time = maxf(p.sled.invulnerable_time, 5.0)
+		p.say("Tomtens skydd! Inget kan stoppa dig.", Hud.COOL)
 		_sound.play("cocoa", -2.0, 1.25)
 	elif roll < 0.92:
-		_add_bonus(250)
-		_hud.popup("En burk pepparkakor! +250", Hud.WARM)
+		_add_bonus(p, 250)
+		p.say("En burk pepparkakor! +250", Hud.WARM)
 		_sound.play("coin", -2.0, 1.2)
 	else:
-		_add_bonus(1)
-		_hud.popup(["Kol. Du har varit stygg i år.", "Ett par raggsockor. +1", "Ett mjukt paket. +1"][_rng.randi_range(0, 2)], Hud.WARM)
+		_add_bonus(p, 1)
+		p.say(["Kol. Du har varit stygg i år.", "Ett par raggsockor. +1", "Ett mjukt paket. +1"][_rng.randi_range(0, 2)], Hud.WARM)
 		_sound.play("cocoa", -6.0, 0.7)
-
-
-func _score() -> int:
-	return int(_run_distance) + _bonus
 
 
 func _set_paused(paused: bool) -> void:
 	get_tree().paused = paused
 	state = State.PAUSED if paused else State.PLAYING
-	_hud.show_screen("pause" if paused else "game")
+	_hud.show_screen("pause" if paused else ("race" if _racing else "game"))
 	_sound.set_music_ducked(paused)
 
 
@@ -506,8 +999,14 @@ func _update_paused() -> void:
 
 
 func _update_game_over(delta: float) -> void:
-	_world.update_world(_sled.distance(), delta)
-	_sled.step(delta, 0.0, 0.0, false)
+	_update_world(delta)
+	for p in _players:
+		if _racing:
+			_coast_home(p, delta)
+		else:
+			p.sled.step(delta, 0.0, 0.0, false)
+	if _racing:
+		_update_race_hud()
 	if _input_cooldown > 0.0:
 		return
 	if _confirm_pressed():
@@ -536,11 +1035,19 @@ func _on_hud_pressed(action: StringName) -> void:
 		&"start":
 			if state == State.MENU:
 				_start_run()
+		&"duo":
+			if state == State.MENU:
+				_two_players = true
+				_sound.play("whoosh", -6.0, 1.2)
+				_enter_lobby()
+		&"solo":
+			if state == State.LOBBY:
+				_back_to_solo()
 		&"previous", &"next":
 			if state == State.MENU:
 				_change_vehicle(-1 if action == &"previous" else 1)
 		&"settings":
-			if state == State.MENU or state == State.PAUSED:
+			if state == State.MENU or state == State.PAUSED or state == State.LOBBY:
 				_hud.open_settings(_save.master_volume, _save.music_volume, _save.effects_volume)
 		&"close_settings":
 			_close_settings()
@@ -563,6 +1070,11 @@ func _apply_graphics() -> void:
 	var viewport := get_viewport()
 	viewport.scaling_3d_mode = Quality.scaling_mode()
 	viewport.scaling_3d_scale = Quality.render_scale()
+	for p in _players:
+		var half := p.camera.get_viewport()
+		if half != viewport:
+			half.scaling_3d_mode = Quality.scaling_mode()
+			half.scaling_3d_scale = Quality.render_scale()
 	_atmosphere.apply_quality()
 
 
@@ -613,7 +1125,7 @@ func _update_settings_input() -> void:
 	if _hud.settings_open:
 		if Input.is_action_just_pressed(&"back") or Input.is_action_just_pressed(&"pause") or Input.is_action_just_pressed(&"settings"):
 			_close_settings()
-	elif (state == State.MENU or state == State.PAUSED) and _input_cooldown <= 0.0 and Input.is_action_just_pressed(&"settings"):
+	elif (state == State.MENU or state == State.PAUSED or state == State.LOBBY) and _input_cooldown <= 0.0 and Input.is_action_just_pressed(&"settings"):
 		_hud.open_settings(_save.master_volume, _save.music_volume, _save.effects_volume)
 
 
@@ -643,22 +1155,24 @@ const CLIFF_BONUS := 500
 const WIPEOUT_LINES := ["Vurpa!", "Hoppla!", "Puh, klarade mig!", "Det där gjorde ont i stoltheten."]
 
 
-func _check_collisions() -> void:
-	var probe := _sled.position + Vector3.UP * 0.3
-	var d := _sled.distance()
+func _check_collisions(p: Player = null) -> void:
+	if p == null:
+		p = _players[0]
+	var probe := p.sled.position + Vector3.UP * 0.3
+	var d := p.sled.distance()
 	for obstacle in _world.obstacles_near(d):
 		if not obstacle.visible or obstacle.hit:
 			continue
-		if obstacle.is_vehicle() and _on_roof(obstacle, probe):
-			_roof_bounce(obstacle)
+		if obstacle.is_vehicle() and _on_roof(p, obstacle, probe):
+			_roof_bounce(p, obstacle)
 			continue
-		if obstacle.landable and _on_top(obstacle, probe):
-			_top_hop(obstacle)
+		if obstacle.landable and _on_top(p, obstacle, probe):
+			_top_hop(p, obstacle)
 			continue
 		var contact := _contact(obstacle, probe)
-		if _sled.invulnerable_time <= 0.0 and contact != Vector3.INF:
-			_impact(obstacle, contact)
-			if _sled.crashed:
+		if p.sled.invulnerable_time <= 0.0 and contact != Vector3.INF:
+			_impact(p, obstacle, contact)
+			if p.sled.crashed:
 				return
 			continue
 		if obstacle.near_miss_done:
@@ -667,7 +1181,7 @@ func _check_collisions() -> void:
 			obstacle.close_call = true
 		if obstacle.close_call and -obstacle.position.z < d - 1.5:
 			obstacle.near_miss_done = true
-			_near_miss(obstacle)
+			_near_miss(p, obstacle)
 
 
 ## Where the ride touches `obstacle`, or INF. Spruces are also checked at
@@ -682,74 +1196,74 @@ func _contact(obstacle: Obstacle, probe: Vector3) -> Vector3:
 
 
 ## Coming down from above onto a car is a trampoline, not a crash.
-func _on_roof(obstacle: Obstacle, probe: Vector3) -> bool:
+func _on_roof(p: Player, obstacle: Obstacle, probe: Vector3) -> bool:
 	var roof := obstacle.position.y + obstacle.top
-	return _sled.velocity.y < 1.0 and probe.y > roof - 0.9 and probe.y < roof + 0.8 and obstacle.clearance(probe) < Sled.RADIUS
+	return p.sled.velocity.y < 1.0 and probe.y > roof - 0.9 and probe.y < roof + 0.8 and obstacle.clearance(probe) < Sled.RADIUS
 
 
 ## Coming down from the air onto the top of something (a head, a rock).
-func _on_top(obstacle: Obstacle, probe: Vector3) -> bool:
+func _on_top(p: Player, obstacle: Obstacle, probe: Vector3) -> bool:
 	var top := obstacle.position.y + obstacle.height()
-	return not _sled.on_ground and _sled.velocity.y < 1.0 and probe.y > top - obstacle.height() * 0.45 and probe.y < top + 0.8 and obstacle.clearance(probe) < Sled.RADIUS
+	return not p.sled.on_ground and p.sled.velocity.y < 1.0 and probe.y > top - obstacle.height() * 0.45 and probe.y < top + 0.8 and obstacle.clearance(probe) < Sled.RADIUS
 
 
 ## Not a crash: people and animals topple, you get a small hop and lose a
 ## little speed. Hard things just give you something to bounce off.
-func _top_hop(obstacle: Obstacle) -> void:
+func _top_hop(p: Player, obstacle: Obstacle) -> void:
 	obstacle.near_miss_done = true
-	_sled.bounce(3.5)
-	_sled.velocity *= 0.88
-	_camera.add_shake(0.3)
-	_rumble(0.3, 0.3, 0.15)
+	p.sled.bounce(3.5)
+	p.sled.velocity *= 0.88
+	p.camera.add_shake(0.3)
+	p.rumble(0.3, 0.3, 0.15)
 	if obstacle.is_creature():
-		obstacle.launch(_sled.travel_velocity() * 0.25 + Vector3.UP * 2.0)
-		_add_bonus(30)
-		_hud.popup("Hoppsan! +30", Hud.WARM)
+		obstacle.launch(p.sled.travel_velocity() * 0.25 + Vector3.UP * 2.0)
+		_add_bonus(p, 30)
+		p.say("Hoppsan! +30", Hud.WARM)
 		_sound.play("moose" if obstacle.kind == Obstacle.Kind.MOOSE else "oops", 0.0, _rng.randf_range(1.0, 1.3))
 	else:
 		_sound.play("land", 0.0, 1.2)
 
 
-func _roof_bounce(obstacle: Obstacle) -> void:
+func _roof_bounce(p: Player, obstacle: Obstacle) -> void:
 	obstacle.near_miss_done = true
-	_sled.bounce(8.5)
-	_sled.velocity += Vector3(obstacle.velocity.x * 0.3, 0.0, 0.0)
+	p.sled.bounce(8.5)
+	p.sled.velocity += Vector3(obstacle.velocity.x * 0.3, 0.0, 0.0)
 	var points := 400 if obstacle.kind == Obstacle.Kind.PLOW else 250
-	_add_bonus(points)
-	_hud.popup("Taklandning! +%d" % points, Hud.HOT, 60)
+	_add_bonus(p, points)
+	p.say("Taklandning! +%d" % points, Hud.HOT, 60)
 	_sound.play("horn", 0.0, 1.15)
 	_sound.play("jump", 0.0, 0.8)
-	_camera.add_shake(0.5)
-	_atmosphere.flash(Hud.WARM, 0.25)
-	_rumble(0.5, 0.4, 0.2)
+	p.camera.add_shake(0.5)
+	p.flash(Hud.WARM, 0.25)
+	p.rumble(0.5, 0.4, 0.2)
 
 
-func _near_miss(obstacle: Obstacle) -> void:
+func _near_miss(p: Player, obstacle: Obstacle) -> void:
 	var points := 100 if obstacle.is_vehicle() else 50
-	_add_bonus(points)
-	_hud.popup("%s +%d" % [NEAR_MISS_LINES[_rng.randi_range(0, NEAR_MISS_LINES.size() - 1)], points], Hud.COOL)
+	_add_bonus(p, points)
+	p.say("%s +%d" % [NEAR_MISS_LINES[_rng.randi_range(0, NEAR_MISS_LINES.size() - 1)], points], Hud.COOL)
 	_sound.play("whoosh", 0.0, _rng.randf_range(0.9, 1.2))
 	if obstacle.is_vehicle():
 		_sound.play("horn", -4.0)
-	_sled.boost_time = maxf(_sled.boost_time, 0.5)
-	_camera.add_shake(0.2)
+	p.sled.boost_time = maxf(p.sled.boost_time, 0.5)
+	p.camera.add_shake(0.2)
 
 
 ## A collision, judged by physics: how fast you close on the obstacle,
 ## shared out by the two masses and softened by the ride's protection.
-func _impact(obstacle: Obstacle, probe: Vector3) -> void:
+func _impact(p: Player, obstacle: Obstacle, probe: Vector3) -> void:
 	if _no_crash and not obstacle.soft and not obstacle.harmless:
 		return
 	if obstacle.in_branches(probe):
 		_brush(obstacle)
 		return
-	var travel := _sled.travel_velocity()
+	var travel := p.sled.travel_velocity()
 	var heading := Vector3(travel.x, 0.0, travel.z)
 	var normal := obstacle.push_normal(probe, -heading.normalized() if heading.length() > 0.1 else Vector3.BACK)
 	var relative := travel - obstacle.velocity
 	relative.y = 0.0
 	var closing := maxf(-relative.dot(normal), 0.0)
-	var rider := _sled.total_mass()
+	var rider := p.sled.total_mass()
 	var share := 1.0 if is_inf(obstacle.mass) else obstacle.mass / (obstacle.mass + rider)
 	if obstacle.movable():
 		var thrown := travel * 0.35 - normal * closing * rider / (obstacle.mass + rider) * 1.6
@@ -758,27 +1272,27 @@ func _impact(obstacle: Obstacle, probe: Vector3) -> void:
 		_sound.play("poff", -6.0, 1.4)
 		return
 	if obstacle.soft:
-		_soft_hit(obstacle)
+		_soft_hit(p, obstacle)
 		return
-	var severity := closing * share / _sled.spec.protection
+	var severity := closing * share / p.sled.spec.protection
 	var separation := Sled.RADIUS - obstacle.clearance(probe) + 0.05
 	if severity >= CRASH_SEVERITY:
-		_crash_into(obstacle)
+		_crash_into(p, obstacle)
 	elif severity >= WIPEOUT_SEVERITY:
-		_sled.knock(normal, closing * share * 1.2, separation, _rng.randf_range(1.0, 2.0) * (1.0 if _rng.randf() < 0.5 else -1.0))
-		_sled.velocity *= 0.45
-		_sled.bounce(2.0)
+		p.sled.knock(normal, closing * share * 1.2, separation, _rng.randf_range(1.0, 2.0) * (1.0 if _rng.randf() < 0.5 else -1.0))
+		p.sled.velocity *= 0.45
+		p.sled.bounce(2.0)
 		_sound.play("oops", 0.0, 0.9)
 		_sound.play("land", 2.0, 0.8)
-		_camera.add_shake(0.7)
-		_rumble(0.6, 0.7, 0.3)
-		_hud.popup(WIPEOUT_LINES[_rng.randi_range(0, WIPEOUT_LINES.size() - 1)], Hud.WARM, 52)
+		p.camera.add_shake(0.7)
+		p.rumble(0.6, 0.7, 0.3)
+		p.say(WIPEOUT_LINES[_rng.randi_range(0, WIPEOUT_LINES.size() - 1)], Hud.WARM, 52)
 	else:
-		_sled.knock(normal, closing * share * 1.3, separation)
-		_sled.velocity *= 0.92
+		p.sled.knock(normal, closing * share * 1.3, separation)
+		p.sled.velocity *= 0.92
 		_sound.play("land", -2.0, 1.1)
-		_camera.add_shake(clampf(severity * 0.1, 0.1, 0.4))
-		_rumble(0.3, 0.2, 0.1)
+		p.camera.add_shake(clampf(severity * 0.1, 0.1, 0.4))
+		p.rumble(0.3, 0.2, 0.1)
 
 
 ## Spruce branches are soft: you ride straight through with a rustle
@@ -790,29 +1304,29 @@ func _brush(obstacle: Obstacle) -> void:
 	_sound.play("rustle", -3.0, _rng.randf_range(0.9, 1.15))
 
 
-func _soft_hit(obstacle: Obstacle) -> void:
-	obstacle.react_to_hit(_sled.velocity)
+func _soft_hit(p: Player, obstacle: Obstacle) -> void:
+	obstacle.react_to_hit(p.sled.velocity)
 	match obstacle.kind:
 		Obstacle.Kind.SNOWMAN:
-			Debris.burst(_world_root, _field, obstacle.position, _sled.velocity * 0.6, 14, 0.28)
+			Debris.burst(_world_root, _field, obstacle.position, p.sled.velocity * 0.6, 14, 0.28)
 			_sound.play("poff", 2.0)
-			_sled.velocity *= 0.82
-			_add_bonus(25)
-			_hud.popup("Snögubbe-strike! +25", Hud.WARM)
-			_camera.add_shake(0.5)
-			_rumble(0.4, 0.2, 0.2)
+			p.sled.velocity *= 0.82
+			_add_bonus(p, 25)
+			p.say("Snögubbe-strike! +25", Hud.WARM)
+			p.camera.add_shake(0.5)
+			p.rumble(0.4, 0.2, 0.2)
 		Obstacle.Kind.LOG:
-			_sled.bounce(4.5)
-			_sled.velocity *= 0.75
+			p.sled.bounce(4.5)
+			p.sled.velocity *= 0.75
 			_sound.play("land", 2.0, 0.8)
-			_camera.add_shake(0.6)
-			_rumble(0.5, 0.6, 0.2)
+			p.camera.add_shake(0.6)
+			p.rumble(0.5, 0.6, 0.2)
 		_:
 			_sound.play("oops")
-			_hud.popup("Haren hoppade undan!", Hud.COOL)
+			p.say("Haren hoppade undan!", Hud.COOL)
 
 
-func _crash_into(obstacle: Obstacle) -> void:
+func _crash_into(p: Player, obstacle: Obstacle) -> void:
 	match obstacle.kind:
 		Obstacle.Kind.MOOSE:
 			_sound.play("moose", 2.0)
@@ -825,178 +1339,185 @@ func _crash_into(obstacle: Obstacle) -> void:
 	if line.contains("%s"):
 		var names: Array = KID_NAMES if obstacle.kind == Obstacle.Kind.KID else PERSON_NAMES
 		line = line % names[_rng.randi_range(0, names.size() - 1)]
-	_crash(line)
+	_crash(line, p)
 
 
 func _crash_lines(obstacle: Obstacle) -> Array:
 	return BIRCH_CRASH_LINES if obstacle.birch else CRASH_LINES.get(obstacle.kind, ["Krasch!"])
 
 
-func _crash(line: String) -> void:
+func _crash(line: String, p: Player = null) -> void:
+	if p == null:
+		p = _players[0]
 	if _no_crash:
 		return
 	if _autopilot:
-		print("crash at %d m: %s" % [int(_run_distance), line])
-	_sled.crash()
-	_lives -= 1
-	_crash_timer = RESPAWN_DELAY
+		print("crash at %d m: %s" % [int(p.run_distance), line])
+	p.sled.crash()
+	if not _racing:
+		p.lives -= 1
+	p.crash_timer = RESPAWN_DELAY
 	_sound.play("crash")
-	_camera.mode = ChaseCamera.Mode.CRASH
-	_camera.add_shake(1.0)
-	_atmosphere.flash(Color(1, 1, 1), 0.55)
-	_rumble(0.8, 1.0, 0.45)
-	_last_crash_line = line
-	_hud.popup(line, Hud.HOT, 56, CRASH_LINE_HOLD)
+	p.camera.mode = ChaseCamera.Mode.CRASH
+	p.camera.add_shake(1.0)
+	p.flash(Color(1, 1, 1), 0.55)
+	p.rumble(0.8, 1.0, 0.45)
+	p.last_crash_line = line
+	p.say(line, Hud.HOT, 56, CRASH_LINE_HOLD)
 
 
-func _after_crash() -> void:
-	if _lives <= 0:
+func _after_crash(p: Player) -> void:
+	if p.lives <= 0 and not _racing:
 		_game_over()
 		return
-	var d := _sled.distance() + 4.0
+	var d := p.sled.distance() + 4.0
 	var water := _field.water_strip(d)
 	if water != Vector2.ZERO:
 		d = water.y + TerrainField.WATER_BLEND + 6.0
 	if _field.near_road(d, 8.0):
 		d = _field.nearest_road(d) + TerrainField.ROAD_HALF_WIDTH + 20.0
-	_sled.place_at(d, 0.0, 12.0)
-	_sled.invulnerable_time = 2.5
-	_camera.mode = ChaseCamera.Mode.CHASE
-	_camera.snap()
+	p.sled.place_at(d, 0.0, 12.0)
+	p.sled.invulnerable_time = 2.5
+	p.camera.mode = ChaseCamera.Mode.CHASE
+	p.camera.snap()
 
 
 func _game_over() -> void:
+	var p := _players[0]
 	state = State.GAME_OVER
 	_director.stop()
-	var record := _run_distance > _save.best_distance
+	var record := p.run_distance > _save.best_distance
 	if record:
-		_save.best_distance = _run_distance
-	_save.best_score = maxi(_save.best_score, _score())
+		_save.best_distance = p.run_distance
+	_save.best_score = maxi(_save.best_score, p.score())
 	if not _autopilot:
 		_save.store()
-	_hud.show_game_over(GAME_OVER_LINES[_rng.randi_range(0, GAME_OVER_LINES.size() - 1)], _last_crash_line, _run_distance, _score(), _save.best_distance, record)
+	_hud.show_game_over(GAME_OVER_LINES[_rng.randi_range(0, GAME_OVER_LINES.size() - 1)], p.last_crash_line, p.run_distance, p.score(), _save.best_distance, record)
 	_sound.set_music_ducked(true)
 	_input_cooldown = 0.8
 
 
-func _check_bounds() -> void:
-	var d := _sled.distance()
-	var outside := absf(_sled.position.x - _field.center_x(d)) - _field.half_width(d)
+func _check_bounds(p: Player = null) -> void:
+	if p == null:
+		p = _players[0]
+	var d := p.sled.distance()
+	var outside := absf(p.sled.position.x - _field.center_x(d)) - _field.half_width(d)
 	var in_town := _field.region(d) == TerrainField.Region.TOWN
 	var kind := _field.region(d)
 	if kind == TerrainField.Region.MALL and outside > 2.0:
-		_crash(["Rakt in i skyltfönstret!", "Du provade en tröja. Med ansiktet.", "Öppet köp gäller inte."][_rng.randi_range(0, 2)])
+		_crash(["Rakt in i skyltfönstret!", "Du provade en tröja. Med ansiktet.", "Öppet köp gäller inte."][_rng.randi_range(0, 2)], p)
 		return
 	if kind == TerrainField.Region.BANDY and outside > 1.0:
-		_crash(["In i sargen!", "Utvisning, tio minuter!"][_rng.randi_range(0, 1)])
+		_crash(["In i sargen!", "Utvisning, tio minuter!"][_rng.randi_range(0, 1)], p)
 		return
 	var in_woods := _field.region(d) == TerrainField.Region.WOODS
 	if in_woods and outside > 2.8:
-		_crash(["In i granskogen!", "Barr överallt.", "Skogen tog dig."][_rng.randi_range(0, 2)])
+		_crash(["In i granskogen!", "Barr överallt.", "Skogen tog dig."][_rng.randi_range(0, 2)], p)
 	elif in_town and outside > 3.2:
-		_crash(["Rakt in i skyltfönstret!", "Du handlade lite på vägen.", "Butiken har stängt. Nu."][_rng.randi_range(0, 2)])
+		_crash(["Rakt in i skyltfönstret!", "Du handlade lite på vägen.", "Butiken har stängt. Nu."][_rng.randi_range(0, 2)], p)
 	elif outside > 30.0:
-		_crash("Vilse i villaområdet!")
+		_crash("Vilse i villaområdet!", p)
 
 
-func _check_pickups() -> void:
-	var probe := _sled.position + Vector3.UP * 0.6
-	for pickup in _world.pickups_near(_sled.distance()):
+func _check_pickups(p: Player = null) -> void:
+	if p == null:
+		p = _players[0]
+	var probe := p.sled.position + Vector3.UP * 0.6
+	for pickup in _world.pickups_near(p.sled.distance()):
 		if not pickup.touches(probe):
 			continue
 		pickup.collect()
 		match pickup.kind:
 			Pickup.Kind.GINGERBREAD:
-				_cookie_streak += 1
-				_cookie_timer = 1.5
-				_add_bonus(10 * mini(_cookie_streak, 6))
-				_sound.play("coin", -4.0, 1.0 + 0.06 * mini(_cookie_streak, 8))
+				p.cookie_streak += 1
+				p.cookie_timer = 1.5
+				_add_bonus(p, 10 * mini(p.cookie_streak, 6))
+				_sound.play("coin", -4.0, 1.0 + 0.06 * mini(p.cookie_streak, 8))
 			Pickup.Kind.MITTEN:
-				_lives = mini(_lives + 1, MAX_LIVES)
+				if _racing:
+					# No lives in a race: warm hands go faster.
+					p.sled.boost_time = maxf(p.sled.boost_time, 1.2)
+					p.say("Varma vantar, mer fart!", Hud.COOL)
+				else:
+					p.lives = mini(p.lives + 1, MAX_LIVES)
 				_sound.play("cocoa")
 			Pickup.Kind.WAX:
-				_sled.boost_time = 2.5
+				p.sled.boost_time = 2.5
 				_sound.play("boost")
-				_atmosphere.flash(Color(0.6, 0.85, 1.0), 0.35)
-				_camera.add_shake(0.4)
+				p.flash(Color(0.6, 0.85, 1.0), 0.35)
+				p.camera.add_shake(0.4)
 
 
-func _on_skimmed(speed: float) -> void:
+func _on_skimmed(speed: float, p: Player) -> void:
 	if state != State.PLAYING:
 		return
 	_sound.play("splash", 0.0, _rng.randf_range(0.9, 1.15))
-	Splash.spawn(_world_root, _sled.position, _sled.velocity, 0.8)
-	_camera.add_shake(0.25)
-	_rumble(0.2, 0.3, 0.1)
-	_add_bonus(int(speed))
+	Splash.spawn(_world_root, p.sled.position, p.sled.velocity, 0.8)
+	p.camera.add_shake(0.25)
+	p.rumble(0.2, 0.3, 0.1)
+	_add_bonus(p, int(speed))
 
 
-func _on_sank() -> void:
-	if state != State.PLAYING or _sled.crashed:
+func _on_sank(p: Player) -> void:
+	if state != State.PLAYING or p.sled.crashed:
 		return
 	_sound.play("splash", 4.0, 0.75)
-	Splash.spawn(_world_root, _sled.position, Vector3.ZERO, 1.8)
-	_crash(["Plask!", "Blöta byxor!", "Isvak!", "För lite fart, för mycket vatten."][_rng.randi_range(0, 3)])
+	Splash.spawn(_world_root, p.sled.position, Vector3.ZERO, 1.8)
+	_crash(["Plask!", "Blöta byxor!", "Isvak!", "För lite fart, för mycket vatten."][_rng.randi_range(0, 3)], p)
 
 
-func _on_jumped() -> void:
+func _on_jumped(_p: Player) -> void:
 	_sound.play("jump", -4.0)
 
 
-func _on_landed(air_time: float, impact: float, spin: float) -> void:
-	if state != State.PLAYING or _sled.crashed:
+func _on_landed(air_time: float, impact: float, spin: float, p: Player) -> void:
+	if state != State.PLAYING or p.sled.crashed:
 		return
 	if impact > 4.0:
 		_sound.play("land", linear_to_db(clampf(impact / 14.0, 0.2, 1.0)))
-		_camera.add_shake(clampf(impact * 0.04, 0.0, 0.8))
-		_sled.puff()
-		_rumble(0.3, clampf(impact / 20.0, 0.1, 0.8), 0.15)
-	if _over_cliff:
-		_over_cliff = false
+		p.camera.add_shake(clampf(impact * 0.04, 0.0, 0.8))
+		p.sled.puff()
+		p.rumble(0.3, clampf(impact / 20.0, 0.1, 0.8), 0.15)
+	if p.over_cliff:
+		p.over_cliff = false
 		var points := CLIFF_BONUS + int(air_time * 40.0)
-		_add_bonus(points)
-		_hud.popup("Du överlevde stupet! +%d" % points, Hud.WARM, 60, 2.0)
+		_add_bonus(p, points)
+		p.say("Du överlevde stupet! +%d" % points, Hud.WARM, 60, 2.0)
 		_sound.play("trick")
-		_camera.add_shake(0.8)
-		_sled.puff()
-		_rumble(0.6, 0.9, 0.35)
+		p.camera.add_shake(0.8)
+		p.sled.puff()
+		p.rumble(0.6, 0.9, 0.35)
 		return
 	var turns := roundi(absf(spin) / PI)
 	if turns >= 2:
 		var degrees := turns * 180
-		_add_bonus(degrees)
-		_hud.popup("%d°! +%d" % [degrees, degrees], Hud.HOT, 60)
+		_add_bonus(p, degrees)
+		p.say("%d°! +%d" % [degrees, degrees], Hud.HOT, 60)
 		_sound.play("trick")
 	elif air_time > 0.7:
 		# Short hops still score, but only real flights get a call-out.
 		var points := int(air_time * 40.0)
-		_add_bonus(points)
+		_add_bonus(p, points)
 		if air_time >= 2.0:
-			_hud.popup("Luftfärd! %s s +%d" % [("%.1f" % air_time).replace(".", ","), points], Hud.WARM)
-
-
-## Test runs (autopilot, --mute, headless) never shake a connected pad.
-func _rumble(weak: float, strong: float, duration: float) -> void:
-	if _autopilot or _muted or DisplayServer.get_name() == "headless":
-		return
-	for device in Input.get_connected_joypads():
-		Input.start_joy_vibration(device, weak, strong, duration)
+			p.say("Luftfärd! %s s +%d" % [("%.1f" % air_time).replace(".", ","), points], Hud.WARM)
 
 
 # --- Testing helpers ---
 
-func _autopilot_steer() -> float:
-	var d := _sled.distance()
+func _autopilot_steer(p: Player = null) -> float:
+	if p == null:
+		p = _players[0]
+	var d := p.sled.distance()
 	var look := d + 22.0
 	var target_x := _field.center_x(look)
 	if _reckless:
-		return clampf(wrapf(atan2(target_x - _sled.position.x, look - d) - _sled.yaw, -PI, PI) * 3.0, -1.0, 1.0)
+		return clampf(wrapf(atan2(target_x - p.sled.position.x, look - d) - p.sled.yaw, -PI, PI) * 3.0, -1.0, 1.0)
 	for obstacle in _world.obstacles_near(d + 20.0):
 		var od := -obstacle.position.z
 		if od > d and od < d + 30.0 and absf(obstacle.position.x - target_x) < 3.5:
 			target_x = obstacle.position.x + (4.5 if obstacle.position.x < target_x else -4.5)
-	var desired := atan2(target_x - _sled.position.x, look - d)
-	return clampf(wrapf(desired - _sled.yaw, -PI, PI) * 3.0, -1.0, 1.0)
+	var desired := atan2(target_x - p.sled.position.x, look - d)
+	return clampf(wrapf(desired - p.sled.yaw, -PI, PI) * 3.0, -1.0, 1.0)
 
 
 ## Testing aid: distance where the first region of the named kind begins.
@@ -1019,7 +1540,8 @@ func _maybe_screenshot() -> void:
 		return
 	var path := _screenshot_path.replace(".png", "_%d.png" % _screenshot_index) if _screenshot_times.size() > 1 else _screenshot_path
 	get_viewport().get_texture().get_image().save_png(path)
-	print("Saved ", path, " distance=", int(_run_distance), " speed=", int(_sled.speed() * 3.6), " km/h fps=", Engine.get_frames_per_second(), " lives=", _lives, " state=", State.keys()[state])
+	var p := _players[0]
+	print("Saved ", path, " distance=", int(p.run_distance), " speed=", int(p.sled.speed() * 3.6), " km/h fps=", Engine.get_frames_per_second(), " lives=", p.lives, " state=", State.keys()[state])
 	_screenshot_index += 1
 	if _screenshot_index >= _screenshot_times.size():
 		_screenshot_path = ""

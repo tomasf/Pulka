@@ -38,6 +38,10 @@ var frozen := true
 var steer_visual := 0.0
 ## Sideways drift from wind gusts, in metres per second.
 var wind_drift := Vector3.ZERO
+## Pull from another rider's slipstream, in m/s² (races only).
+var draft := 0.0
+## Braking, in m/s²: a rider past the finish digs in their heels.
+var brake := 0.0
 
 var _ground_time := 0.0
 var _air_since := 0.0
@@ -83,11 +87,14 @@ func _ready() -> void:
 	add_child(_trail)
 
 
-func set_vehicle(new_spec: VehicleSpec, rng: RandomNumberGenerator) -> void:
+## `jacket` dresses the rider in a given colour (each racer in their own);
+## otherwise jacket and hat are picked at random.
+func set_vehicle(new_spec: VehicleSpec, rng: RandomNumberGenerator, jacket := Color.TRANSPARENT) -> void:
 	spec = new_spec
 	_vehicle_mesh.mesh = RideModels.vehicle(spec.model)
 	_trail.set_model(spec.model)
-	_rider.mesh = RideModels.rider(Palette.pick(Palette.JACKETS, rng), Palette.pick(Palette.JACKETS, rng), spec.model)
+	var coat := Palette.pick(Palette.JACKETS, rng) if jacket.a == 0.0 else jacket
+	_rider.mesh = RideModels.rider(coat, Palette.pick(Palette.JACKETS, rng), spec.model)
 	_reset_rider()
 
 
@@ -207,11 +214,13 @@ func _step_physics(dt: float, steer: float, tuck: float, jump: bool) -> void:
 			var slip := atan2(side_speed, forward_speed)
 			var turned := slip * exp(-grip * dt)
 			var scrubbed := planar_speed * (1.0 - absf(slip - turned) * spec.scrub)
-			planar_speed = maxf(0.0, scrubbed - (drag + friction) * dt)
+			planar_speed = maxf(0.0, scrubbed - (drag + friction + brake) * dt)
 			planar = Vector2(cos(turned), sin(turned)) * planar_speed
 		velocity = along * planar.x + side * planar.y + n * normal_speed
 		if boost_time > 0.0:
 			velocity += along * 16.0 * dt
+		if draft > 0.0:
+			velocity += along * draft * dt
 		if jump and on_ground and _ground_time > 0.12:
 			velocity += n * spec.jump
 			on_ground = false

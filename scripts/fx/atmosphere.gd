@@ -34,6 +34,9 @@ var _sun: DirectionalLight3D
 var _snow: GPUParticles3D
 var _flash := 0.0
 var _snow_process: ParticleProcessMaterial
+## Snow round the second player's camera in a split-screen race; it shares
+## the first snowfall's settings.
+var _second_snow: GPUParticles3D
 var _aurora: Array[MeshInstance3D] = []
 var _intensity := 0.0
 ## Distance, storm and night the sky was last painted for.
@@ -192,6 +195,28 @@ func _update_aurora(camera: Camera3D) -> void:
 		curtain.global_position = at
 		curtain.look_at(camera.global_position + Vector3.UP * (150.0 + i * 30.0), Vector3.UP)
 		(curtain.material_override as ShaderMaterial).set_shader_parameter("strength", aurora)
+
+
+## A split-screen race: snow also falls round the second camera, which can
+## be far from the first. Null takes it away again.
+func follow_second_view(camera: Camera3D) -> void:
+	if camera == null:
+		if _second_snow != null:
+			_second_snow.queue_free()
+			_second_snow = null
+		return
+	if _second_snow == null:
+		_second_snow = GPUParticles3D.new()
+		_second_snow.amount = _snow.amount
+		_second_snow.lifetime = _snow.lifetime
+		_second_snow.preprocess = _snow.preprocess
+		_second_snow.local_coords = false
+		_second_snow.visibility_aabb = _snow.visibility_aabb
+		_second_snow.process_material = _snow_process
+		_second_snow.draw_pass_1 = _snow.draw_pass_1
+		add_child(_second_snow)
+	_second_snow.amount_ratio = _snow.amount_ratio
+	_second_snow.global_position = camera.global_position - camera.global_basis.z * 16.0 + Vector3.UP * 5.0
 
 
 func _make_snowfall() -> GPUParticles3D:

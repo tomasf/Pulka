@@ -6,6 +6,9 @@ extends Camera3D
 enum Mode { ORBIT, CHASE, CRASH }
 
 var mode := Mode.ORBIT
+## Orbit with the rider in the middle of the view (a racer who has won),
+## not off to the right of the menu panel.
+var centered := false
 var target: Sled
 var field: TerrainField
 
@@ -84,7 +87,7 @@ func _update_orbit(delta: float) -> void:
 	look_at(center + Vector3(0, 0.2, -1.0), Vector3.UP)
 	fov = 60.0
 	# Keep the rider in the right half of the screen, clear of the menu panel.
-	h_offset = -1.7
+	h_offset = 0.0 if centered else -1.7
 	v_offset = 0.0
 
 

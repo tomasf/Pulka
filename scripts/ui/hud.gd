@@ -101,6 +101,12 @@ var _backdrops: Array[Control] = []
 var _menu_column: VBoxContainer
 var _menu_start: Button
 var _menu_settings: Button
+var _menu_players: Button
+## Over the split-screen menu: the players choice and how to go back.
+var _lobby_bar: Control
+## In a split-screen race each player has their own HUD; this one only
+## shows menus, pause and results.
+var racing := false
 var _touch_mode := false
 var _last_row_first: Button
 ## The button each screen focuses first, for keyboard and controller play.
@@ -133,6 +139,7 @@ func _ready() -> void:
 	_build_menu()
 	_build_pause()
 	_build_game_over()
+	_build_lobby_bar()
 	_build_settings()
 	if OS.has_feature("web"):
 		_build_fullscreen_button()
@@ -140,11 +147,14 @@ func _ready() -> void:
 	add_child(_fps_meter)
 	_default_focus[_menu] = _menu_start
 	# Left/right on the menu pick a ride, so focus only moves up and down there.
-	for button in [_menu_start, _menu_settings]:
+	for button in [_menu_start, _menu_players, _menu_settings]:
 		button.focus_neighbor_left = button.get_path()
 		button.focus_neighbor_right = button.get_path()
 	_menu_start.focus_neighbor_bottom = _menu_settings.get_path()
 	_menu_settings.focus_neighbor_top = _menu_start.get_path()
+	if _menu_players.visible:
+		_menu_start.focus_neighbor_top = _menu_players.get_path()
+		_menu_players.focus_neighbor_bottom = _menu_start.get_path()
 	show_screen("")
 	get_viewport().size_changed.connect(_fit_safe_area)
 	_fit_safe_area()
@@ -475,6 +485,12 @@ func _build_menu() -> void:
 	title.rotation = -0.05
 	column.add_child(title)
 	column.add_child(label("Den oändliga backen", 34, COOL, 10))
+	# One player or two, chosen first: two splits the screen, and each
+	# player then picks their own ride on their half. Not on phones.
+	var players := _players_row(1)
+	_menu_players = players.get_child(1) as Button
+	players.visible = not Quality.is_mobile()
+	column.add_child(players)
 	var spacer := Control.new()
 	spacer.custom_minimum_size = Vector2(0, 8)
 	column.add_child(spacer)
@@ -530,6 +546,34 @@ func _build_menu() -> void:
 	settings.offset_right = -36
 	settings.offset_bottom = -32
 	_menu.add_child(settings)
+
+
+## "1 spelare | 2 spelare", the current choice lit up and the other a
+## button that switches to it.
+func _players_row(current: int) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.add_child(_button("1 spelare", &"solo", 28, current == 1, current != 1))
+	row.add_child(_button("2 spelare", &"duo", 28, current == 2, current != 2))
+	return row
+
+
+## Across the top of the split-screen menu.
+func _build_lobby_bar() -> void:
+	_lobby_bar = _full_rect()
+	var column := VBoxContainer.new()
+	column.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	column.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	column.offset_top = 18
+	column.alignment = BoxContainer.ALIGNMENT_CENTER
+	column.add_theme_constant_override("separation", 6)
+	var center := CenterContainer.new()
+	center.add_child(_players_row(2))
+	column.add_child(center)
+	var hint := label("Esc / B: tillbaka till en spelare", 20, Color(1, 1, 1, 0.85), 6)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(hint)
+	_lobby_bar.add_child(column)
 
 
 func update_menu(spec: VehicleSpec, unlocked: bool, best_distance: float, best_score: int) -> void:
@@ -592,6 +636,15 @@ func _button_row(entries: Array) -> CenterContainer:
 	center.add_child(row)
 	_last_row_first = row.get_child(0) as Button
 	return center
+
+
+## Results of a two-player race: who won, and each rider's time.
+func show_race_result(title: String, body: String) -> void:
+	_over_cause.visible = false
+	_over_title.text = title
+	_over_body.text = body
+	_over_record.visible = false
+	show_screen("over", 0.8)
 
 
 ## `cause` is the line from the final crash, shown above the title.
@@ -740,7 +793,8 @@ func show_screen(screen: String, focus_delay := 0.0) -> void:
 	else:
 		_focus_current.call_deferred()
 	_menu.visible = screen == "menu"
-	_game.visible = screen == "game" or screen == "pause"
+	_game.visible = (screen == "game" or screen == "pause") and not racing
+	_lobby_bar.visible = screen == "lobby"
 	_popups.visible = screen == "game"
 	_pause.visible = screen == "pause"
 	_over.visible = screen == "over"

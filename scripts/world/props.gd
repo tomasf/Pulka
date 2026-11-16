@@ -1277,6 +1277,30 @@ static func repose(root: Node3D, rig: Rig, phase: float) -> void:
 			(joint.get_child(1) as Node3D).rotation.x = angles.y
 
 
+## The finish of a race: an inflatable arch `width` metres across the
+## track, chequered along the top, sponsor stripes down the legs.
+static func finish_arch(width: int) -> ArrayMesh:
+	return cached_mesh("finish%d" % width, func() -> ArrayMesh:
+		var kit := MeshKit.new()
+		var red := Color(0.9, 0.12, 0.15)
+		var half := width * 0.5
+		for side in [-1.0, 1.0]:
+			kit.capsule_between(Vector3(side * half, 0.0, 0), Vector3(side * half, 5.2, 0), 0.55, red, 12)
+			for k in 3:
+				kit.cylinder(0.57, 0.3, Vector3(side * half, 1.0 + k * 1.4, 0), Color(1, 1, 1), 12)
+			kit.ellipsoid(Vector3(0.9, 0.25, 0.9), Vector3(side * half, 0.0, 0), Palette.SNOW)
+		kit.capsule_between(Vector3(-half, 5.6, 0), Vector3(half, 5.6, 0), 0.6, red, 12)
+		# A chequered banner hanging under the top tube.
+		var squares := int(width / 0.6)
+		for i in squares:
+			for row in 2:
+				var x := -half + 0.6 + (i + 0.5) * (width - 1.2) / squares
+				var dark := (i + row) % 2 == 0
+				kit.box(Vector3((width - 1.2) / squares, 0.4, 0.06), Vector3(x, 4.75 - row * 0.4, 0), Color(0.08, 0.08, 0.1) if dark else Color(1, 1, 1))
+		kit.box(Vector3(width * 0.6, 1.4, 0.08), Vector3(0, 5.9, 0), Color(0.95, 0.75, 0.1))
+		return kit.build())
+
+
 # --- Pickups ---
 
 ## A gingerbread man facing -Z, piped with white icing: eyes, a smile,

@@ -4,8 +4,9 @@ extends Node3D
 ## fights, Santa flying over dropping presents, and northern lights that
 ## double your points. One event at a time, spaced out along the slope.
 
-signal snowball_hit
-signal gift_collected
+## Which ride the snowball hit, or caught the present.
+signal snowball_hit(who: Sled)
+signal gift_collected(who: Sled)
 
 enum Kind { NONE, BLIZZARD, SNOWBALLS, SANTA, AURORA }
 
@@ -25,7 +26,10 @@ class Flying:
 	var age := 0.0
 
 
+## The ride events follow (the leader in a race).
 var sled: Sled
+## Everyone riding: any of them can be hit or catch a present.
+var sleds: Array[Sled] = []
 var field: TerrainField
 var atmosphere: Atmosphere
 var sound: SoundBank
@@ -178,19 +182,21 @@ func _apply_atmosphere() -> void:
 # --- Blizzard ---
 
 func _update_wind() -> void:
-	if _storm <= 0.0:
-		sled.wind_drift = Vector3.ZERO
-		return
-	var gust := 0.35 + 0.65 * absf(sin(_clock * 0.8) * sin(_clock * 0.31 + 1.0))
-	var across := field.track_dir(sled.distance()).cross(Vector3.UP)
-	sled.wind_drift = across * _wind_side * gust * 5.5 * _storm
+	for rider in sleds:
+		if _storm <= 0.0:
+			rider.wind_drift = Vector3.ZERO
+			continue
+		var gust := 0.35 + 0.65 * absf(sin(_clock * 0.8) * sin(_clock * 0.31 + 1.0))
+		var across := field.track_dir(rider.distance()).cross(Vector3.UP)
+		rider.wind_drift = across * _wind_side * gust * 5.5 * _storm
 
 
 # --- Snowball fight ---
 
 func _throw() -> void:
 	var flight := 0.9
-	var target := sled.position + sled.velocity * flight + Vector3(_rng.randf_range(-1.2, 1.2), 0.5, _rng.randf_range(-1.0, 1.0))
+	var aimed := sleds[_rng.randi_range(0, sleds.size() - 1)] if not sleds.is_empty() else sled
+	var target := aimed.position + aimed.velocity * flight + Vector3(_rng.randf_range(-1.2, 1.2), 0.5, _rng.randf_range(-1.0, 1.0))
 	var target_d := -target.z
 	var side := -1.0 if _rng.randf() < 0.5 else 1.0
 	var launch_d := target_d + _rng.randf_range(-2.0, 8.0)
@@ -213,16 +219,18 @@ func _throw() -> void:
 
 
 func _update_snowballs(delta: float) -> void:
-	var body := sled.position + Vector3.UP * 0.6
 	for ball: Flying in _snowballs.duplicate():
 		ball.age += delta
 		ball.velocity.y -= GRAVITY * delta
 		ball.node.position += ball.velocity * delta
-		var hit := not sled.crashed and ball.node.position.distance_to(body) < 1.0
+		var hit: Sled = null
+		for rider in sleds:
+			if not rider.crashed and ball.node.position.distance_to(rider.position + Vector3.UP * 0.6) < 1.0:
+				hit = rider
 		var ground := field.height_world(ball.node.position.x, ball.node.position.z)
-		if hit or ball.node.position.y < ground or ball.age > 3.0:
-			if hit:
-				snowball_hit.emit()
+		if hit != null or ball.node.position.y < ground or ball.age > 3.0:
+			if hit != null:
+				snowball_hit.emit(hit)
 			Debris.burst(get_parent(), field, ball.node.position - Vector3(0, 0.6, 0), ball.velocity * 0.2, 5, 0.12)
 			ball.node.queue_free()
 			_snowballs.erase(ball)
@@ -320,12 +328,18 @@ func _update_gifts(delta: float) -> void:
 				gift.node.rotation = Vector3(0, gift.node.rotation.y, 0)
 		else:
 			gift.node.rotation.y += delta * 1.5
-		var offset := gift.node.position - sled.position
-		if not sled.crashed and Vector2(offset.x, offset.z).length() < 1.9 and absf(offset.y) < 2.5:
+		var catcher: Sled = null
+		var last := sled.position.z
+		for rider in sleds:
+			var offset := gift.node.position - rider.position
+			if not rider.crashed and Vector2(offset.x, offset.z).length() < 1.9 and absf(offset.y) < 2.5:
+				catcher = rider
+			last = maxf(last, rider.position.z)
+		if catcher != null:
 			_caught += 1
-			gift_collected.emit()
+			gift_collected.emit(catcher)
 			gift.node.queue_free()
 			_gifts.erase(gift)
-		elif gift.node.position.z > sled.position.z + 30.0:
+		elif gift.node.position.z > last + 30.0:
 			gift.node.queue_free()
 			_gifts.erase(gift)

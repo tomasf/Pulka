@@ -78,10 +78,19 @@ func tick(delta: float, player_d: float) -> void:
 	if not _honked and approaching and absf(_head - player_d) < 90.0 and obstacles[0].visible:
 		_honked = true
 		_horn.play()
-	if absf(_head - player_d) < SIGHT or absf(_tail - player_d) < SIGHT:
+	if _in_sight(player_d):
 		_place()
 	else:
 		_hide()
+
+
+## Near any rider (the one in front, or another further back).
+func _in_sight(player_d: float) -> bool:
+	var riders := _world.rider_ds if not _world.rider_ds.is_empty() else PackedFloat32Array([player_d])
+	for d in riders:
+		if absf(_head - d) < SIGHT or absf(_tail - d) < SIGHT:
+			return true
+	return false
 
 
 func finished(player_d: float) -> bool:

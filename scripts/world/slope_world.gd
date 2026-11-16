@@ -47,7 +47,9 @@ var car_horn_sound: AudioStream
 var jet_sound: AudioStream
 var regions: RegionBuilder
 ## Distance of the player, for things that react to them (trains, planes).
+## With two players this is the one in front; `rider_ds` has them all.
 var player_d := 0.0
+var rider_ds := PackedFloat32Array()
 ## Moving things that are not tied to one chunk (trains run through many).
 var _free: Array[Node] = []
 var _free_obstacles: Array[Obstacle] = []
@@ -93,28 +95,46 @@ func reset(new_field: TerrainField, start_d: float) -> void:
 
 
 ## `build_ms` is the time this frame may spend building chunks ahead.
-func update_world(player_distance: float, delta: float, build_ms := BUILD_MS) -> void:
+## `others` are the distances of any riders behind the one in front: the
+## world is kept and built around each of them too.
+func update_world(player_distance: float, delta: float, build_ms := BUILD_MS, others := PackedFloat32Array()) -> void:
 	player_d = player_distance
-	var current := int(floorf(player_d / CHUNK_LENGTH))
+	rider_ds = PackedFloat32Array([player_d])
+	rider_ds.append_array(others)
+	var currents: Array[int] = []
+	for d in rider_ds:
+		currents.append(int(floorf(d / CHUNK_LENGTH)))
 	for key: int in _chunks.keys():
-		if key < current - CHUNKS_BEHIND or key > current + _chunks_ahead + 1:
+		var wanted := false
+		for current in currents:
+			if key >= current - CHUNKS_BEHIND and key <= current + _chunks_ahead + 1:
+				wanted = true
+		if not wanted:
 			(_chunks[key] as Chunk).queue_free()
 			_chunks.erase(key)
 			_building.erase(key)
 	# Nearest first; the ones right ahead are finished whatever it costs.
 	var deadline := Time.get_ticks_usec() + int(build_ms * 1000.0)
 	_heavy_budget = build_ms * 600.0
-	for i in range(current - CHUNKS_BEHIND, current + _chunks_ahead + 1):
-		var urgent := i <= current + URGENT_AHEAD
-		if not urgent and Time.get_ticks_usec() >= deadline:
-			break
-		if not _chunks.has(i) or _building.has(i):
-			_build(i, INF if urgent else float(deadline))
+	for current in currents:
+		for i in range(current - CHUNKS_BEHIND, current + URGENT_AHEAD + 1):
+			if not _chunks.has(i) or _building.has(i):
+				_build(i, INF)
+	for current in currents:
+		for i in range(current + URGENT_AHEAD + 1, current + _chunks_ahead + 1):
+			if Time.get_ticks_usec() >= deadline:
+				break
+			if not _chunks.has(i) or _building.has(i):
+				_build(i, float(deadline))
 	for chunk: Chunk in _chunks.values():
 		chunk.tick(delta)
+	var last := player_d
+	for d in rider_ds:
+		last = minf(last, d)
 	for node in _free.duplicate():
 		node.call(&"tick", delta, player_d)
-		if node.call(&"finished", player_d):
+		# Gone only once every rider is past it.
+		if node.call(&"finished", last):
 			for obstacle: Obstacle in node.get(&"obstacles"):
 				_free_obstacles.erase(obstacle)
 			_free.erase(node)
