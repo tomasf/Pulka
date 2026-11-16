@@ -54,6 +54,13 @@ var _spray: GPUParticles3D
 var _puff: GPUParticles3D
 var _trail: SnowTrail
 var _visual_spin := 0.0
+## How far the rider is crouched forward for speed, 0 to 1, eased.
+var _tuck_visual := 0.0
+## How squashed the rider is from a landing; springs back to 0.
+var _squash := 0.0
+var _squash_speed := 0.0
+## Running clock for the rider's small shakes over the snow.
+var _rumble := 0.0
 ## The ground under the ride (normal, height) and where it was sampled; the
 ## physics and the visuals ask for the same spot several times a frame.
 var _ground := Vector4.ZERO
@@ -125,6 +132,7 @@ func place_at(d: float, lateral := 0.0, start_speed := 0.0) -> void:
 
 func step(delta: float, steer: float, tuck: float, jump: bool) -> void:
 	steer_visual = lerpf(steer_visual, steer, 1.0 - exp(-8.0 * delta))
+	_tuck_visual = lerpf(_tuck_visual, tuck if on_ground and not crashed else 0.0, 1.0 - exp(-6.0 * delta))
 	if frozen:
 		_update_visual(delta)
 		return
@@ -258,6 +266,8 @@ func _resolve_ground() -> void:
 			if absf(air_spin) > 0.3:
 				# Land tricks cleanly: the nose snaps to the direction of travel.
 				yaw += wrapf(atan2(velocity.x, -velocity.z) - yaw, -PI, PI)
+			# The rider sinks into the landing, harder the harder it was.
+			_squash_speed -= clampf(maxf(-into, 0.0) * 0.12, 0.3, 2.2)
 			landed.emit(air_time, maxf(-into, 0.0), air_spin)
 	elif on_ground:
 		on_ground = false
@@ -310,6 +320,9 @@ func crash() -> void:
 		return
 	var impact_velocity := travel_velocity()
 	crashed = true
+	_rider.scale = Vector3.ONE
+	_squash = 0.0
+	_squash_speed = 0.0
 	var xform := _rider.global_transform
 	_rider.top_level = true
 	_rider.global_transform = xform
@@ -374,8 +387,23 @@ func _update_visual(delta: float) -> void:
 	_body.rotation.y = _visual_spin
 	_vehicle_mesh.transform = Transform3D.IDENTITY
 	if not crashed and _rider:
+		# A damped spring brings a squashed rider back up after a landing.
+		_squash_speed += (-_squash * 260.0 - _squash_speed * 16.0) * delta
+		_squash = clampf(_squash + _squash_speed * delta, -0.3, 0.15)
+		var rattle := 0.0
+		if on_ground and spec != null:
+			_rumble += delta * (30.0 + speed() * 0.8)
+			rattle = (sin(_rumble) * 0.6 + sin(_rumble * 2.3) * 0.4) * clampf(speed() / 40.0, 0.0, 1.0) * 0.006
+		var seat := spec.seat_height if spec else 0.2
+		_rider.position = Vector3(0, seat + rattle + _squash * 0.2, 0.05)
+		_rider.scale = Vector3(1.0 - _squash * 0.4, 1.0 + _squash, 1.0 - _squash * 0.4)
+		# Leaning into turns, crouching forward to tuck, and in the air
+		# leaning back on the way up and forward coming down.
+		var pitch := -_tuck_visual * 0.32
+		if not on_ground:
+			pitch += clampf(velocity.y * 0.025, -0.2, 0.2)
 		_rider.rotation.z = -steer_visual * 0.25
-		_rider.rotation.x = 0.0
+		_rider.rotation.x = pitch
 		_rider.rotation.y = 0.0
 	_body.visible = invulnerable_time <= 0.0 or fmod(invulnerable_time, 0.2) < 0.12
 

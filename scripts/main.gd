@@ -457,10 +457,32 @@ func _on_snowball_hit() -> void:
 	_rumble(0.3, 0.3, 0.15)
 
 
+## What is in one of Santa's parcels: usually something useful, now and
+## then a bag of points, once in a while a lump of coal.
 func _on_gift_collected() -> void:
-	_add_bonus(100)
-	_hud.popup("+100", Hud.HOT)
-	_sound.play("cocoa", -2.0, _rng.randf_range(0.95, 1.15))
+	var roll := _rng.randf()
+	if roll < 0.25 and _lives < MAX_LIVES:
+		_lives += 1
+		_hud.popup("Ett par vantar! Extraliv!", Hud.HOT)
+		_sound.play("cocoa")
+	elif roll < 0.5:
+		_sled.boost_time = maxf(_sled.boost_time, 2.5)
+		_hud.popup("Turbovalla!", Hud.COOL)
+		_sound.play("boost")
+		_atmosphere.flash(Color(0.6, 0.85, 1.0), 0.35)
+		_camera.add_shake(0.4)
+	elif roll < 0.68:
+		_sled.invulnerable_time = maxf(_sled.invulnerable_time, 5.0)
+		_hud.popup("Tomtens skydd! Inget kan stoppa dig.", Hud.COOL)
+		_sound.play("cocoa", -2.0, 1.25)
+	elif roll < 0.92:
+		_add_bonus(250)
+		_hud.popup("En burk pepparkakor! +250", Hud.WARM)
+		_sound.play("coin", -2.0, 1.2)
+	else:
+		_add_bonus(1)
+		_hud.popup(["Kol. Du har varit stygg i år.", "Ett par raggsockor. +1", "Ett mjukt paket. +1"][_rng.randi_range(0, 2)], Hud.WARM)
+		_sound.play("cocoa", -6.0, 0.7)
 
 
 func _score() -> int:

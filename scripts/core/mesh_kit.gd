@@ -77,6 +77,20 @@ func capsule(radius: float, height: float, pos: Vector3, color: Color, rot := Ve
 	return add(mesh, Transform3D(Basis.from_euler(rot) * Basis.from_scale(scale), pos), color)
 
 
+## A capsule spanning from a to b: a limb, a tube, a branch.
+func capsule_between(a: Vector3, b: Vector3, radius: float, color: Color, segments := 10) -> MeshKit:
+	var span := b - a
+	if span.length() < 0.001:
+		return self
+	var turn := Basis(Quaternion(Vector3.UP, span.normalized()))
+	var mesh := CapsuleMesh.new()
+	mesh.radius = radius
+	mesh.height = span.length() + radius * 2.0
+	mesh.radial_segments = segments
+	mesh.rings = 3 if segments >= 8 else 1
+	return add(mesh, Transform3D(turn, (a + b) * 0.5), color)
+
+
 ## Ellipsoid: a sphere stretched by `radii` and rotated by `rot`.
 func ellipsoid(radii: Vector3, pos: Vector3, color: Color, rot := Vector3.ZERO) -> MeshKit:
 	var mesh := SphereMesh.new()
@@ -231,6 +245,26 @@ static func superellipse(half_x: float, half_z: float, y: float, points := 28, p
 		var c := cos(angle)
 		var s := sin(angle)
 		ring.append(Vector3(signf(c) * pow(absf(c), 2.0 / power) * half_x, y, signf(s) * pow(absf(s), 2.0 / power) * half_z))
+	return ring
+
+
+## Closed outline in the XZ plane at height y whose radius goes in and out
+## `lobes` times round, like the tips of branches round a spruce tier.
+## `depth` is how far in (0 to 1) the radius dips between lobes; `jitter`
+## varies each lobe's reach, from `seed`, so no two look alike.
+static func lobed(radius: float, y: float, lobes: int, depth: float, seed: int, jitter := 0.0, droop := 0.0) -> PackedVector3Array:
+	var ring := PackedVector3Array()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var reach := PackedFloat32Array()
+	for i in lobes:
+		reach.append(1.0 - rng.randf() * jitter)
+	var twist := rng.randf() * TAU
+	for i in lobes * 2:
+		var angle := twist + PI * i / lobes
+		var tip := i % 2 == 0
+		var r := radius * (reach[i / 2] if tip else 1.0 - depth)
+		ring.append(Vector3(cos(angle) * r, y - (droop * reach[i / 2] if tip else 0.0), sin(angle) * r))
 	return ring
 
 

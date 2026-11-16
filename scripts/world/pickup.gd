@@ -39,7 +39,9 @@ func tick(delta: float) -> void:
 	if collected:
 		return
 	_time += delta
+	# Turning slowly, bobbing and rocking a little, as if it floated.
 	rotation.y = _time * 2.5
+	rotation.x = sin(_time * 1.7) * 0.12
 	position.y = _base_y + sin(_time * 3.0) * 0.15
 
 
@@ -47,6 +49,15 @@ func touches(p: Vector3) -> bool:
 	return not collected and p.distance_squared_to(position) < RADIUS * RADIUS * 1.8
 
 
+## Picked up: it gives a little hop and a spin and shrinks away.
 func collect() -> void:
 	collected = true
-	visible = false
+	if not is_inside_tree():
+		visible = false
+		return
+	var pop := create_tween()
+	pop.tween_property(self, "scale", Vector3.ONE * 1.2, 0.05).set_ease(Tween.EASE_OUT)
+	pop.parallel().tween_property(self, "position:y", position.y + 0.5, 0.18).set_ease(Tween.EASE_OUT)
+	pop.parallel().tween_property(self, "rotation:y", rotation.y + TAU, 0.18)
+	pop.tween_property(self, "scale", Vector3.ONE * 0.01, 0.13).set_ease(Tween.EASE_IN)
+	pop.tween_callback(func() -> void: visible = false)

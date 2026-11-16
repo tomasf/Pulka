@@ -48,6 +48,8 @@ var near_miss_done := false
 var visual: MeshInstance3D
 
 var _limbs: Array[Node3D] = []
+## Per limb, the joint of its lower part (knee, elbow), or null.
+var _lowers: Array[Node3D] = []
 var _limb_specs: Array[Props.Limb] = []
 var _stride := 0.0
 var _gait := 0.0
@@ -72,8 +74,18 @@ func configure(which: Kind, rig: Props.Rig, terrain: TerrainField) -> Obstacle:
 		var limb := MeshInstance3D.new()
 		limb.mesh = spec.mesh
 		joint.add_child(limb)
+		var lower: Node3D = null
+		if spec.lower != null:
+			lower = Node3D.new()
+			lower.position = spec.joint
+			lower.rotation.x = spec.rest
+			var lower_mesh := MeshInstance3D.new()
+			lower_mesh.mesh = spec.lower
+			lower.add_child(lower_mesh)
+			joint.add_child(lower)
 		visual.add_child(joint)
 		_limbs.append(joint)
+		_lowers.append(lower)
 		_limb_specs.append(spec)
 	match which:
 		Kind.TREE:
@@ -218,6 +230,8 @@ func _process(delta: float) -> void:
 	rotate_object_local(Vector3.BACK, _spin.z * delta)
 	for i in _limbs.size():
 		_limbs[i].rotation = Vector3(sin(_airtime * 17.0 + i) * 1.3, 0.0, cos(_airtime * 13.0 + i * 2.0) * 0.8)
+		if _lowers[i] != null:
+			_lowers[i].rotation.x = sin(_airtime * 11.0 + i * 1.7) * 0.9
 	var ground := field.height_world(position.x, position.z)
 	if position.y < ground:
 		position.y = ground
@@ -261,13 +275,24 @@ func tick(delta: float) -> void:
 			visual.position.y = absf(sin(_time * _hop_rate)) * _hop_height
 		_gait += velocity.length() * _stride * delta
 		for i in _limbs.size():
-			_limbs[i].rotation = Vector3(sin(_gait + _limb_specs[i].phase) * _limb_specs[i].swing, 0.0, 0.0)
+			var angles := _limb_specs[i].pose(_gait)
+			_limbs[i].rotation = Vector3(angles.x, 0.0, 0.0)
+			if _lowers[i] != null:
+				_lowers[i].rotation.x = angles.y
 		if not _limbs.is_empty():
-			visual.position.y = absf(sin(_gait)) * 0.04
+			# The body rises over each step and rolls a little from foot to foot.
+			visual.position.y = absf(cos(_gait)) * 0.035
+			visual.rotation.z = sin(_gait) * 0.035
 	else:
 		for i in _limbs.size():
 			if _limb_specs[i].waves:
 				_limbs[i].rotation = Vector3(0.0, 0.0, 2.5 + 0.35 * sin(_time * 9.0 + position.x))
+				if _lowers[i] != null:
+					_lowers[i].rotation.x = 0.3 + 0.25 * sin(_time * 9.0 + position.x + 0.8)
+		if not _limbs.is_empty() and _hop_rate == 0.0:
+			# Standing about: breathing, shifting weight now and then.
+			visual.position.y = sin(_time * 1.6 + position.x) * 0.008
+			visual.rotation.z = sin(_time * 0.4 + position.z) * 0.02
 
 
 func _face_velocity() -> void:

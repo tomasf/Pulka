@@ -6,30 +6,6 @@ extends RefCounted
 
 # --- Shopping mall ---
 
-const MALL_SHOPS := [
-	"Mössor & Vantar", "Glöggbaren", "Pulkadepån", "Skidbutiken", "Pepparkakshuset", "Tomteverkstan",
-	"Ylle & Co", "Godisbutiken", "Kaffestugan", "Leksakslådan", "Sportlovet", "Vinterskor",
-]
-
-
-## A glass shop front, 10 m wide along local X, facing -Z.
-static func shopfront(variant: int) -> ArrayMesh:
-	return Props.cached_mesh("shop%d" % variant, func() -> ArrayMesh:
-		var kit := MeshKit.new()
-		var band: Color = Palette.JACKETS[variant % Palette.JACKETS.size()]
-		var frame := Color(0.85, 0.86, 0.88)
-		kit.box(Vector3(10.0, 11.0, 6.0), Vector3(0, 3.0, 3.0), Color(0.9, 0.88, 0.84))
-		kit.box(Vector3(9.6, 3.2, 0.1), Vector3(0, 1.7, -0.02), Color(1.0, 0.9, 0.7, 0.0))
-		for i in 5:
-			kit.box(Vector3(0.12, 3.4, 0.16), Vector3(-4.8 + i * 2.4, 1.7, -0.05), frame)
-		kit.box(Vector3(10.0, 0.14, 0.18), Vector3(0, 3.35, -0.05), frame)
-		kit.box(Vector3(10.0, 1.0, 0.2), Vector3(0, 4.0, -0.08), band)
-		kit.box(Vector3(10.0, 0.08, 0.3), Vector3(0, 0.04, -0.1), frame)
-		for i in 3:
-			kit.box(Vector3(0.6, 0.9, 0.5), Vector3(-3.0 + i * 3.0, 0.45, 0.6), Palette.pick(Palette.JACKETS, _rng(variant + i)))
-		return kit.build())
-
-
 ## Ten metres of mall ceiling, `span` metres wide (along X): a slab with a
 ## skylight down the middle and rows of ceiling lights.
 static func mall_ceiling(span: int) -> ArrayMesh:
@@ -62,51 +38,97 @@ static func mall_entrance(span: int) -> ArrayMesh:
 		return kit.build())
 
 
+## A wire shopping trolley: a tapered basket of bars on a chassis with
+## castors, a red handle and something orange in it.
 static func shopping_cart() -> ArrayMesh:
 	return Props.cached_mesh("cart", func() -> ArrayMesh:
 		var kit := MeshKit.new()
-		var wire := Color(0.75, 0.78, 0.8)
-		kit.box(Vector3(0.6, 0.5, 0.9), Vector3(0, 0.75, 0), Color(0.75, 0.78, 0.8, 1.0))
-		kit.box(Vector3(0.52, 0.42, 0.82), Vector3(0, 0.79, 0), Color(0.3, 0.32, 0.36))
-		kit.cylinder(0.025, 0.62, Vector3(0, 1.1, 0.5), Color(0.9, 0.1, 0.1), 6, Vector3(0, 0, PI / 2))
-		for sx in [-0.25, 0.25]:
-			for sz in [-0.35, 0.35]:
-				kit.cylinder(0.06, 0.04, Vector3(sx, 0.06, sz), Color(0.1, 0.1, 0.1), 8, Vector3(0, 0, PI / 2))
-				kit.box(Vector3(0.03, 0.5, 0.03), Vector3(sx, 0.3, sz), wire)
-		kit.box(Vector3(0.3, 0.25, 0.25), Vector3(0.1, 1.12, -0.1), Color(1.0, 0.6, 0.1))
+		var wire := Color(0.78, 0.8, 0.83)
+		var red := Color(0.9, 0.1, 0.1)
+		# Basket corners: wider at the back (+Z) where the handle is.
+		var lo := [Vector3(-0.24, 0.55, -0.45), Vector3(0.24, 0.55, -0.45), Vector3(0.28, 0.55, 0.45), Vector3(-0.28, 0.55, 0.45)]
+		var hi := [Vector3(-0.28, 1.0, -0.5), Vector3(0.28, 1.0, -0.5), Vector3(0.32, 1.0, 0.5), Vector3(-0.32, 1.0, 0.5)]
+		for i in 4:
+			var j := (i + 1) % 4
+			kit.capsule_between(lo[i], lo[j], 0.012, wire, 4)
+			kit.capsule_between(hi[i], hi[j], 0.015, wire, 4)
+			kit.capsule_between(lo[i], hi[i], 0.012, wire, 4)
+			for k in range(1, 6):
+				var t := k / 6.0
+				kit.capsule_between(lo[i].lerp(lo[j], t), hi[i].lerp(hi[j], t), 0.007, wire, 3)
+			kit.capsule_between(lo[i].lerp(hi[i], 0.5), lo[j].lerp(hi[j], 0.5), 0.007, wire, 3)
+		kit.box(Vector3(0.48, 0.02, 0.9), Vector3(0, 0.55, 0), Color(0.6, 0.62, 0.65))
+		kit.capsule_between(Vector3(-0.33, 1.08, 0.58), Vector3(0.33, 1.08, 0.58), 0.025, red, 8)
+		for side in [-1.0, 1.0]:
+			kit.capsule_between(Vector3(0.3 * side, 1.0, 0.5), Vector3(0.32 * side, 1.08, 0.58), 0.015, wire, 4)
+			kit.capsule_between(Vector3(0.22 * side, 0.1, -0.4), Vector3(0.26 * side, 0.55, 0.4), 0.018, wire, 4)
+			kit.capsule_between(Vector3(0.24 * side, 0.1, 0.4), Vector3(0.26 * side, 0.55, 0.4), 0.018, wire, 4)
+			kit.capsule_between(Vector3(0.22 * side, 0.1, -0.4), Vector3(0.24 * side, 0.1, 0.4), 0.018, wire, 4)
+			for z in [-0.4, 0.4]:
+				kit.cylinder(0.055, 0.04, Vector3(0.23 * side, 0.055, z), Color(0.1, 0.1, 0.1), 10, Vector3(0, 0, PI / 2))
+		kit.box(Vector3(0.3, 0.25, 0.25), Vector3(0.05, 0.7, -0.1), Color(1.0, 0.6, 0.1), Vector3(0, 0.3, 0))
+		kit.box(Vector3(0.2, 0.3, 0.12), Vector3(-0.1, 0.72, 0.2), Color(0.2, 0.5, 0.85))
 		return kit.build())
 
 
+## A ficus in a big planter: a twisting trunk and a crown of leaf clumps.
 static func potted_plant() -> ArrayMesh:
 	return Props.cached_mesh("plant", func() -> ArrayMesh:
 		var kit := MeshKit.new()
-		kit.cylinder(0.45, 0.7, Vector3(0, 0.35, 0), Color(0.75, 0.4, 0.25), 12, Vector3.ZERO, 0.35)
-		kit.cylinder(0.08, 1.2, Vector3(0, 1.2, 0), Palette.TRUNK, 6)
-		kit.sphere(0.75, Vector3(0, 2.1, 0), Color(0.2, 0.5, 0.25), Vector3(1, 0.9, 1))
-		kit.sphere(0.45, Vector3(0.4, 1.7, 0.2), Color(0.25, 0.55, 0.28))
+		kit.lathe(PackedVector2Array([Vector2(0.32, 0.0), Vector2(0.4, 0.05), Vector2(0.47, 0.66), Vector2(0.5, 0.7), Vector2(0.44, 0.72)]), Transform3D.IDENTITY, Color(0.85, 0.84, 0.8), 14)
+		kit.cylinder(0.43, 0.04, Vector3(0, 0.66, 0), Color(0.3, 0.22, 0.15), 14)
+		kit.capsule_between(Vector3(0, 0.65, 0), Vector3(0.08, 1.4, 0.05), 0.06, Palette.TRUNK, 6)
+		kit.capsule_between(Vector3(0.08, 1.4, 0.05), Vector3(-0.05, 1.9, 0), 0.05, Palette.TRUNK, 6)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 42
+		for i in 11:
+			var angle := i * 2.4
+			var r := rng.randf_range(0.25, 0.6)
+			var at := Vector3(cos(angle) * r, 2.0 + rng.randf_range(-0.4, 0.45), sin(angle) * r)
+			var green := Color(0.2, 0.5, 0.25).lerp(Color(0.32, 0.6, 0.28), rng.randf()).darkened(0.15 * (1.0 - (at.y - 1.6)))
+			kit.sphere(rng.randf_range(0.25, 0.38), at, green, Vector3(1, 0.8, 1), 8, 5)
 		return kit.build())
 
 
+## A stone fountain: a wide basin of water, a bowl on a column and a jet
+## falling back in a bell of spray.
 static func fountain() -> ArrayMesh:
 	return Props.cached_mesh("fountain", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var stone := Color(0.8, 0.8, 0.82)
-		kit.cylinder(2.2, 0.6, Vector3(0, 0.3, 0), stone, 20)
-		kit.cylinder(2.0, 0.08, Vector3(0, 0.58, 0), Color(0.45, 0.65, 0.85), 20)
-		kit.cylinder(0.3, 1.6, Vector3(0, 1.2, 0), stone, 12)
-		kit.cylinder(0.9, 0.2, Vector3(0, 2.0, 0), stone, 16)
-		kit.sphere(0.25, Vector3(0, 2.4, 0), Color(0.7, 0.85, 1.0, 0.3), Vector3(1, 1.6, 1))
+		kit.lathe(PackedVector2Array([Vector2(2.1, 0.0), Vector2(2.25, 0.05), Vector2(2.25, 0.55), Vector2(2.35, 0.62), Vector2(2.0, 0.65), Vector2(1.95, 0.3)]), Transform3D.IDENTITY, stone, 24)
+		kit.cylinder(1.97, 0.04, Vector3(0, 0.5, 0), Color(0.42, 0.62, 0.82), 24)
+		kit.lathe(PackedVector2Array([Vector2(0.45, 0.5), Vector2(0.3, 0.7), Vector2(0.22, 1.6), Vector2(0.3, 1.75)]), Transform3D.IDENTITY, stone, 12)
+		kit.lathe(PackedVector2Array([Vector2(0.2, 1.75), Vector2(0.6, 1.85), Vector2(0.95, 2.05), Vector2(0.98, 2.15), Vector2(0.85, 2.12)]), Transform3D.IDENTITY, stone, 16)
+		kit.cylinder(0.86, 0.03, Vector3(0, 2.08, 0), Color(0.42, 0.62, 0.82), 16)
+		# A jet straight up, and arcs of droplets falling from the bowl's rim.
+		kit.cylinder(0.035, 0.8, Vector3(0, 2.45, 0), Color(0.8, 0.92, 1.0, 0.6), 6)
+		kit.sphere(0.07, Vector3(0, 2.86, 0), Color(0.8, 0.92, 1.0, 0.6), Vector3.ONE, 8, 4)
+		for arc in 8:
+			var angle := TAU * arc / 8.0
+			var out := Vector3(cos(angle), 0, sin(angle))
+			for k in 5:
+				var t := k / 4.0
+				kit.sphere(0.035, out * (0.98 + t * 0.45) + Vector3.UP * (2.12 - t * t * 1.55), Color(0.8, 0.92, 1.0, 0.6), Vector3(1, 1.6, 1), 6, 3)
 		return kit.build())
 
 
+## A park bench: slats on cast-iron ends.
 static func bench() -> ArrayMesh:
 	return Props.cached_mesh("bench", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var wood := Color(0.55, 0.38, 0.24)
-		kit.box(Vector3(1.8, 0.08, 0.45), Vector3(0, 0.45, 0), wood)
-		kit.box(Vector3(1.8, 0.4, 0.06), Vector3(0, 0.75, 0.22), wood)
-		for side in [-0.8, 0.8]:
-			kit.box(Vector3(0.06, 0.45, 0.45), Vector3(side, 0.22, 0), Color(0.2, 0.2, 0.22))
+		var iron := Color(0.15, 0.16, 0.17)
+		for k in 4:
+			kit.box(Vector3(1.8, 0.04, 0.09), Vector3(0, 0.45, -0.17 + k * 0.11), wood.darkened(0.05 * (k % 2)))
+		for k in 3:
+			kit.box(Vector3(1.8, 0.09, 0.04), Vector3(0, 0.62 + k * 0.13, 0.24 + k * 0.025), wood, Vector3(-0.2, 0, 0))
+		for side in [-0.75, 0.75]:
+			kit.capsule_between(Vector3(side, 0.0, -0.2), Vector3(side, 0.43, -0.18), 0.03, iron, 6)
+			kit.capsule_between(Vector3(side, 0.0, 0.2), Vector3(side, 0.95, 0.3), 0.03, iron, 6)
+			kit.capsule_between(Vector3(side, 0.43, -0.22), Vector3(side, 0.43, 0.24), 0.025, iron, 6)
+			kit.capsule_between(Vector3(side, 0.43, -0.22), Vector3(side, 0.62, -0.25), 0.025, iron, 6)
+			kit.capsule_between(Vector3(side, 0.62, -0.25), Vector3(side, 0.62, 0.1), 0.025, iron, 6)
 		return kit.build())
 
 
@@ -164,24 +186,54 @@ static func locomotive() -> ArrayMesh:
 		return kit.build())
 
 
+## A passenger coach: a rounded roof, a band of lit windows, doors at
+## each end, bellows between the cars and gear slung underneath.
 static func wagon(variant: int) -> ArrayMesh:
 	return Props.cached_mesh("wagon%d" % variant, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var paint: Color = [Color(0.2, 0.3, 0.55), Color(0.75, 0.12, 0.12), Color(0.6, 0.62, 0.65)][variant % 3]
-		kit.box(Vector3(3.0, 3.0, 14.0), Vector3(0, 2.2, 0), paint)
+		var dark := Color(0.12, 0.12, 0.13)
+		kit.box(Vector3(3.0, 2.7, 14.0), Vector3(0, 2.05, 0), paint)
+		var roof := CylinderMesh.new()
+		roof.top_radius = 1.0
+		roof.bottom_radius = 1.0
+		roof.height = 14.0
+		roof.radial_segments = 16
+		roof.rings = 0
+		kit.add(roof, Transform3D(Basis.from_euler(Vector3(PI / 2, 0, 0)) * Basis.from_scale(Vector3(1.5, 1.0, 0.35)), Vector3(0, 3.4, 0)), Color(0.55, 0.57, 0.6))
+		kit.box(Vector3(3.04, 0.18, 14.0), Vector3(0, 1.45, 0), Color(0.95, 0.95, 0.95))
 		for side in [-1.0, 1.0]:
-			kit.box(Vector3(0.08, 0.8, 12.0), Vector3(1.51 * side, 2.7, 0), Color(1.0, 0.88, 0.6, 0.0))
-		kit.box(Vector3(3.1, 0.25, 14.2), Vector3(0, 3.75, 0), Palette.SNOW)
+			var x: float = 1.52 * side
+			for w in 7:
+				var z := -4.5 + w * 1.5
+				kit.box(Vector3(0.06, 0.95, 1.2), Vector3(x, 2.55, z), Color(0.85, 0.86, 0.88))
+				kit.box(Vector3(0.08, 0.8, 1.05), Vector3(x, 2.55, z), Color(1.0, 0.88, 0.6, 0.0))
+			for end in [-1.0, 1.0]:
+				var z: float = end * 6.2
+				kit.box(Vector3(0.06, 2.1, 0.95), Vector3(x, 1.95, z), Color(0.85, 0.86, 0.88))
+				kit.box(Vector3(0.08, 0.6, 0.35), Vector3(x, 2.55, z - 0.22), Color(1.0, 0.88, 0.6, 0.0))
+				kit.box(Vector3(0.08, 0.6, 0.35), Vector3(x, 2.55, z + 0.22), Color(1.0, 0.88, 0.6, 0.0))
+		for end in [-1.0, 1.0]:
+			kit.box(Vector3(1.6, 2.3, 0.3), Vector3(0, 2.0, end * 7.12), Color(0.25, 0.25, 0.27))
+			for k in 5:
+				kit.box(Vector3(1.66, 0.06, 0.32), Vector3(0, 1.0 + k * 0.48, end * 7.12), Color(0.15, 0.15, 0.16))
+		kit.box(Vector3(2.4, 0.5, 6.0), Vector3(0, 0.55, 0), dark)
+		kit.box(Vector3(3.1, 0.25, 14.2), Vector3(0, 3.78, 0), Palette.SNOW)
 		_bogies(kit, 14.0)
 		return kit.build())
 
 
 static func _bogies(kit: MeshKit, length: float) -> void:
+	var dark := Color(0.12, 0.12, 0.13)
 	for end in [-1.0, 1.0]:
-		kit.box(Vector3(2.4, 0.6, 2.6), Vector3(0, 0.45, end * (length * 0.5 - 2.2)), Color(0.12, 0.12, 0.13))
-		for axle in [-0.7, 0.7]:
-			for side in [-1.0, 1.0]:
-				kit.cylinder(0.4, 0.15, Vector3(0.75 * side, 0.4, end * (length * 0.5 - 2.2) + axle), Color(0.08, 0.08, 0.08), 12, Vector3(0, 0, PI / 2))
+		var z: float = end * (length * 0.5 - 2.2)
+		kit.box(Vector3(2.2, 0.35, 2.8), Vector3(0, 0.6, z), dark)
+		for side in [-1.0, 1.0]:
+			kit.box(Vector3(0.12, 0.45, 2.6), Vector3(0.95 * side, 0.45, z), Color(0.18, 0.18, 0.2))
+			kit.cylinder(0.14, 0.4, Vector3(1.0 * side, 0.85, z), Color(0.7, 0.2, 0.1), 8)
+			for axle in [-0.75, 0.75]:
+				kit.cylinder(0.42, 0.12, Vector3(0.75 * side, 0.42, z + axle), Color(0.08, 0.08, 0.08), 14, Vector3(0, 0, PI / 2))
+				kit.cylinder(0.2, 0.16, Vector3(0.78 * side, 0.42, z + axle), Color(0.45, 0.45, 0.48), 8, Vector3(0, 0, PI / 2))
 
 
 ## Yellow board with a black arrow pointing straight on, facing +Z.
@@ -220,16 +272,44 @@ static func truck(variant: int) -> ArrayMesh:
 		var kit := MeshKit.new()
 		var cab: Color = [Color(0.85, 0.15, 0.12), Color(0.15, 0.3, 0.65), Color(0.95, 0.95, 0.95)][variant % 3]
 		var trailer: Color = [Color(0.92, 0.92, 0.9), Color(0.8, 0.6, 0.15), Color(0.3, 0.45, 0.35)][variant % 3]
-		kit.box(Vector3(2.5, 2.6, 2.4), Vector3(0, 2.1, -6.6), cab)
-		kit.box(Vector3(2.4, 0.9, 0.1), Vector3(0, 2.8, -7.82), Color(0.2, 0.28, 0.38))
+		var glass := Color(0.16, 0.22, 0.3)
+		var dark := Color(0.12, 0.12, 0.13)
+		var lengthwise := Basis(Vector3.UP, -PI / 2.0)
+		# Cab-over tractor: a tall cab with a raked windscreen and a wind
+		# deflector on the roof.
+		kit.slab(PackedVector2Array([Vector2(-5.4, 0.9), Vector2(-5.4, 3.5), Vector2(-6.0, 3.65), Vector2(-7.45, 3.6), Vector2(-7.8, 2.9), Vector2(-7.85, 0.9)]), 2.5, Transform3D(lengthwise, Vector3.ZERO), cab)
+		kit.slab(PackedVector2Array([Vector2(-6.2, 2.15), Vector2(-6.2, 3.3), Vector2(-7.5, 3.3), Vector2(-7.83, 2.75), Vector2(-7.82, 2.15)]), 2.54, Transform3D(lengthwise, Vector3.ZERO), glass)
+		kit.slab(PackedVector2Array([Vector2(-5.4, 3.5), Vector2(-5.5, 4.3), Vector2(-5.9, 4.3), Vector2(-6.9, 3.6)]), 2.4, Transform3D(lengthwise, Vector3.ZERO), cab)
+		kit.box(Vector3(2.3, 0.15, 0.6), Vector3(0, 3.55, -7.75), cab.darkened(0.2), Vector3(0.3, 0, 0))
+		kit.box(Vector3(1.8, 0.9, 0.05), Vector3(0, 1.65, -7.88), Color(0.18, 0.18, 0.2))
+		for k in 5:
+			kit.box(Vector3(1.75, 0.04, 0.07), Vector3(0, 1.3 + k * 0.18, -7.9), Color(0.5, 0.52, 0.55))
+		kit.box(Vector3(2.55, 0.4, 0.3), Vector3(0, 0.95, -7.85), dark)
 		for side in [-1.0, 1.0]:
-			kit.box(Vector3(0.35, 0.25, 0.1), Vector3(0.9 * side, 1.2, -7.85), Palette.HEADLIGHT)
+			kit.box(Vector3(0.4, 0.25, 0.08), Vector3(0.95 * side, 1.0, -8.0), Palette.HEADLIGHT)
+			kit.box(Vector3(0.05, 0.55, 0.3), Vector3(1.45 * side, 2.7, -7.3), dark)
+			kit.capsule_between(Vector3(1.25 * side, 3.0, -7.2), Vector3(1.45 * side, 3.0, -7.3), 0.03, dark, 5)
+			kit.box(Vector3(0.05, 1.0, 0.8), Vector3(1.26 * side, 1.5, -6.2), cab.darkened(0.15))
+			kit.box(Vector3(0.3, 0.12, 0.6), Vector3(1.2 * side, 0.8, -5.9), Color(0.7, 0.72, 0.75))
+			kit.box(Vector3(0.18, 0.12, 0.05), Vector3(0.9 * side, 3.62, -7.5), Color(1.0, 0.55, 0.0, 0.0))
+		kit.cylinder(0.3, 1.0, Vector3(-0.95, 1.0, -4.7), Color(0.7, 0.72, 0.75), 12, Vector3(PI / 2, 0, 0))
+		# Box trailer with ribs, an underrun guard and rear doors.
 		kit.box(Vector3(2.6, 3.0, 12.0), Vector3(0, 2.6, 0.8), trailer)
-		kit.box(Vector3(2.7, 0.2, 12.1), Vector3(0, 4.2, 0.8), Palette.SNOW)
-		kit.box(Vector3(2.4, 0.4, 14.5), Vector3(0, 0.75, -0.6), Color(0.12, 0.12, 0.13))
-		for z in [-6.4, -2.0, 4.5, 5.9]:
+		for k in 13:
 			for side in [-1.0, 1.0]:
-				kit.cylinder(0.5, 0.35, Vector3(1.05 * side, 0.5, z), Color(0.06, 0.06, 0.07), 14, Vector3(0, 0, PI / 2))
+				kit.box(Vector3(0.04, 3.0, 0.08), Vector3(1.31 * side, 2.6, -5.2 + k * 1.0), trailer.darkened(0.12))
+		for side in [-1.0, 1.0]:
+			kit.box(Vector3(0.05, 0.1, 6.0), Vector3(1.2 * side, 0.85, 0.5), Color(0.6, 0.6, 0.62))
+			kit.box(Vector3(0.05, 0.12, 12.0), Vector3(1.32 * side, 1.2, 0.8), Color(1.0, 0.75, 0.1))
+		kit.box(Vector3(0.04, 2.9, 0.05), Vector3(0, 2.6, 6.83), trailer.darkened(0.3))
+		kit.box(Vector3(2.5, 0.15, 0.1), Vector3(0, 0.75, 6.9), dark)
+		for side in [-1.0, 1.0]:
+			kit.box(Vector3(0.3, 0.15, 0.05), Vector3(1.0 * side, 1.0, 6.82), Palette.TAILLIGHT)
+		kit.box(Vector3(2.7, 0.2, 12.1), Vector3(0, 4.2, 0.8), Palette.SNOW)
+		kit.box(Vector3(2.4, 0.4, 14.5), Vector3(0, 0.75, -0.6), dark)
+		for z in [-6.4, -2.0, -0.9, 4.5, 5.9]:
+			for side in [-1.0, 1.0]:
+				Props.wheel(kit, Vector3(1.05 * side, 0.5, z), 0.5, 0.36, Color(0.75, 0.75, 0.72))
 		return kit.build())
 
 
@@ -286,29 +366,53 @@ static func _mirrored(polygon: PackedVector2Array, side: float) -> PackedVector2
 
 
 ## Baggage tractor pulling two carts, nose towards -Z.
+## Baggage tractor pulling two carts of suitcases, nose towards -Z.
 static func tug() -> ArrayMesh:
 	return Props.cached_mesh("tug", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var yellow := Color(1.0, 0.75, 0.05)
-		kit.box(Vector3(1.6, 1.0, 2.4), Vector3(0, 0.8, -2.4), yellow)
-		kit.box(Vector3(1.4, 0.8, 1.0), Vector3(0, 1.7, -2.0), Color(0.2, 0.28, 0.38))
-		kit.box(Vector3(0.3, 0.2, 0.3), Vector3(0, 2.2, -2.0), Color(1.0, 0.5, 0.0, 0.0))
+		var dark := Color(0.15, 0.15, 0.16)
+		kit.box(Vector3(1.6, 0.8, 2.4), Vector3(0, 0.7, -2.4), yellow)
+		kit.box(Vector3(1.5, 0.3, 0.9), Vector3(0, 1.15, -3.1), yellow.darkened(0.1), Vector3(0.2, 0, 0))
+		# Open cab: a roof on four posts, a seat and a wheel.
+		for x in [-0.7, 0.7]:
+			for z in [-2.6, -1.4]:
+				kit.box(Vector3(0.06, 1.0, 0.06), Vector3(x, 1.6, z), dark)
+		kit.box(Vector3(1.6, 0.08, 1.4), Vector3(0, 2.12, -2.0), yellow)
+		kit.box(Vector3(0.6, 0.12, 0.5), Vector3(0, 1.2, -1.8), dark)
+		kit.box(Vector3(0.6, 0.5, 0.1), Vector3(0, 1.45, -1.55), dark)
+		kit.torus(0.13, 0.17, Transform3D(Basis(Vector3.RIGHT, 0.9), Vector3(0, 1.5, -2.45)), dark, 14, 5)
+		kit.cylinder(0.12, 0.2, Vector3(0, 2.25, -2.0), Color(1.0, 0.5, 0.0, 0.0), 8)
+		for side in [-1.0, 1.0]:
+			kit.box(Vector3(0.25, 0.15, 0.05), Vector3(0.55 * side, 0.85, -3.62), Palette.HEADLIGHT)
+		kit.box(Vector3(0.1, 0.1, 0.8), Vector3(0, 0.45, -0.85), dark)
+		var luggage := [Color(0.2, 0.3, 0.7), Color(0.75, 0.2, 0.2), Color(0.15, 0.15, 0.17), Color(0.35, 0.55, 0.3), Color(0.85, 0.65, 0.2)]
 		for cart in 2:
 			var z := 0.2 + cart * 2.6
-			kit.box(Vector3(1.6, 0.2, 2.2), Vector3(0, 0.6, z), Color(0.3, 0.3, 0.32))
-			kit.box(Vector3(1.4, 0.9, 1.6), Vector3(0, 1.15, z), [Color(0.2, 0.3, 0.7), Color(0.75, 0.2, 0.2)][cart])
-		for z in [-3.2, -1.6, 0.2, 2.8]:
+			kit.box(Vector3(1.6, 0.15, 2.2), Vector3(0, 0.6, z), Color(0.35, 0.36, 0.38))
+			for x in [-0.78, 0.78]:
+				kit.box(Vector3(0.05, 1.2, 2.2), Vector3(x, 1.25, z), Color(0.5, 0.52, 0.55, 1.0))
+			kit.box(Vector3(1.6, 0.06, 2.2), Vector3(0, 1.85, z), Color(0.3, 0.45, 0.65))
+			for bag in 4:
+				var color: Color = luggage[(bag + cart * 2) % luggage.size()]
+				kit.box(Vector3(0.5, 0.65, 0.3), Vector3(-0.35 + (bag % 2) * 0.7, 1.0, z - 0.5 + (bag / 2) * 0.9), color, Vector3(0, 0.1 * bag, 0))
+				kit.box(Vector3(0.14, 0.04, 0.04), Vector3(-0.35 + (bag % 2) * 0.7, 1.35, z - 0.5 + (bag / 2) * 0.9), Color(0.1, 0.1, 0.1))
+			kit.box(Vector3(1.62, 0.08, 2.22), Vector3(0, 1.91, z), Palette.SNOW)
+		for z in [-3.2, -1.6, -0.4, 0.8, 2.2, 3.4]:
 			for side in [-1.0, 1.0]:
-				kit.cylinder(0.3, 0.2, Vector3(0.75 * side, 0.3, z), Color(0.08, 0.08, 0.08), 10, Vector3(0, 0, PI / 2))
+				Props.wheel(kit, Vector3(0.75 * side, 0.3, z), 0.3, 0.2, Color(0.75, 0.75, 0.72))
 		return kit.build())
 
 
+## A traffic cone on a square base, with two reflective white bands.
 static func cone() -> ArrayMesh:
 	return Props.cached_mesh("cone", func() -> ArrayMesh:
 		var kit := MeshKit.new()
-		kit.box(Vector3(0.5, 0.05, 0.5), Vector3(0, 0.025, 0), Color(1.0, 0.4, 0.05))
-		kit.cone(0.22, 0.75, Vector3(0, 0.42, 0), Color(1.0, 0.4, 0.05), 12)
-		kit.cylinder(0.15, 0.12, Vector3(0, 0.45, 0), Color(1, 1, 1), 12, Vector3.ZERO, 0.12)
+		var orange := Color(1.0, 0.38, 0.05)
+		kit.box(Vector3(0.46, 0.04, 0.46), Vector3(0, 0.02, 0), Color(0.12, 0.12, 0.13))
+		kit.lathe(PackedVector2Array([Vector2(0.2, 0.04), Vector2(0.17, 0.25), Vector2(0.06, 0.73), Vector2(0.04, 0.76), Vector2(0.0, 0.77)]), Transform3D.IDENTITY, orange, 14)
+		kit.lathe(PackedVector2Array([Vector2(0.162, 0.3), Vector2(0.135, 0.42)]), Transform3D(Basis.from_scale(Vector3(1.04, 1, 1.04)), Vector3.ZERO), Color(0.95, 0.95, 0.95), 14)
+		kit.lathe(PackedVector2Array([Vector2(0.112, 0.5), Vector2(0.09, 0.6)]), Transform3D(Basis.from_scale(Vector3(1.06, 1, 1.06)), Vector3.ZERO), Color(0.95, 0.95, 0.95), 14)
 		return kit.build())
 
 
@@ -347,13 +451,18 @@ static func edge_light(color: Color) -> ArrayMesh:
 		return kit.build())
 
 
+## An airfield windsock: a mast with a hoop holding a striped sock that
+## tapers and droops in the wind.
 static func windsock() -> ArrayMesh:
 	return Props.cached_mesh("windsock", func() -> ArrayMesh:
 		var kit := MeshKit.new()
-		kit.cylinder(0.06, 5.0, Vector3(0, 2.5, 0), Color(0.8, 0.8, 0.8), 6)
-		for i in 4:
+		kit.cylinder(0.08, 5.0, Vector3(0, 2.5, 0), Color(0.8, 0.8, 0.8), 8, Vector3.ZERO, 0.05)
+		kit.capsule_between(Vector3(0, 4.7, 0), Vector3(0.25, 4.7, 0), 0.03, Color(0.4, 0.4, 0.42), 5)
+		kit.torus(0.33, 0.37, Transform3D(Basis(Vector3.FORWARD, PI / 2.0 + 0.1), Vector3(0.28, 4.7, 0)), Color(0.4, 0.4, 0.42), 16, 4)
+		for i in 5:
 			var color := Color(1.0, 0.4, 0.05) if i % 2 == 0 else Color(1, 1, 1)
-			kit.cylinder(0.35 - i * 0.05, 0.6, Vector3(0.3 + i * 0.6, 4.7 - i * 0.12, 0), color, 10, Vector3(0, 0, PI / 2 + 0.15), 0.3 - i * 0.05)
+			var r := 0.34 - i * 0.045
+			kit.cylinder(r, 0.5, Vector3(0.55 + i * 0.5, 4.68 - i * i * 0.025, 0), color, 12, Vector3(0, 0, PI / 2 + 0.06 + i * 0.03), r - 0.045)
 		return kit.build())
 
 
@@ -389,16 +498,32 @@ static func ice_shelf() -> ArrayMesh:
 
 # --- Bandy rink ---
 
+## A bandy goal: red posts and crossbar, a net stretched back to a frame
+## on the ice, its mesh drawn as a grid of cords.
 static func bandy_goal() -> ArrayMesh:
 	return Props.cached_mesh("goal", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var post := Color(0.85, 0.1, 0.1)
+		var net := Color(0.95, 0.95, 0.95)
 		for side in [-1.0, 1.0]:
 			kit.cylinder(0.06, 2.1, Vector3(1.75 * side, 1.05, 0), post, 8)
-			kit.box(Vector3(0.05, 2.0, 1.2), Vector3(1.75 * side, 1.0, 0.6), Color(0.9, 0.9, 0.9, 1.0))
+			kit.capsule_between(Vector3(1.75 * side, 0.03, 0), Vector3(1.75 * side, 0.03, 1.2), 0.03, Color(0.9, 0.9, 0.9), 5)
+			kit.capsule_between(Vector3(1.75 * side, 2.08, 0), Vector3(1.75 * side, 0.6, 1.2), 0.02, Color(0.9, 0.9, 0.9), 5)
 		kit.cylinder(0.06, 3.6, Vector3(0, 2.1, 0), post, 8, Vector3(0, 0, PI / 2))
-		kit.box(Vector3(3.5, 2.0, 0.05), Vector3(0, 1.0, 1.2), Color(0.9, 0.9, 0.9))
-		kit.box(Vector3(3.5, 0.05, 1.2), Vector3(0, 2.05, 0.6), Color(0.9, 0.9, 0.9))
+		kit.capsule_between(Vector3(-1.75, 0.03, 1.2), Vector3(1.75, 0.03, 1.2), 0.03, Color(0.9, 0.9, 0.9), 5)
+		# Back of the net: from the crossbar sloping down to the ground frame.
+		for k in 15:
+			var x := -1.75 + k * 0.25
+			kit.capsule_between(Vector3(x, 2.08, 0), Vector3(x, 0.6, 1.2), 0.008, net, 3)
+			kit.capsule_between(Vector3(x, 0.6, 1.2), Vector3(x, 0.03, 1.2), 0.008, net, 3)
+		for k in 9:
+			var t := k / 8.0
+			var y := lerpf(2.08, 0.6, t)
+			var z := lerpf(0.0, 1.2, t)
+			kit.capsule_between(Vector3(-1.75, y, z), Vector3(1.75, y, z), 0.008, net, 3)
+		for k in 3:
+			var y := 0.15 + k * 0.17
+			kit.capsule_between(Vector3(-1.75, y, 1.2), Vector3(1.75, y, 1.2), 0.008, net, 3)
 		return kit.build())
 
 
@@ -411,21 +536,46 @@ static func boards() -> ArrayMesh:
 		return kit.build())
 
 
+## A floodlight mast: a lattice tower with a rack of lamps at the top.
 static func floodlight() -> ArrayMesh:
 	return Props.cached_mesh("flood", func() -> ArrayMesh:
 		var kit := MeshKit.new()
-		kit.cylinder(0.2, 16.0, Vector3(0, 8.0, 0), Color(0.6, 0.62, 0.65), 8)
-		kit.box(Vector3(3.0, 1.6, 0.4), Vector3(0, 16.3, 0), Color(0.3, 0.3, 0.32))
-		kit.box(Vector3(2.8, 1.4, 0.1), Vector3(0, 16.3, -0.22), Color(1.0, 0.97, 0.85, 0.0))
+		var steel := Color(0.6, 0.62, 0.65)
+		var corners := [Vector3(-0.4, 0, -0.4), Vector3(0.4, 0, -0.4), Vector3(0.4, 0, 0.4), Vector3(-0.4, 0, 0.4)]
+		for i in 4:
+			var c: Vector3 = corners[i]
+			kit.capsule_between(c, c * 0.35 + Vector3.UP * 15.5, 0.05, steel, 5)
+		for k in 8:
+			var y0 := k * 1.95
+			var y1 := y0 + 1.95
+			var s0 := lerpf(1.0, 0.35, y0 / 15.5)
+			var s1 := lerpf(1.0, 0.35, y1 / 15.5)
+			for i in 4:
+				var a: Vector3 = corners[i]
+				var b: Vector3 = corners[(i + 1) % 4]
+				kit.capsule_between(a * s0 + Vector3.UP * y0, b * s1 + Vector3.UP * y1, 0.02, steel, 3)
+		kit.box(Vector3(3.2, 0.1, 0.5), Vector3(0, 15.5, 0), steel)
+		for row in 2:
+			for col in 4:
+				var at := Vector3(-1.2 + col * 0.8, 15.9 + row * 0.7, -0.05)
+				kit.box(Vector3(0.7, 0.6, 0.35), at, Color(0.25, 0.25, 0.27), Vector3(0.3, 0, 0))
+				kit.box(Vector3(0.6, 0.5, 0.05), at + Vector3(0, -0.06, -0.18), Color(1.0, 0.97, 0.85, 0.0), Vector3(0.3, 0, 0))
+		kit.box(Vector3(3.3, 0.08, 0.45), Vector3(0, 17.0, 0.05), Palette.SNOW)
 		return kit.build())
 
 
+## Low stands of wooden benches on a concrete stepped base, along Z.
 static func bleachers() -> ArrayMesh:
 	return Props.cached_mesh("bleachers", func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		for row in 4:
-			kit.box(Vector3(1.0, 0.45 * (row + 1), 12.0), Vector3(row * 1.0, 0.225 * (row + 1), 0), Color(0.5, 0.52, 0.56))
-			kit.box(Vector3(1.0, 0.06, 12.0), Vector3(row * 1.0, 0.45 * (row + 1) + 0.03, 0), Palette.SNOW)
+			kit.box(Vector3(1.0, 0.45 * (row + 1), 12.0), Vector3(row * 1.0, 0.225 * (row + 1), 0), Color(0.6, 0.6, 0.62))
+			kit.box(Vector3(0.35, 0.06, 12.0), Vector3(row * 1.0 + 0.15, 0.45 * (row + 1) + 0.25, 0), Color(0.55, 0.38, 0.24))
+			for z in [-5.5, -1.8, 1.8, 5.5]:
+				kit.box(Vector3(0.06, 0.25, 0.06), Vector3(row * 1.0 + 0.15, 0.45 * (row + 1) + 0.12, z), Color(0.2, 0.2, 0.22))
+			kit.box(Vector3(0.55, 0.06, 12.0), Vector3(row * 1.0 - 0.2, 0.45 * (row + 1) + 0.03, 0), Palette.SNOW)
+			kit.box(Vector3(0.3, 0.05, 12.0), Vector3(row * 1.0 + 0.15, 0.45 * (row + 1) + 0.3, 0), Palette.SNOW)
+		kit.box(Vector3(0.05, 1.0, 12.0), Vector3(3.5, 2.3, 0), Color(0.4, 0.42, 0.45))
 		return kit.build())
 
 

@@ -48,6 +48,8 @@ var _snowballs: Array[Flying] = []
 var _throwers: Array[Node3D] = []
 var _gifts: Array[Flying] = []
 var _sleigh: Node3D
+## Santa's reindeer, galloping through the air as the sleigh flies.
+var _reindeer: Array[Node3D] = []
 var _sleigh_d := 0.0
 var _sleigh_speed := 0.0
 var _drops := 0
@@ -162,6 +164,7 @@ func _clear() -> void:
 	if _sleigh:
 		_sleigh.queue_free()
 		_sleigh = null
+		_reindeer.clear()
 
 
 func _apply_atmosphere() -> void:
@@ -229,14 +232,17 @@ func _update_snowballs(delta: float) -> void:
 
 func _spawn_sleigh() -> void:
 	_sleigh = Node3D.new()
+	_reindeer.clear()
 	var sleigh := MeshInstance3D.new()
 	sleigh.mesh = Props.santa_sleigh()
 	_sleigh.add_child(sleigh)
 	for row in 2:
 		for side in [-1.0, 1.0]:
-			var deer := Props.posed(Props.deer(), row * 1.3 + (0.0 if side < 0.0 else 0.6))
+			var deer := Props.posed(Props.reindeer(), row * 1.3 + (0.0 if side < 0.0 else 0.6))
 			deer.position = Vector3(0.75 * side, 0.1, -3.4 - row * 2.4)
+			deer.set_meta("phase", row * 1.3 + (0.0 if side < 0.0 else 0.6))
 			_sleigh.add_child(deer)
+			_reindeer.append(deer)
 			if row == 1 and side < 0.0:
 				var nose := MeshInstance3D.new()
 				nose.mesh = MeshKit.new().sphere(0.07, Vector3(0, 1.57, -0.95), Color(1.0, 0.1, 0.1, 0.0)).build()
@@ -258,6 +264,8 @@ func _place_sleigh() -> void:
 	_sleigh.position = Vector3(x, y, -_sleigh_d)
 	var dir := field.track_dir(_sleigh_d)
 	_sleigh.rotation = Vector3(sin(_clock * 2.0) * 0.06, atan2(-dir.x, -dir.z), sin(_clock * 1.3) * 0.08)
+	for deer in _reindeer:
+		Props.repose(deer, Props.reindeer(), _clock * 7.0 + float(deer.get_meta("phase")))
 
 
 func _update_sleigh(delta: float) -> void:
@@ -282,6 +290,7 @@ func _update_sleigh(delta: float) -> void:
 	if _drops >= GIFTS_PER_FLIGHT and ahead > 260.0:
 		_sleigh.queue_free()
 		_sleigh = null
+		_reindeer.clear()
 
 
 func _drop_gift() -> void:

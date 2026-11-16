@@ -66,7 +66,7 @@ func _place_town(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo
 			var xform := Transform3D(Basis(Vector3.UP, facing), Vector3(x, field.height(x, d, false) - 0.1, -d))
 			world.add_decor(decor, Props.town_house(variant), xform)
 			var sign := Label3D.new()
-			sign.text = Props.SHOP_NAMES[rng.randi_range(0, Props.SHOP_NAMES.size() - 1)]
+			sign.text = Shops.TOWN[variant % Shops.TOWN.size()][0]
 			sign.font_size = 64
 			sign.pixel_size = 0.009
 			sign.outline_size = 0
@@ -479,18 +479,43 @@ func _place_mall(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo
 				continue
 			var x: float = field.center_x(d) + side * (field.half_width(d) + 0.3)
 			var xform := world.slope_xform(x, d, PI / 2.0 if side > 0.0 else -PI / 2.0)
-			world.add_decor(decor, RegionProps.shopfront(rng.randi_range(0, 7)), xform)
-			var sign := Label3D.new()
-			sign.text = RegionProps.MALL_SHOPS[rng.randi_range(0, RegionProps.MALL_SHOPS.size() - 1)]
-			sign.font_size = 72
-			sign.pixel_size = 0.008
-			sign.outline_size = 0
-			sign.modulate = Color(1, 1, 1)
-			sign.shaded = false
-			sign.double_sided = false
-			sign.transform = xform * Transform3D(Basis(Vector3.UP, PI), Vector3(0, 4.0, -0.2))
-			chunk.add_child(sign)
+			var index := rng.randi_range(0, Shops.MALL.size() - 1)
+			var shop: Array = Shops.MALL[index]
+			world.add_decor(decor, Shops.mall_front(index), xform)
+			var facing := Basis(Vector3.UP, PI)
+			var name_sign := Shops.label(shop[0], 72, 0.008)
+			name_sign.transform = xform * Transform3D(facing, Vector3(0, 4.05, -0.25))
+			chunk.add_child(name_sign)
+			# The slogan on the billboard above, and a sale sticker on the
+			# glass in one corner.
+			var slogan := Shops.label(shop[2], 60, 0.009, Color(1, 1, 1))
+			slogan.outline_size = 18
+			slogan.outline_modulate = Color(0.1, 0.1, 0.15)
+			slogan.width = 560.0
+			slogan.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			slogan.transform = xform * Transform3D(facing, Vector3(-0.5, 6.35, -0.16))
+			chunk.add_child(slogan)
+			var sticker := Shops.label(shop[3], 72, 0.008, Color(1.0, 0.9, 0.1))
+			sticker.outline_size = 24
+			sticker.outline_modulate = Color(0.85, 0.05, 0.1)
+			sticker.transform = xform * Transform3D(facing * Basis(Vector3.BACK, 0.18), Vector3(-3.3 * side, 1.0, -0.12))
+			chunk.add_child(sticker)
 			d += 10.0
+	# Advertising banners hung across the mall every so often.
+	var hang := ceilf(lo / 40.0) * 40.0 + 20.0
+	while hang < hi:
+		if hang > inside_from + 10.0 and hang < inside_to - 10.0:
+			var width := mini(int(field.half_width(hang) * 1.2), 14)
+			var index := int(hang / 40.0)
+			var xform := world.slope_xform(field.center_x(hang), hang, 0.0) * Transform3D(Basis.IDENTITY, Vector3(0, 6.0, 0))
+			world.add_decor(decor, Shops.banner(width, index), xform)
+			for face in [0.0, PI]:
+				var text := Shops.label(Shops.BANNERS[index % Shops.BANNERS.size()], 96, 0.009, Color(1, 1, 1))
+				text.outline_size = 16
+				text.outline_modulate = Shops.INK
+				text.transform = xform * Transform3D(Basis(Vector3.UP, face), Vector3(0, 0, 0.04 if face == 0.0 else -0.04))
+				chunk.add_child(text)
+		hang += 40.0
 	var roof := ceilf(lo / 10.0) * 10.0
 	while roof < hi:
 		if roof > inside_from and roof < inside_to:

@@ -51,7 +51,7 @@ static func _pulka(kit: MeshKit) -> void:
 		var angle := PI * t
 		loop.append(Vector3(-cos(angle) * 0.2, 0.38 + sin(angle) * 0.03, -0.66 - sin(angle) * 0.3))
 	for i in loop.size() - 1:
-		_capsule_between(kit, loop[i], loop[i + 1], 0.016, rope)
+		kit.capsule_between(loop[i], loop[i + 1], 0.016, rope)
 	for side in [-1.0, 1.0]:
 		kit.cylinder(0.022, 0.03, Vector3(0.2 * side, 0.38, -0.66), red.darkened(0.2), 10, Vector3(PI / 2.5, 0, 0))
 
@@ -89,13 +89,13 @@ static func _snowracer(kit: MeshKit) -> void:
 	var black := Color(0.1, 0.1, 0.12)
 	for side in [-1.0, 1.0]:
 		_ski(kit, Vector3(0.32 * side, 0.0, 0.25), 1.1, steel)
-		_capsule_between(kit, Vector3(0.32 * side, 0.06, 0.05), Vector3(0.12 * side, 0.3, 0.1), 0.025, black)
-		_capsule_between(kit, Vector3(0.32 * side, 0.06, 0.5), Vector3(0.12 * side, 0.3, 0.42), 0.025, black)
+		kit.capsule_between(Vector3(0.32 * side, 0.06, 0.05), Vector3(0.12 * side, 0.3, 0.1), 0.025, black)
+		kit.capsule_between(Vector3(0.32 * side, 0.06, 0.5), Vector3(0.12 * side, 0.3, 0.42), 0.025, black)
 	_ski(kit, Vector3(0, 0.0, -0.92), 0.8, steel)
-	_capsule_between(kit, Vector3(0, 0.06, -0.92), Vector3(0, 0.3, -0.72), 0.03, black)
+	kit.capsule_between(Vector3(0, 0.06, -0.92), Vector3(0, 0.3, -0.72), 0.03, black)
 	# Frame spine and rear axle bar.
-	_capsule_between(kit, Vector3(0, 0.3, 0.48), Vector3(0, 0.33, -0.72), 0.045, red)
-	_capsule_between(kit, Vector3(-0.14, 0.3, 0.26), Vector3(0.14, 0.3, 0.26), 0.04, red)
+	kit.capsule_between(Vector3(0, 0.3, 0.48), Vector3(0, 0.33, -0.72), 0.045, red)
+	kit.capsule_between(Vector3(-0.14, 0.3, 0.26), Vector3(0.14, 0.3, 0.26), 0.04, red)
 	# Front fairing with a racing stripe.
 	kit.ellipsoid(Vector3(0.17, 0.11, 0.42), Vector3(0, 0.38, -0.42), red)
 	kit.ellipsoid(Vector3(0.05, 0.112, 0.38), Vector3(0, 0.385, -0.42), Color(1, 1, 1))
@@ -103,20 +103,20 @@ static func _snowracer(kit: MeshKit) -> void:
 	kit.capsule(0.11, 0.5, Vector3(0, 0.42, 0.2), black, Vector3(PI / 2, 0, 0), Vector3(1.6, 1.0, 0.45))
 	kit.capsule(0.08, 0.36, Vector3(0, 0.6, 0.47), black, Vector3(0, 0, PI / 2), Vector3(1.0, 1.0, 0.55))
 	# Steering column and wheel facing the rider.
-	_capsule_between(kit, Vector3(0, 0.36, -0.72), Vector3(0, 0.72, -0.6), 0.025, black)
+	kit.capsule_between(Vector3(0, 0.36, -0.72), Vector3(0, 0.72, -0.6), 0.025, black)
 	var wheel := Transform3D(Basis(Vector3.RIGHT, PI / 2.0 - 0.55), Vector3(0, 0.74, -0.59))
 	kit.torus(0.15, 0.2, wheel, Color(1.0, 0.8, 0.1), 24, 8)
 	for i in 3:
 		var angle := TAU * i / 3.0
 		var spoke := Vector3(cos(angle) * 0.16, sin(angle) * 0.16, 0)
-		_capsule_between(kit, wheel * Vector3.ZERO, wheel * Vector3(spoke.x, 0, spoke.y), 0.012, black)
+		kit.capsule_between(wheel * Vector3.ZERO, wheel * Vector3(spoke.x, 0, spoke.y), 0.012, black)
 	kit.sphere(0.035, wheel * Vector3.ZERO, black, Vector3.ONE, 10, 6)
 
 
 static func _ski(kit: MeshKit, at: Vector3, length: float, color: Color) -> void:
 	kit.box(Vector3(0.13, 0.035, length), at + Vector3(0, 0.02, 0), color)
 	var tip := at + Vector3(0, 0.02, -length * 0.5)
-	_capsule_between(kit, tip, tip + Vector3(0, 0.1, -0.12), 0.03, color)
+	kit.capsule_between(tip, tip + Vector3(0, 0.1, -0.12), 0.03, color)
 	kit.box(Vector3(0.1, 0.03, length * 0.9), at + Vector3(0, 0.045, 0), Color(0.2, 0.2, 0.22))
 
 
@@ -149,8 +149,8 @@ static func _wok(kit: MeshKit) -> void:
 	# A well-used, oiled patch in the middle catches the light.
 	kit.lathe(PackedVector2Array([Vector2(0.0, 0.026), Vector2(0.2, 0.04)]), Transform3D.IDENTITY, Color(0.3, 0.27, 0.24), 24)
 	var wood := Color(0.55, 0.33, 0.17)
-	_capsule_between(kit, Vector3(0, 0.25, 0.5), Vector3(0, 0.27, 0.66), 0.03, steel.lightened(0.3))
-	_capsule_between(kit, Vector3(0, 0.27, 0.66), Vector3(0, 0.36, 1.12), 0.042, wood)
+	kit.capsule_between(Vector3(0, 0.25, 0.5), Vector3(0, 0.27, 0.66), 0.03, steel.lightened(0.3))
+	kit.capsule_between(Vector3(0, 0.27, 0.66), Vector3(0, 0.36, 1.12), 0.042, wood)
 	kit.cylinder(0.046, 0.04, Vector3(0, 0.36, 1.12), wood.darkened(0.3), 10, Vector3(PI / 2.0 - 0.2, 0, 0))
 	# The little helper handle on the far side.
 	kit.torus(0.05, 0.075, Transform3D(Basis(Vector3.RIGHT, PI / 2.0), Vector3(0, 0.27, -0.58)), steel.lightened(0.3), 14, 5)
@@ -173,16 +173,16 @@ static func rider(jacket: Color, hat: Color, model := VehicleSpec.Model.PULKA) -
 		var hip := Vector3(0.11 * side, 0.1, 0.0)
 		var knee: Vector3 = knees * mirror
 		var foot: Vector3 = feet * mirror
-		_capsule_between(kit, hip, knee, 0.085, PANTS)
-		_capsule_between(kit, knee, foot + Vector3(0, 0.06, 0), 0.075, PANTS)
+		kit.capsule_between(hip, knee, 0.085, PANTS)
+		kit.capsule_between(knee, foot + Vector3(0, 0.06, 0), 0.075, PANTS)
 		kit.sphere(0.08, knee, PANTS.lightened(0.08), Vector3(1, 0.9, 1), 10, 6)
 		kit.ellipsoid(Vector3(0.075, 0.075, 0.12), foot + Vector3(0, 0.02, -0.03), BOOTS)
 		kit.box(Vector3(0.15, 0.03, 0.25), foot + Vector3(0, -0.045, -0.03), SOLE)
 		var shoulder := Vector3(0.22 * side, 0.58, 0.02)
 		var hand: Vector3 = hands * mirror
 		var elbow := shoulder.lerp(hand, 0.5) + Vector3(0.07 * side, -0.07, 0.04)
-		_capsule_between(kit, shoulder, elbow, 0.07, jacket)
-		_capsule_between(kit, elbow, hand, 0.062, jacket)
+		kit.capsule_between(shoulder, elbow, 0.07, jacket)
+		kit.capsule_between(elbow, hand, 0.062, jacket)
 		kit.cylinder(0.068, 0.05, hand.lerp(elbow, 0.12), jacket.lightened(0.3), 10)
 		kit.sphere(0.07, hand, hat, Vector3(1, 0.85, 1.2), 10, 6)
 		kit.sphere(0.03, hand + Vector3(-0.05 * side, 0.03, -0.02), hat, Vector3.ONE, 8, 4)
@@ -199,16 +199,16 @@ static func rider(jacket: Color, hat: Color, model := VehicleSpec.Model.PULKA) -
 	for tail in 2:
 		var start := Vector3(0.05 + tail * 0.04, 0.66, 0.12)
 		var end := start + Vector3(0.04 + tail * 0.05, -0.22 - tail * 0.06, 0.24)
-		_capsule_between(kit, start, end, 0.035, scarf if tail == 0 else Color(1, 1, 1))
+		kit.capsule_between(start, end, 0.035, scarf if tail == 0 else Color(1, 1, 1))
 		for f in 3:
 			kit.box(Vector3(0.012, 0.012, 0.06), end + Vector3(-0.02 + f * 0.02, 0, 0.05), scarf)
-	_head(kit, Vector3(0, 0.86, 0), hat)
+	head(kit, Vector3(0, 0.86, 0), hat)
 	return kit.build()
 
 
 ## A simple round cartoon face: dark oval eyes with a glint, a small nose
 ## and smile, hair round the back and a beanie that sits above the eyes.
-static func _head(kit: MeshKit, at: Vector3, hat: Color) -> void:
+static func head(kit: MeshKit, at: Vector3, hat: Color) -> void:
 	var skin := Palette.SKIN
 	kit.sphere(0.15, at, skin, Vector3(1.0, 1.02, 0.97), 16, 10)
 	kit.ellipsoid(Vector3(0.152, 0.125, 0.122), at + Vector3(0, 0.012, 0.042), HAIR)
@@ -233,16 +233,3 @@ static func _head(kit: MeshKit, at: Vector3, hat: Color) -> void:
 	for offset in [Vector3.ZERO, Vector3(0.03, -0.01, 0), Vector3(-0.025, 0.0, 0.02), Vector3(0, 0.02, -0.025)]:
 		kit.sphere(0.045, pom + offset, Color(1, 1, 1), Vector3.ONE, 8, 5)
 
-
-## A capsule spanning from a to b.
-static func _capsule_between(kit: MeshKit, a: Vector3, b: Vector3, radius: float, color: Color) -> void:
-	var span := b - a
-	if span.length() < 0.001:
-		return
-	var turn := Basis(Quaternion(Vector3.UP, span.normalized()))
-	var mesh := CapsuleMesh.new()
-	mesh.radius = radius
-	mesh.height = span.length() + radius * 2.0
-	mesh.radial_segments = 10
-	mesh.rings = 3
-	kit.add(mesh, Transform3D(turn, (a + b) * 0.5), color)
