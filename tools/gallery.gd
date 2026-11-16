@@ -129,6 +129,37 @@ static func _entries(group: String) -> Array:
 	for kind in ["person", "moose", "deer", "reindeer", "dog", "hare", "bear"]:
 		for anim in [["walk", 0.0], ["walk", 0.5], ["idle", 0.3], ["wave", 0.2], ["gallop", 0.3], ["hop", 0.5], ["flail", 0.3]]:
 			groups["creatures"].append(["%s %s" % [kind, anim[0]], func() -> Node3D: return _creature(kind, anim[0], anim[1])])
+	groups["moose"] = []
+	for view in [Vector3(-1, 0.4, -1.15), Vector3(-1, 0.05, 0), Vector3(0, 0.12, -1)]:
+		groups["moose"].append(["moose", func() -> Node3D:
+			var animal := _creature("moose", "idle", 0.0)
+			animal.set_meta("frame", AABB(Vector3(-1.3, 0, -2.6), Vector3(2.6, 3.2, 4.1)))
+			return _viewed(animal, view)])
+	groups["moose_head"] = []
+	for view in [Vector3(-1, 0.12, -0.8), Vector3(0, 0.08, -1)]:
+		groups["moose_head"].append(["moose head", func() -> Node3D:
+			var animal := _creature("moose", "idle", 0.0)
+			animal.set_meta("frame", AABB(Vector3(-0.65, 1.50, -2.65), Vector3(1.3, 1.65, 1.5)))
+			return _viewed(animal, view)])
+	for kind in ["deer", "reindeer", "dog", "hare"]:
+		groups[kind + "_review"] = []
+		var box: AABB
+		match kind:
+			"deer": box = AABB(Vector3(-0.45, 0, -1.15), Vector3(0.9, 2.15, 1.95))
+			"reindeer": box = AABB(Vector3(-0.65, 0, -1.25), Vector3(1.3, 2.9, 2.1))
+			"dog": box = AABB(Vector3(-0.3, 0, -0.95), Vector3(0.6, 1.05, 1.8))
+			"hare": box = AABB(Vector3(-0.28, 0, -0.5), Vector3(0.56, 0.95, 0.95))
+		for view in [Vector3(-1, 0.35, -1.1), Vector3(-1, 0.03, 0), Vector3(0, 0.1, -1)]:
+			groups[kind + "_review"].append([kind, func() -> Node3D:
+				var animal := _creature(kind, "idle", 0.0)
+				animal.set_meta("frame", box)
+				return _viewed(animal, view)])
+	groups["animal_motion"] = []
+	for kind in ["deer", "reindeer", "dog", "hare"]:
+		var gait := "hop" if kind == "hare" else ("walk" if kind == "dog" else "gallop")
+		for pose in [["idle", 0.0], ["walk", 0.25], ["walk", 0.75], [gait, 0.3], [gait, 0.7], ["flail", 0.3]]:
+			groups["animal_motion"].append([kind + " " + pose[0], func() -> Node3D:
+				return _viewed(_creature(kind, pose[0], pose[1]), Vector3(-1, 0.1, -0.4))])
 	groups["bear"] = []
 	for anim in [["walk", 0.0], ["walk", 0.5], ["idle", 0.3], ["flail", 0.3]]:
 		groups["bear"].append(["bear %s" % anim[0], func() -> Node3D: return _creature("bear", anim[0], anim[1])])

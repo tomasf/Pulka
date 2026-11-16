@@ -255,7 +255,7 @@ func _spawn_sleigh() -> void:
 			if row == 1 and side < 0.0:
 				# Rudolph's glowing nose, on the end of his snout as he gallops.
 				var nose := MeshKit.new().sphere(0.07, Vector3.ZERO, Color(1.0, 0.1, 0.1, 0.0)).build()
-				(deer as CreatureRig).attach_at(nose, "head", Transform3D(Basis.IDENTITY, Vector3(0, 1.56, -0.97)))
+				(deer as CreatureRig).attach_at(nose, "head", Transform3D(Basis.IDENTITY, Vector3(0, 1.535, -1.065)))
 	add_child(_sleigh)
 	# Swoops in from high up ahead of the player, then leads the way.
 	_sleigh_d = sled.distance() + 40.0

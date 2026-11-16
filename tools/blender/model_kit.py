@@ -44,6 +44,27 @@ class ModelKit:
         return obj
 
     @staticmethod
+    def profile_body(name, sections):
+        vertices, faces = [], []
+        count = 32
+        for z, width, bottom, top in sections:
+            for k in range(count):
+                angle = k * math.tau / count
+                vertices.append(ModelKit.g(width * math.cos(angle), (top + bottom) / 2 + (top - bottom) / 2 * math.sin(angle), z))
+        for j in range(len(sections) - 1):
+            for k in range(count):
+                a, b = j * count + k, j * count + (k + 1) % count
+                faces.append((a, a + count, b + count, b))
+        faces.extend((tuple(range(count)), tuple(reversed(range((len(sections)-1)*count, len(sections)*count)))))
+        mesh = bpy.data.meshes.new(name)
+        mesh.from_pydata(vertices, [], faces)
+        obj = ModelKit.link(bpy.data.objects.new(name, mesh))
+        sub = obj.modifiers.new('continuous contours', 'SUBSURF')
+        sub.levels = 2
+        ModelKit._apply_modifiers(obj)
+        return obj
+
+    @staticmethod
     def skin(name, joints, edges, radii, mat, subdivisions=2):
         """A smooth body grown along `edges` between `joints` (Godot
         coordinates), `radii` per joint (across, front to back)."""

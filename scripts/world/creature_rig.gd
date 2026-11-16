@@ -33,9 +33,10 @@ func _init(kind: String) -> void:
 		for surface in mesh.mesh.get_surface_count():
 			var original := mesh.mesh.surface_get_material(surface) as StandardMaterial3D
 			if original != null and mesh.mesh.surface_get_format(surface) & Mesh.ARRAY_FORMAT_COLOR:
-				var painted := original.duplicate() as StandardMaterial3D
-				painted.vertex_color_use_as_albedo = true
-				mesh.set_surface_override_material(surface, painted)
+				# Vertex colours belong to the asset, so all instances can use
+				# the shared material. Per-instance overrides here also leave
+				# transient material RIDs behind when a baked pose is freed.
+				original.vertex_color_use_as_albedo = true
 	for name: String in LOOPS:
 		if _player.has_animation(name):
 			_player.get_animation(name).loop_mode = Animation.LOOP_LINEAR
