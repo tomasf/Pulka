@@ -401,7 +401,8 @@ static func moose() -> Rig:
 
 ## A brown bear, lumbering across the slope.
 static func bear() -> Rig:
-	return cached_rig("bear", func() -> Rig: return Rig.creature("bear", {}, 1.5))
+	# The walk covers 0.6 / 0.62 metres in 40 frames at 24 fps.
+	return cached_rig("bear", func() -> Rig: return Rig.creature("bear", {}, 0.581))
 
 
 static func deer() -> Rig:

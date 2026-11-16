@@ -137,6 +137,28 @@ static func _entries(group: String) -> Array:
 		var bear := _creature("bear", "idle", 0.0)
 		bear.set_meta("frame", AABB(Vector3(-0.5, 0, -1.0), Vector3(1.0, 0.5, 1.0)))
 		return _viewed(bear, Vector3(-0.6, 0.35, -1))])
+	groups["bear_anatomy"] = [
+		["three quarter", func() -> Node3D: return _creature("bear", "idle", 0.0)],
+		["profile", func() -> Node3D: return _viewed(_creature("bear", "idle", 0.0), Vector3(-1, 0.05, 0))],
+		["head front", func() -> Node3D:
+			var bear := _creature("bear", "idle", 0.0)
+			bear.set_meta("frame", AABB(Vector3(-0.36, 0.77, -1.72), Vector3(0.72, 0.65, 0.82)))
+			return _viewed(bear, Vector3(0, 0.08, -1))],
+		["head side", func() -> Node3D:
+			var bear := _creature("bear", "idle", 0.0)
+			bear.set_meta("frame", AABB(Vector3(-0.36, 0.77, -1.72), Vector3(0.72, 0.65, 0.82)))
+			return _viewed(bear, Vector3(-1, 0.1, -0.6))],
+		["forepaws", func() -> Node3D:
+			var bear := _creature("bear", "idle", 0.0)
+			bear.set_meta("frame", AABB(Vector3(-0.5, 0, -1.04), Vector3(1, 0.52, 0.72)))
+			return _viewed(bear, Vector3(-0.5, 0.35, -1))],
+		["rear", func() -> Node3D: return _viewed(_creature("bear", "idle", 0.0), Vector3(-0.6, 0.25, 1))],
+	]
+	groups["bear_walk"] = []
+	for step in 6:
+		var fraction := step / 6.0
+		groups["bear_walk"].append(["walk %.2f" % fraction, func() -> Node3D:
+			return _viewed(_creature("bear", "walk", fraction), Vector3(-1, 0.12, -0.3))])
 	groups["scarves"] = [
 		["rider front", func() -> Node3D: return _face3d()],
 		["rider back", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.TEFAT), Vector3(0.4, 0.4, 1))],
