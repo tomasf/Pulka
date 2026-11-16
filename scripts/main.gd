@@ -535,13 +535,21 @@ func _update_playing(delta: float) -> void:
 		_update_hud()
 
 
+## Tracks stay this far behind the rearmost rider, then go.
+const TRAIL_BEHIND := 120.0
+
+
 func _update_world(delta: float, build_ms := SlopeWorld.BUILD_MS) -> void:
 	var lead := _leader()
 	var others := PackedFloat32Array()
+	var last := lead.sled.distance()
 	for p in _players:
 		if p != lead:
 			others.append(p.sled.distance())
+		last = minf(last, p.sled.distance())
 	_world.update_world(lead.sled.distance(), delta, build_ms, others)
+	for p in _players:
+		p.sled.prune_trail(last - TRAIL_BEHIND)
 
 
 func _update_player(p: Player, before: float, delta: float) -> void:
@@ -1376,7 +1384,7 @@ func _after_crash(p: Player) -> void:
 		d = water.y + TerrainField.WATER_BLEND + 6.0
 	if _field.near_road(d, 8.0):
 		d = _field.nearest_road(d) + TerrainField.ROAD_HALF_WIDTH + 20.0
-	p.sled.place_at(d, 0.0, 12.0)
+	p.sled.place_at(d, 0.0, 12.0, true)
 	p.sled.invulnerable_time = 2.5
 	p.camera.mode = ChaseCamera.Mode.CHASE
 	p.camera.snap()

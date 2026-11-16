@@ -118,7 +118,8 @@ func rider_position() -> Vector3:
 	return _rider.global_position
 
 
-func place_at(d: float, lateral := 0.0, start_speed := 0.0) -> void:
+## `keep_trail` leaves the tracks so far (back on the slope after a crash).
+func place_at(d: float, lateral := 0.0, start_speed := 0.0, keep_trail := false) -> void:
 	var x := field.center_x(d) + lateral
 	position = Vector3(x, field.height(x, d), -d)
 	var direction := field.track_dir(d)
@@ -132,7 +133,10 @@ func place_at(d: float, lateral := 0.0, start_speed := 0.0) -> void:
 	_lean = 0.0
 	_ground_time = 1.0
 	_up = field.normal_world(position.x, position.z)
-	_trail.clear()
+	if keep_trail:
+		_trail.lift()
+	else:
+		_trail.clear()
 	_reset_rider()
 	_update_visual(1.0)
 
@@ -429,6 +433,11 @@ func _update_particles() -> void:
 
 ## Tracks in the snow wherever the ride touches it, but not on water or
 ## the mall's tiled floor. Ice only takes faint scratches.
+## Forgets the tracks that end before distance `d` (behind everyone).
+func prune_trail(d: float) -> void:
+	_trail.prune(d)
+
+
 func _update_trail() -> void:
 	var d := distance()
 	if not on_ground or crashed or field.is_water(d) or field.region(d) == TerrainField.Region.MALL:

@@ -3,13 +3,13 @@ extends Node3D
 ## Tracks the ride leaves in the snow: a groove per runner or ski, laid on
 ## the ground as strips of pressed-down snow. Finished stretches are frozen into
 ## meshes of their own, so only the newest few metres are rebuilt as you
-## ride, and the oldest are dropped far behind.
+## ride. Stretches stay until the game drops those behind everyone (see
+## `prune`), so a racer can follow the other's tracks all the way.
 
 ## Metres travelled between trail samples.
 const SPACING := 0.4
-## Samples per frozen stretch, and how many stretches are kept.
+## Samples per frozen stretch.
 const SEGMENT := 16
-const SEGMENTS := 14
 ## Height above the ground, against flicker where the terrain mesh dips.
 const LIFT := 0.035
 ## Across a groove, in half widths from its middle: where each strip edge
@@ -35,6 +35,8 @@ var _strengths := PackedFloat32Array()
 var _joined := PackedByteArray()
 var _live: MeshInstance3D
 var _frozen: Array[MeshInstance3D] = []
+## Per frozen stretch, the distance down the slope where it ends.
+var _frozen_ends := PackedFloat32Array()
 var _gap := true
 
 
@@ -60,6 +62,13 @@ static func grooves(model: VehicleSpec.Model) -> Array[Vector2]:
 			return [Vector2(0.0, 0.26)]
 
 
+## Drops the stretches that end before distance `d` down the slope.
+func prune(d: float) -> void:
+	while not _frozen_ends.is_empty() and _frozen_ends[0] < d:
+		_frozen.pop_front().queue_free()
+		_frozen_ends.remove_at(0)
+
+
 func set_model(model: VehicleSpec.Model) -> void:
 	_grooves = SnowTrail.grooves(model)
 	clear()
@@ -70,6 +79,7 @@ func clear() -> void:
 	for stretch in _frozen:
 		stretch.queue_free()
 	_frozen.clear()
+	_frozen_ends.clear()
 	_reset_live()
 	_gap = true
 
@@ -97,8 +107,7 @@ func record(at: Vector3, right: Vector3, up: Vector3, strength: float) -> void:
 	var stretch := _strip()
 	stretch.mesh = _build()
 	_frozen.append(stretch)
-	if _frozen.size() > SEGMENTS:
-		_frozen.pop_front().queue_free()
+	_frozen_ends.append(-at.z)
 	# The last sample starts the next stretch, so the strip runs on unbroken.
 	var last := _points.size() - 1
 	var keep := [_points[last], _rights[last], _ups[last], _strengths[last]]
