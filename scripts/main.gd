@@ -68,7 +68,6 @@ const GAME_OVER_LINES := [
 	"Pulkan har talat.", "Nu får du gå upp igen.", "Snö i nacken, snö i själen.",
 	"Mamma ropar på middag!", "Vantarna är slut.", "Det var ändå ett bra åk.",
 ]
-const NEAR_MISS_LINES := ["Nära ögat!", "Puh!", "Hårsmån!", "Snyggt!", "Oj oj oj!"]
 
 var state := State.MENU
 
@@ -1259,10 +1258,11 @@ func _roof_bounce(p: Player, obstacle: Obstacle) -> void:
 	p.rumble(0.5, 0.4, 0.2)
 
 
+## Shaving past something: points, a whoosh and a little push, but no
+## call-out (they came too often to be worth reading).
 func _near_miss(p: Player, obstacle: Obstacle) -> void:
 	var points := 100 if obstacle.is_vehicle() else 50
 	_add_bonus(p, points)
-	p.say("%s +%d" % [NEAR_MISS_LINES[_rng.randi_range(0, NEAR_MISS_LINES.size() - 1)], points], Hud.COOL)
 	_sound.play("whoosh", 0.0, _rng.randf_range(0.9, 1.2))
 	if obstacle.is_vehicle():
 		_sound.play("horn", -4.0)

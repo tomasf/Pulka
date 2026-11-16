@@ -105,15 +105,17 @@ class PersonModel:
         pants = K.skin("pants", leg_joints, leg_edges, leg_radii, "pants")
         trunks = K.ellipsoid("trunks", (0, 0.9, 0.0), (0.185, 0.1, 0.145), "trunks", segments=20, rings=10)
 
-        trim = [K.tube("zip", (0, 0.9, -0.165), (0, 1.48, -0.135), 0.011, "jacket_trim", vertices=8)]
+        trim = []
         for s in (-1, 1):
             trim.append(K.ellipsoid("cuff", side((0.266, 0.985, 0.005), s), (0.064, 0.05, 0.064), "jacket_trim", segments=12, rings=6))
         trim.append(K.ellipsoid("hood", (0, 1.52, 0.13), (0.15, 0.09, 0.07), "jacket", rotation=(math.radians(-20), 0, 0), segments=16, rings=8))
         trim = K.join(trim, "jacket_trim")
 
-        scarf = [K.torus("scarf", (0, 1.55, 0.0), 0.11, 0.045, "scarf")]
-        scarf.append(K.torus("scarf_band", (0, 1.6, 0.0), 0.1, 0.034, "white"))
-        scarf.append(K.tube("tail", (0.07, 1.52, -0.12), (0.1, 1.24, -0.17), 0.04, "scarf", end_radius=0.035, vertices=10))
+        # A flat knitted band round the neck, a stripe along its top and a
+        # flat end hanging down the front.
+        scarf = [K.torus("scarf", (0, 1.555, 0.0), 0.105, 0.016, "scarf", scale=(1, 2.6, 1))]
+        scarf.append(K.torus("scarf_band", (0, 1.605, 0.0), 0.093, 0.014, "white", scale=(1, 1.6, 1)))
+        scarf.append(K.ellipsoid("tail", (0.085, 1.39, -0.15), (0.048, 0.15, 0.012), "scarf", rotation=(math.radians(-10), 0, math.radians(-6)), segments=12, rings=8))
         scarf = K.join(scarf, "scarf")
 
         head = K.face(PersonModel.HEAD, 0.15, "hat")

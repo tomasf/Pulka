@@ -137,6 +137,22 @@ static func _entries(group: String) -> Array:
 		var bear := _creature("bear", "idle", 0.0)
 		bear.set_meta("frame", AABB(Vector3(-0.5, 0, -1.0), Vector3(1.0, 0.5, 1.0)))
 		return _viewed(bear, Vector3(-0.6, 0.35, -1))])
+	groups["scarves"] = [
+		["rider front", func() -> Node3D: return _face3d()],
+		["rider back", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.TEFAT), Vector3(0.4, 0.4, 1))],
+		["person", func() -> Node3D: return _creature("person", "idle", 0.0)],
+		["person close", func() -> Node3D:
+			var who := _creature("person", "idle", 0.0)
+			who.set_meta("frame", AABB(Vector3(-0.3, 1.2, -0.3), Vector3(0.6, 0.6, 0.6)))
+			return _viewed(who, Vector3(-0.5, 0.2, -1))],
+	]
+	groups["boots"] = []
+	for model in VehicleSpec.Model.values():
+		groups["boots"].append(["feet %d" % model, func() -> Node3D:
+			var ride := _ride3d(model)
+			var spec: VehicleSpec = VehicleSpec.all()[model]
+			ride.set_meta("frame", AABB(Vector3(-0.35, spec.seat_height - 0.3, -0.75), Vector3(0.7, 0.45, 0.6)))
+			return _viewed(ride, Vector3(-0.8, 0.5, -1))])
 	groups["shops"] = []
 	for i in Shops.MALL.size():
 		groups["shops"].append(["mall%d" % i, func() -> Node3D: return _front(Shops.mall_front(i))])

@@ -244,20 +244,19 @@ class RiderModel:
             leg_edges += [(0, base), (base, base + 1), (base + 1, base + 2)]
         pants = RiderModel.skin_object("pants", leg_joints, leg_edges, leg_radii, "pants")
 
-        # A zip down the front, knitted cuffs at the wrists and a hood folded
-        # down at the back of the neck.
+        # Knitted cuffs at the wrists and a hood folded down at the back of
+        # the neck.
         seams = [RiderModel.ellipsoid("hood", RiderModel.g(0, 0.64, 0.12), (0.14, 0.07, 0.09), "jacket", rotation=(math.radians(25), 0, 0), segments=16, rings=8)]
-        seams += [RiderModel.cylinder("zip", RiderModel.g(0, 0.43, -0.135), 0.01, 0.24, "jacket_trim", rotation=(math.radians(-8), 0, 0), vertices=8)]
         for tag, side in (("L", -1), ("R", 1)):
             cuff_at = joints["hand." + tag] * 0.85 + joints["elbow." + tag] * 0.15
             seams.append(RiderModel.ellipsoid("cuff", RiderModel.g(*cuff_at), (0.064, 0.064, 0.064), "jacket_trim", segments=12, rings=6))
         trim = RiderModel.join(seams, "jacket_trim")
 
-        # Scarf: a wrap round the neck and a tail fluttering behind.
-        scarf = [RiderModel.torus("scarf", RiderModel.g(0, 0.66, 0.01), 0.11, 0.045, "scarf")]
-        scarf.append(RiderModel.torus("scarf2", RiderModel.g(0, 0.71, 0.01), 0.1, 0.035, "white"))
-        tail = RiderModel.cylinder("tail", RiderModel.g(0.08, 0.55, 0.22), 0.04, 0.3, "scarf", rotation=(math.radians(-55), math.radians(10), 0), vertices=10)
-        scarf.append(tail)
+        # Scarf: a flat knitted band wrapped round the neck (a stripe at its
+        # top edge) and a flat end hanging down the back.
+        scarf = [RiderModel.torus("scarf", RiderModel.g(0, 0.665, 0.01), 0.112, 0.016, "scarf", scale=(1, 1, 2.6))]
+        scarf.append(RiderModel.torus("scarf2", RiderModel.g(0, 0.715, 0.01), 0.098, 0.014, "white", scale=(1, 1, 1.6)))
+        scarf.append(RiderModel.ellipsoid("tail", RiderModel.g(0.07, 0.55, 0.17), (0.05, 0.012, 0.15), "scarf", rotation=(math.radians(-35), math.radians(8), 0), segments=12, rings=8))
         neck_wrap = RiderModel.join(scarf, "scarf")
 
         # --- Head: a round face with eyes, nose, smile, cheeks; hair; beanie ---
@@ -312,9 +311,18 @@ class RiderModel:
             mitt.append(RiderModel.torus("band", RiderModel.g(*(hand + Vector((0, 0.0, 0.05)))), 0.05, 0.012, "white", rotation=(math.radians(90), 0, 0)))
             hands[tag] = RiderModel.join(mitt, "mitten." + tag)
             foot = joints["foot." + tag]
-            boot = [RiderModel.ellipsoid("boot", RiderModel.g(*(foot + Vector((0, 0.03, -0.03)))), (0.075, 0.075, 0.125), "boots", segments=16, rings=10)]
-            boot.append(RiderModel.cylinder("shaft", RiderModel.g(*(foot + Vector((0, 0.08, 0.01)))), 0.078, 0.11, "boots", vertices=16))
-            boot.append(RiderModel.ellipsoid("sole", RiderModel.g(*(foot + Vector((0, -0.035, -0.03)))), (0.078, 0.02, 0.13), "sole", segments=16, rings=6))
+            # Blender radii: across, front to back, height. A low boot
+            # reaching forward with a rounded toe, a shaft up the shin with
+            # a pale lining at its rim, a sole under it all.
+            boot = [RiderModel.ellipsoid("boot", RiderModel.g(*(foot + Vector((0, 0.02, -0.04)))), (0.072, 0.13, 0.07), "boots", segments=18, rings=10)]
+            boot.append(RiderModel.ellipsoid("toe", RiderModel.g(*(foot + Vector((0, 0.025, -0.12)))), (0.068, 0.06, 0.06), "boots", segments=14, rings=8))
+            # The shaft and its lining run up along the shin, whatever angle
+            # the leg rests at.
+            shin = (joints["knee." + tag] - foot).normalized()
+            along = Vector((0, 0, 1)).rotation_difference((RiderModel.g(*shin)).normalized()).to_euler()
+            boot.append(RiderModel.cylinder("shaft", RiderModel.g(*(foot + shin * 0.08)), 0.072, 0.13, "boots", rotation=tuple(along), vertices=18))
+            boot.append(RiderModel.torus("lining", RiderModel.g(*(foot + shin * 0.145)), 0.08, 0.02, "white", rotation=tuple(along)))
+            boot.append(RiderModel.ellipsoid("sole", RiderModel.g(*(foot + Vector((0, -0.04, -0.045)))), (0.076, 0.15, 0.018), "sole", segments=18, rings=6))
             feet[tag] = RiderModel.join(boot, "boot." + tag)
 
         # --- Rigging: the soft body by weights, the rest rigidly on a bone ---
