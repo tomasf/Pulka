@@ -42,6 +42,22 @@ func _init(kind: String) -> void:
 			_player.get_animation(name).loop_mode = Animation.LOOP_LINEAR
 
 
+## A stable body pivot, unaffected by waving arms, antlers or flailing.
+## Model origins are at the feet; the spine root is inside the torso.
+func tumble_center() -> Vector3:
+	var bone := _skeleton.find_bone("spine")
+	if bone < 0:
+		bone = _skeleton.find_bone("hips")
+	if bone < 0:
+		return Vector3.ZERO
+	var center := _skeleton.get_bone_global_rest(bone).origin
+	var node: Node3D = _skeleton
+	while node != self:
+		center = node.transform * center
+		node = node.get_parent() as Node3D
+	return center
+
+
 func has(animation: StringName) -> bool:
 	return _player.has_animation(animation)
 

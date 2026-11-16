@@ -63,6 +63,8 @@ var _hop_height := 0.0
 var _fly := Vector3.ZERO
 var _spin := Vector3.ZERO
 var _airtime := 0.0
+var _flight_pivot := Vector3.ZERO
+var _flight_bounds := AABB()
 
 
 func configure(which: Kind, rig: Props.Rig, terrain: TerrainField) -> Obstacle:
@@ -225,6 +227,10 @@ func push_normal(p: Vector3, fallback: Vector3) -> Vector3:
 ## Sends the obstacle tumbling with this velocity: a simple ragdoll that
 ## spins, flails its limbs, bounces and comes to rest.
 func launch(push: Vector3) -> void:
+	_flight_bounds = _visual_bounds()
+	_flight_pivot = _flight_bounds.get_center()
+	if _creature != null:
+		_flight_pivot = visual.transform * (_creature.transform * _creature.tumble_center())
 	hit = true
 	flying = true
 	velocity = Vector3.ZERO
@@ -243,25 +249,63 @@ func _process(delta: float) -> void:
 		_creature.play(&"flail", 1.6)
 	_fly.y -= 15.0 * delta
 	position += _fly * delta
+	var center := transform * _flight_pivot
 	rotate_object_local(Vector3.RIGHT, _spin.x * delta)
 	rotate_object_local(Vector3.UP, _spin.y * delta)
 	rotate_object_local(Vector3.BACK, _spin.z * delta)
+	# Keep the torso on its ballistic path while the foot-origin orbits it.
+	position += center - transform * _flight_pivot
 	for i in _limbs.size():
 		_limbs[i].rotation = Vector3(sin(_airtime * 17.0 + i) * 1.3, 0.0, cos(_airtime * 13.0 + i * 2.0) * 0.8)
 		if _lowers[i] != null:
 			_lowers[i].rotation.x = sin(_airtime * 11.0 + i * 1.7) * 0.9
-	var ground := field.height_world(position.x, position.z)
-	if position.y < ground:
-		position.y = ground
-		_fly = Vector3(_fly.x * 0.6, absf(_fly.y) * 0.3, _fly.z * 0.6)
+	var penetration := _ground_penetration()
+	if penetration > 0.0:
+		position.y += penetration
+		if _fly.y >= 0.0:
+			return
+		_fly = Vector3(_fly.x * 0.6, -_fly.y * 0.3, _fly.z * 0.6)
 		_spin *= 0.55
 		if _fly.length() < 1.2 and _airtime > 0.6:
 			flying = false
-			# Come to rest lying on its side.
+			# Lie on the side around the same pivot, then lower onto the snow.
+			center = transform * _flight_pivot
 			rotation = Vector3(0.0, rotation.y, PI / 2.0 if kind != Kind.CONE else PI / 2.2)
-			visual.position.y = 0.2
+			position += center - transform * _flight_pivot
+			position.y += _ground_penetration()
 			if _creature != null:
 				_creature.play(&"flail", 0.25)
+
+
+## Rest mesh bounds, including child scale and limb placements. Sampled only
+## at launch; a full skinned mesh evaluation every frame would be expensive.
+func _visual_bounds() -> AABB:
+	var bounds := AABB()
+	var first := true
+	var stack: Array[Node3D] = [visual]
+	var transforms: Array[Transform3D] = [visual.transform]
+	while not stack.is_empty():
+		var node := stack.pop_back() as Node3D
+		var to_obstacle: Transform3D = transforms.pop_back()
+		if node is MeshInstance3D and node.mesh != null:
+			var box: AABB = to_obstacle * node.mesh.get_aabb()
+			bounds = box if first else bounds.merge(box)
+			first = false
+		for child in node.get_children():
+			if child is Node3D:
+				stack.append(child)
+				transforms.append(to_obstacle * child.transform)
+	return bounds
+
+
+## Positive while the rotated bounds penetrate the terrain. Unlike testing
+## the foot-origin, this also works when the figure is upside down or prone.
+func _ground_penetration() -> float:
+	var penetration := -INF
+	for corner in 8:
+		var point := transform * _flight_bounds.get_endpoint(corner)
+		penetration = maxf(penetration, field.height_world(point.x, point.z) - point.y)
+	return penetration
 
 
 ## People and animals: landing on top of them is survivable.
@@ -282,7 +326,7 @@ func patrol(speed: float, lo: float, hi: float) -> void:
 
 func tick(delta: float) -> void:
 	_time += delta
-	if hit and not soft:
+	if flying or (hit and not soft):
 		return
 	if velocity != Vector3.ZERO:
 		position += velocity * delta
