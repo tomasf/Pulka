@@ -48,6 +48,9 @@ var near_miss_done := false
 var visual: MeshInstance3D
 
 var _limbs: Array[Node3D] = []
+## A Blender-made person or animal, animated instead of swinging limbs.
+var _creature: CreatureRig
+var _rig: Props.Rig
 ## Per limb, the joint of its lower part (knee, elbow), or null.
 var _lowers: Array[Node3D] = []
 var _limb_specs: Array[Props.Limb] = []
@@ -68,6 +71,11 @@ func configure(which: Kind, rig: Props.Rig, terrain: TerrainField) -> Obstacle:
 	visual.mesh = rig.body
 	add_child(visual)
 	_stride = rig.stride
+	_rig = rig
+	if rig.kind != "":
+		_creature = rig.make()
+		visual.add_child(_creature)
+		_creature.play(&"wave" if rig.waves else &"idle")
 	for spec in rig.limbs:
 		var joint := Node3D.new()
 		joint.position = spec.pivot
@@ -174,6 +182,10 @@ func configure(which: Kind, rig: Props.Rig, terrain: TerrainField) -> Obstacle:
 			top = 3.0
 			follow_terrain = false
 	mass = MASS.get(which, INF)
+	if _creature != null:
+		# The hare's hops are in its animation.
+		_hop_rate = 0.0
+		_hop_height = 0.0
 	set_process(false)
 	return self
 
@@ -223,6 +235,8 @@ func _process(delta: float) -> void:
 		set_process(false)
 		return
 	_airtime += delta
+	if _creature != null:
+		_creature.play(&"flail", 1.6)
 	_fly.y -= 15.0 * delta
 	position += _fly * delta
 	rotate_object_local(Vector3.RIGHT, _spin.x * delta)
@@ -242,6 +256,8 @@ func _process(delta: float) -> void:
 			# Come to rest lying on its side.
 			rotation = Vector3(0.0, rotation.y, PI / 2.0 if kind != Kind.CONE else PI / 2.2)
 			visual.position.y = 0.2
+			if _creature != null:
+				_creature.play(&"flail", 0.25)
 
 
 ## People and animals: landing on top of them is survivable.
@@ -274,6 +290,8 @@ func tick(delta: float) -> void:
 		if _hop_rate > 0.0:
 			visual.position.y = absf(sin(_time * _hop_rate)) * _hop_height
 		_gait += velocity.length() * _stride * delta
+		if _creature != null:
+			_creature.play(_rig.gait, velocity.length() / _rig.pace)
 		for i in _limbs.size():
 			var angles := _limb_specs[i].pose(_gait)
 			_limbs[i].rotation = Vector3(angles.x, 0.0, 0.0)
@@ -284,6 +302,8 @@ func tick(delta: float) -> void:
 			visual.position.y = absf(cos(_gait)) * 0.035
 			visual.rotation.z = sin(_gait) * 0.035
 	else:
+		if _creature != null:
+			_creature.play(&"wave" if _rig.waves else &"idle")
 		for i in _limbs.size():
 			if _limb_specs[i].waves:
 				_limbs[i].rotation = Vector3(0.0, 0.0, 2.5 + 0.35 * sin(_time * 9.0 + position.x))

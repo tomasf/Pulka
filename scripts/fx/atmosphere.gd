@@ -187,13 +187,13 @@ func _update_aurora(camera: Camera3D) -> void:
 		curtain.visible = aurora > 0.01
 		if not curtain.visible:
 			continue
-		var ahead := -camera.global_basis.z
-		ahead.y = 0.0
-		ahead = ahead.normalized()
-		var side := ahead.cross(Vector3.UP)
+		# Hung in the sky far down the valley: it keeps its distance as you
+		# ride but stays put when you turn, like the real thing.
+		var ahead := Vector3.FORWARD
+		var side := Vector3.RIGHT
 		var at := camera.global_position + ahead * (420.0 + i * 120.0) + side * (i * 160.0 - 80.0) + Vector3.UP * (150.0 + i * 30.0)
 		curtain.global_position = at
-		curtain.look_at(camera.global_position + Vector3.UP * (150.0 + i * 30.0), Vector3.UP)
+		curtain.look_at(at - ahead, Vector3.UP)
 		(curtain.material_override as ShaderMaterial).set_shader_parameter("strength", aurora)
 
 

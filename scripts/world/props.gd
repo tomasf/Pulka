@@ -56,11 +56,38 @@ class Rig:
 	var limbs: Array[Limb] = []
 	## Gait cycle in radians per metre travelled.
 	var stride := 0.0
+	## A person or animal made in Blender (models/<kind>.glb) instead of a
+	## body and limbs: its colours by material name, the metres one cycle
+	## of its gait covers, the gait (walk, hop) and whether it waves when
+	## standing still.
+	var kind := ""
+	var colours := {}
+	var pace := 1.4
+	var gait := &"walk"
+	var waves := false
+	## Something held (a bandy stick), in the model's space, following a bone.
+	var held: ArrayMesh
+	var held_bone := ""
 
 	static func of(mesh: ArrayMesh) -> Rig:
 		var rig := Rig.new()
 		rig.body = mesh
 		return rig
+
+	static func creature(model: String, dress: Dictionary, metres: float) -> Rig:
+		var rig := Rig.new()
+		rig.kind = model
+		rig.colours = dress
+		rig.pace = metres
+		return rig
+
+	## The Blender-made figure for this rig, dressed and holding its things.
+	func make() -> CreatureRig:
+		var figure := CreatureRig.new(kind)
+		figure.dress(colours)
+		if held != null:
+			figure.attach_at(held, held_bone, Transform3D.IDENTITY)
+		return figure
 
 
 static var _rigs: Dictionary = {}
@@ -329,210 +356,60 @@ static func person(variant: int) -> Rig:
 	return dressed("person%d" % variant, jacket, hat, scarf, pants)
 
 
-## A person in the given clothes. `bathing` swaps the winter gear for a
-## swimsuit; `stick` adds a bandy stick in the right hand. Legs bend at the
-## knee and arms at the elbow, so a walk has some spring to it.
+## A person in the given clothes. `bathing` swaps the winter gear for bare
+## skin and trunks (in the jacket's colour); `stick` puts a bandy stick in
+## the right hand. Hat colour goes for the mittens too.
 static func dressed(key: String, jacket: Color, hat: Color, scarf: Color, pants: Color, bathing := false, stick := false) -> Rig:
 	return cached_rig(key, func() -> Rig:
 		var skin := Palette.SKIN
-		var top := skin if bathing else jacket
-		var legs := skin if bathing else pants
-		var boots := skin if bathing else Color(0.22, 0.14, 0.1)
-		var kit := MeshKit.new()
-		# Torso: a padded jacket a little wider at the chest, longer at the
-		# back, or bare skin and swimwear for a winter dip.
-		var torso := PackedVector2Array([
-			Vector2(0.0, 0.8), Vector2(0.2, 0.82), Vector2(0.23, 0.9), Vector2(0.22, 1.1),
-			Vector2(0.235, 1.3), Vector2(0.22, 1.44), Vector2(0.15, 1.53), Vector2(0.0, 1.55),
-		])
+		var colours := {
+			"jacket": jacket, "jacket_trim": jacket.lightened(0.35), "pants": pants, "trunks": pants,
+			"hat": hat, "hat_cuff": hat.darkened(0.2), "scarf": scarf,
+		}
 		if bathing:
-			torso = PackedVector2Array([
-				Vector2(0.0, 0.85), Vector2(0.17, 0.87), Vector2(0.18, 0.95), Vector2(0.16, 1.12),
-				Vector2(0.19, 1.32), Vector2(0.19, 1.44), Vector2(0.12, 1.52), Vector2(0.0, 1.54),
-			])
-		kit.lathe(torso, Transform3D(Basis.from_scale(Vector3(1.0, 1.0, 0.72)), Vector3.ZERO), top, 16)
-		if bathing:
-			kit.lathe(PackedVector2Array([Vector2(0.172, 0.84), Vector2(0.185, 0.95), Vector2(0.17, 1.0)]), Transform3D(Basis.from_scale(Vector3(1.0, 1.0, 0.74)), Vector3.ZERO), jacket, 16)
-		else:
-			for band in [0.98, 1.16, 1.34]:
-				kit.add(_disc(0.232, 0.025), Transform3D(Basis.from_scale(Vector3(1.0, 1.0, 0.74)), Vector3(0, band, 0)), jacket.darkened(0.15))
-			kit.box(Vector3(0.025, 0.66, 0.02), Vector3(0, 1.16, -0.17), jacket.lightened(0.4))
-			kit.add(_disc(0.212, 0.07), Transform3D(Basis.from_scale(Vector3(1.0, 1.0, 0.74)), Vector3(0, 0.83, 0)), jacket.darkened(0.25))
-			kit.cylinder(0.13, 0.1, Vector3(0, 1.55, 0), scarf, 14)
-			kit.cylinder(0.128, 0.04, Vector3(0, 1.6, 0), Color(1, 1, 1), 14)
-			kit.capsule_between(Vector3(0.08, 1.52, -0.12), Vector3(0.11, 1.26, -0.18), 0.04, scarf, 8)
-			for f in 3:
-				kit.box(Vector3(0.015, 0.05, 0.015), Vector3(0.09 + f * 0.022, 1.21, -0.185), scarf)
-		kit.ellipsoid(Vector3(0.18, 0.12, 0.13), Vector3(0, 0.86, 0), jacket if bathing else pants)
-		kit.cylinder(0.06, 0.12, Vector3(0, 1.58, 0), skin, 10)
-		RideModels.head(kit, Vector3(0, 1.73, 0), hat)
-		var rig := Rig.of(kit.build())
-		rig.stride = 4.0
-		# Leg: thigh from the hip, shin and boot from the knee.
-		var thigh := MeshKit.new()
-		thigh.capsule_between(Vector3.ZERO, Vector3(0, -0.44, 0), 0.088, legs)
-		var thigh_mesh := thigh.build()
-		var shin := MeshKit.new()
-		shin.capsule_between(Vector3.ZERO, Vector3(0, -0.37, 0), 0.075, legs)
-		shin.ellipsoid(Vector3(0.075, 0.07, 0.13), Vector3(0, -0.42, -0.04), boots)
-		if not bathing:
-			shin.cylinder(0.082, 0.12, Vector3(0, -0.34, 0), boots, 10)
-			shin.box(Vector3(0.14, 0.03, 0.26), Vector3(0, -0.475, -0.04), Color(0.08, 0.07, 0.07))
-		var shin_mesh := shin.build()
-		# Arm: upper arm from the shoulder, forearm and mitten from the elbow.
-		var upper := MeshKit.new()
-		upper.capsule_between(Vector3.ZERO, Vector3(0, -0.27, 0), 0.068, top)
-		var upper_mesh := upper.build()
-		var fore := MeshKit.new()
-		fore.capsule_between(Vector3.ZERO, Vector3(0, -0.24, 0), 0.06, top)
-		if bathing:
-			fore.sphere(0.055, Vector3(0, -0.29, 0), skin, Vector3(0.8, 1.0, 1.0), 10, 6)
-		else:
-			fore.cylinder(0.066, 0.05, Vector3(0, -0.22, 0), jacket.lightened(0.3), 10)
-			fore.sphere(0.065, Vector3(0, -0.3, 0), hat, Vector3(0.8, 1.1, 1.1), 10, 6)
-			fore.sphere(0.028, Vector3(0, -0.27, -0.05), hat, Vector3.ONE, 8, 4)
-		var fore_mesh := fore.build()
-		var right_fore := fore_mesh
+			colours = {
+				"jacket": skin, "jacket_trim": skin, "pants": skin, "trunks": jacket, "boots": skin,
+				"sole": skin.darkened(0.15), "scarf": skin, "hat": hat, "hat_cuff": hat.darkened(0.2),
+			}
+		var rig := Rig.creature("person", colours, 1.4)
+		rig.waves = not stick
 		if stick:
-			var holding := MeshKit.new()
-			holding.capsule_between(Vector3.ZERO, Vector3(0, -0.24, 0), 0.06, top)
-			holding.sphere(0.065, Vector3(0, -0.3, 0), hat, Vector3(0.8, 1.1, 1.1), 10, 6)
-			var wood := Color(0.6, 0.45, 0.25)
-			holding.capsule_between(Vector3(0, -0.15, 0.25), Vector3(0, -0.95, -0.6), 0.02, wood, 6)
-			holding.capsule_between(Vector3(0, -0.95, -0.6), Vector3(0, -0.98, -0.88), 0.03, wood, 6)
-			holding.box(Vector3(0.05, 0.04, 0.12), Vector3(0, -0.6, -0.22), Color(0.1, 0.1, 0.12), Vector3(0.75, 0, 0))
-			right_fore = holding.build()
-		rig.limbs.append(Limb.new(thigh_mesh, Vector3(-0.1, 0.9, 0), 0.0, 0.5).with_lower(shin_mesh, Vector3(0, -0.44, 0), -0.05, -0.75))
-		rig.limbs.append(Limb.new(thigh_mesh, Vector3(0.1, 0.9, 0), PI, 0.5).with_lower(shin_mesh, Vector3(0, -0.44, 0), -0.05, -0.75))
-		rig.limbs.append(Limb.new(upper_mesh, Vector3(-0.27, 1.43, 0), PI, 0.42).with_lower(fore_mesh, Vector3(0, -0.27, 0), 0.25, 0.35))
-		rig.limbs.append(Limb.new(upper_mesh, Vector3(0.27, 1.43, 0), 0.0, 0.42, not stick).with_lower(right_fore, Vector3(0, -0.27, 0), 0.6 if stick else 0.25, 0.0 if stick else 0.35))
+			rig.held = _bandy_stick()
+			rig.held_bone = "forearm.R"
 		return rig)
+
+
+## A bandy stick in a right hand hanging at the side, its curved blade
+## down by the ice in front (model space of the person).
+static func _bandy_stick() -> ArrayMesh:
+	return cached_mesh("bandy_stick", func() -> ArrayMesh:
+		var kit := MeshKit.new()
+		var wood := Color(0.6, 0.45, 0.25)
+		kit.capsule_between(Vector3(0.28, 1.0, 0.08), Vector3(0.3, 0.08, -0.6), 0.02, wood, 6)
+		kit.capsule_between(Vector3(0.3, 0.08, -0.6), Vector3(0.3, 0.04, -0.85), 0.03, wood, 6)
+		kit.box(Vector3(0.05, 0.04, 0.12), Vector3(0.285, 0.75, -0.1), Color(0.1, 0.1, 0.12), Vector3(0.9, 0, 0))
+		return kit.build())
 
 
 static func dog() -> Rig:
-	return cached_rig("dog", func() -> Rig:
-		var fur := Color(0.62, 0.42, 0.22)
-		var dark := Color(0.42, 0.27, 0.14)
-		var kit := MeshKit.new()
-		kit.ellipsoid(Vector3(0.18, 0.18, 0.4), Vector3(0, 0.5, 0.02), fur)
-		kit.ellipsoid(Vector3(0.17, 0.2, 0.18), Vector3(0, 0.55, -0.28), fur)
-		kit.capsule(0.09, 0.3, Vector3(0, 0.66, -0.38), fur, Vector3(-0.7, 0, 0))
-		kit.sphere(0.14, Vector3(0, 0.78, -0.47), fur)
-		kit.ellipsoid(Vector3(0.075, 0.065, 0.12), Vector3(0, 0.74, -0.61), Color(0.8, 0.65, 0.45))
-		kit.sphere(0.035, Vector3(0, 0.77, -0.72), Color(0.05, 0.05, 0.05))
-		for side in [-1.0, 1.0]:
-			kit.sphere(0.022, Vector3(0.06 * side, 0.83, -0.58), Color(0.05, 0.05, 0.05))
-			kit.ellipsoid(Vector3(0.04, 0.12, 0.07), Vector3(0.12 * side, 0.74, -0.44), dark, Vector3(0, 0, side * 0.35))
-		kit.capsule(0.035, 0.36, Vector3(0, 0.66, 0.46), fur, Vector3(0.8, 0, 0))
-		kit.cylinder(0.105, 0.05, Vector3(0, 0.64, -0.37), Color(0.9, 0.1, 0.1), 14, Vector3(-0.7, 0, 0))
-		var rig := Rig.of(kit.build())
-		rig.stride = 4.0
-		var leg := MeshKit.new()
-		leg.capsule_between(Vector3.ZERO, Vector3(0, -0.2, 0), 0.06, fur)
-		var paw := MeshKit.new()
-		paw.capsule_between(Vector3.ZERO, Vector3(0, -0.2, 0), 0.042, fur)
-		paw.ellipsoid(Vector3(0.05, 0.035, 0.07), Vector3(0, -0.22, -0.025), dark)
-		_legs(rig, leg.build(), 0.1, -0.27, 0.27, 0.45, 0.6, paw.build(), Vector3(0, -0.2, 0), 0.7)
-		return rig)
+	return cached_rig("dog", func() -> Rig: return Rig.creature("dog", {}, 0.9))
 
 
 static func moose() -> Rig:
-	return cached_rig("moose", func() -> Rig:
-		var fur := Color(0.3, 0.2, 0.13)
-		var face := Color(0.26, 0.17, 0.11)
-		var antler := Color(0.86, 0.79, 0.62)
-		var kit := MeshKit.new()
-		kit.ellipsoid(Vector3(0.55, 0.6, 1.2), Vector3(0, 1.75, 0), fur)
-		kit.ellipsoid(Vector3(0.5, 0.55, 0.6), Vector3(0, 2.05, -0.65), fur)
-		kit.ellipsoid(Vector3(0.48, 0.5, 0.55), Vector3(0, 1.75, 0.75), fur)
-		kit.capsule(0.25, 0.95, Vector3(0, 2.05, -1.25), fur, Vector3(-1.1, 0, 0))
-		kit.ellipsoid(Vector3(0.22, 0.26, 0.42), Vector3(0, 2.15, -1.8), face, Vector3(0.35, 0, 0))
-		kit.ellipsoid(Vector3(0.2, 0.22, 0.28), Vector3(0, 1.98, -2.12), face.darkened(0.15))
-		kit.ellipsoid(Vector3(0.06, 0.2, 0.08), Vector3(0, 1.8, -1.78), face)
-		for side in [-1.0, 1.0]:
-			kit.sphere(0.035, Vector3(0.08 * side, 1.98, -2.38), Color(0.02, 0.02, 0.02))
-			kit.sphere(0.04, Vector3(0.2 * side, 2.25, -1.85), Color(0.02, 0.02, 0.02))
-			kit.ellipsoid(Vector3(0.06, 0.18, 0.1), Vector3(0.22 * side, 2.42, -1.62), fur, Vector3(0, 0, side * 0.7))
-			# Palmate antlers: a beam out from the skull into a broad, cupped
-			# palm with a row of tines along its edge.
-			kit.capsule_between(Vector3(0.1 * side, 2.38, -1.7), Vector3(0.32 * side, 2.5, -1.68), 0.055, antler, 7)
-			var palm_at := Vector3(0.6 * side, 2.62, -1.62)
-			var palm := Basis.from_euler(Vector3(0.2, 0, side * 0.4))
-			kit.ellipsoid(Vector3(0.42, 0.05, 0.26), palm_at, antler, palm.get_euler())
-			kit.ellipsoid(Vector3(0.22, 0.045, 0.18), Vector3(0.45 * side, 2.56, -1.85), antler, Vector3(0.6, 0, side * 0.3))
-			# Tines grow from the palm's rim round its outer end, pointing
-			# up off the face of the palm.
-			for tine in 6:
-				var around := lerpf(-1.3, 1.5, tine / 5.0)
-				var rim := Vector3(cos(around) * 0.38 * side, 0.0, sin(around) * 0.23)
-				var base: Vector3 = palm_at + palm * rim
-				var tip: Vector3 = base + palm * (Vector3.UP * 0.24 + rim.normalized() * 0.06)
-				kit.capsule_between(base, tip, 0.03, antler, 5)
-		kit.capsule(0.06, 0.2, Vector3(0, 1.95, 1.3), fur, Vector3(0.5, 0, 0))
-		# The bell: a flap of hairy skin hanging under the throat.
-		kit.capsule_between(Vector3(0, 1.85, -1.55), Vector3(0, 1.45, -1.5), 0.07, fur.darkened(0.15), 7)
-		# A hump of muscle over the shoulders, a darker mane along it.
-		kit.ellipsoid(Vector3(0.42, 0.35, 0.55), Vector3(0, 2.38, -0.55), fur.darkened(0.12))
-		var rig := Rig.of(kit.build())
-		rig.stride = 2.2
-		var leg := MeshKit.new()
-		var shin := Color(0.62, 0.55, 0.46)
-		leg.capsule_between(Vector3(0, 0.1, 0), Vector3(0, -0.62, 0), 0.15, fur)
-		var lower := MeshKit.new()
-		lower.capsule_between(Vector3.ZERO, Vector3(0, -0.8, 0), 0.075, shin)
-		lower.sphere(0.085, Vector3.ZERO, shin.darkened(0.1), Vector3.ONE, 8, 5)
-		lower.cylinder(0.075, 0.14, Vector3(0, -0.86, -0.03), Color(0.12, 0.1, 0.08), 8, Vector3.ZERO, 0.06)
-		_legs(rig, leg.build(), 0.3, -0.75, 0.8, 1.55, 0.4, lower.build(), Vector3(0, -0.62, 0), 0.6)
-		return rig)
+	return cached_rig("moose", func() -> Rig: return Rig.creature("moose", {}, 2.6))
 
 
 static func deer() -> Rig:
-	return cached_rig("deer", func() -> Rig:
-		var fur := Color(0.64, 0.43, 0.26)
-		var kit := MeshKit.new()
-		kit.ellipsoid(Vector3(0.24, 0.27, 0.55), Vector3(0, 1.05, 0), fur)
-		kit.ellipsoid(Vector3(0.18, 0.15, 0.1), Vector3(0, 1.08, 0.5), Color(0.97, 0.96, 0.93))
-		kit.capsule(0.1, 0.6, Vector3(0, 1.38, -0.5), fur, Vector3(-0.6, 0, 0))
-		kit.ellipsoid(Vector3(0.12, 0.13, 0.22), Vector3(0, 1.62, -0.72), fur, Vector3(0.3, 0, 0))
-		kit.sphere(0.03, Vector3(0, 1.57, -0.93), Color(0.05, 0.05, 0.05))
-		for side in [-1.0, 1.0]:
-			kit.sphere(0.025, Vector3(0.09 * side, 1.66, -0.78), Color(0.05, 0.05, 0.05))
-			kit.ellipsoid(Vector3(0.04, 0.12, 0.07), Vector3(0.13 * side, 1.76, -0.66), fur, Vector3(0, 0, side * 0.6))
-			kit.capsule(0.022, 0.32, Vector3(0.06 * side, 1.86, -0.68), Color(0.45, 0.35, 0.25), Vector3(0, 0, -side * 0.3))
-		var rig := Rig.of(kit.build())
-		rig.stride = 2.4
-		var leg := MeshKit.new()
-		leg.capsule_between(Vector3(0, 0.08, 0), Vector3(0, -0.42, 0), 0.075, fur)
-		var lower := MeshKit.new()
-		lower.capsule_between(Vector3.ZERO, Vector3(0, -0.46, 0), 0.035, fur.darkened(0.1))
-		lower.cylinder(0.04, 0.06, Vector3(0, -0.5, -0.01), Color(0.1, 0.08, 0.06), 8, Vector3.ZERO, 0.025)
-		_legs(rig, leg.build(), 0.14, -0.38, 0.38, 0.95, 0.55, lower.build(), Vector3(0, -0.42, 0), 0.8)
-		return rig)
+	return cached_rig("deer", func() -> Rig: return Rig.creature("deer", {}, 1.6))
 
 
-## A mountain hare in its white winter coat: crouched on long hind feet,
-## black tips to its ears.
+## A mountain hare in its white winter coat, black tips to its ears: it
+## gets about in hops.
 static func hare() -> Rig:
 	return cached_rig("hare", func() -> Rig:
-		var fur := Color(0.94, 0.94, 0.96)
-		var shade := Color(0.84, 0.85, 0.9)
-		var kit := MeshKit.new()
-		kit.ellipsoid(Vector3(0.16, 0.17, 0.28), Vector3(0, 0.24, 0.04), fur, Vector3(-0.35, 0, 0))
-		for side in [-1.0, 1.0]:
-			kit.ellipsoid(Vector3(0.07, 0.13, 0.15), Vector3(0.1 * side, 0.18, 0.16), fur)
-			kit.ellipsoid(Vector3(0.045, 0.03, 0.15), Vector3(0.09 * side, 0.03, 0.1), shade)
-			kit.capsule_between(Vector3(0.06 * side, 0.2, -0.16), Vector3(0.06 * side, 0.02, -0.2), 0.03, fur, 6)
-		kit.ellipsoid(Vector3(0.1, 0.1, 0.13), Vector3(0, 0.4, -0.24), fur, Vector3(0.3, 0, 0))
-		kit.ellipsoid(Vector3(0.06, 0.05, 0.05), Vector3(0, 0.37, -0.34), shade)
-		kit.sphere(0.016, Vector3(0, 0.385, -0.375), Color(0.75, 0.5, 0.52), Vector3.ONE, 6, 4)
-		for side in [-1.0, 1.0]:
-			kit.sphere(0.022, Vector3(0.065 * side, 0.43, -0.29), Color(0.08, 0.06, 0.05), Vector3.ONE, 8, 4)
-			var root := Vector3(0.04 * side, 0.48, -0.2)
-			var tip := root + Vector3(0.06 * side, 0.24, 0.1)
-			kit.ellipsoid(Vector3(0.035, 0.13, 0.02), root.lerp(tip, 0.5), fur, Vector3(0.4, 0, -side * 0.25))
-			kit.ellipsoid(Vector3(0.022, 0.035, 0.016), tip - Vector3(0.01 * side, 0.01, 0.0), Color(0.1, 0.09, 0.09), Vector3(0.4, 0, -side * 0.25))
-		kit.sphere(0.05, Vector3(0, 0.26, 0.31), Color(1, 1, 1), Vector3.ONE, 8, 5)
-		return Rig.of(kit.build()))
+		var rig := Rig.creature("hare", {}, 0.9)
+		rig.gait = &"hop"
+		return rig)
 
 
 # --- Vehicles on the roads ---
@@ -1186,40 +1063,12 @@ static func santa_sleigh() -> ArrayMesh:
 		return kit.build())
 
 
-## Santa's reindeer: sturdier than a roe deer, dark with a pale mane down
-## its neck and great branching antlers. Its nose is where a roe deer's is.
+## Santa's reindeer: sturdier than a roe deer, dark with a pale mane and
+## great branching antlers; it gallops through the air.
 static func reindeer() -> Rig:
 	return cached_rig("reindeer", func() -> Rig:
-		var fur := Color(0.45, 0.32, 0.22)
-		var pale := Color(0.9, 0.86, 0.78)
-		var antler := Color(0.8, 0.72, 0.56)
-		var kit := MeshKit.new()
-		kit.ellipsoid(Vector3(0.27, 0.3, 0.6), Vector3(0, 1.05, 0), fur)
-		kit.ellipsoid(Vector3(0.2, 0.17, 0.12), Vector3(0, 1.08, 0.55), pale)
-		kit.capsule_between(Vector3(0, 1.15, -0.4), Vector3(0, 1.5, -0.62), 0.14, fur)
-		kit.capsule_between(Vector3(0, 1.0, -0.45), Vector3(0, 1.35, -0.62), 0.12, pale)
-		kit.ellipsoid(Vector3(0.12, 0.13, 0.24), Vector3(0, 1.6, -0.72), fur, Vector3(0.35, 0, 0))
-		kit.ellipsoid(Vector3(0.09, 0.08, 0.1), Vector3(0, 1.55, -0.88), fur.darkened(0.2))
-		var dark := Color(0.05, 0.05, 0.05)
-		for side in [-1.0, 1.0]:
-			kit.sphere(0.025, Vector3(0.09 * side, 1.66, -0.78), dark, Vector3.ONE, 8, 4)
-			kit.ellipsoid(Vector3(0.035, 0.09, 0.06), Vector3(0.13 * side, 1.72, -0.64), fur, Vector3(0, 0, side * 0.9))
-			# Antler: a beam sweeping back and up with tines off its front.
-			var beam: Array[Vector3] = [Vector3(0.06 * side, 1.75, -0.68), Vector3(0.18 * side, 2.0, -0.6), Vector3(0.3 * side, 2.25, -0.45), Vector3(0.32 * side, 2.5, -0.55), Vector3(0.24 * side, 2.65, -0.7)]
-			for i in beam.size() - 1:
-				kit.capsule_between(beam[i], beam[i + 1], 0.03, antler, 5)
-			for i in [1, 2, 3]:
-				kit.capsule_between(beam[i], beam[i] + Vector3(0.04 * side, 0.18, -0.2), 0.02, antler, 4)
-			kit.capsule_between(beam[0].lerp(beam[1], 0.5), Vector3(0.1 * side, 1.95, -0.92), 0.022, antler, 4)
-		kit.capsule_between(Vector3(0, 1.15, 0.58), Vector3(0, 1.08, 0.68), 0.05, pale, 6)
-		var rig := Rig.of(kit.build())
-		rig.stride = 2.4
-		var leg := MeshKit.new()
-		leg.capsule_between(Vector3(0, 0.08, 0), Vector3(0, -0.42, 0), 0.085, fur)
-		var lower := MeshKit.new()
-		lower.capsule_between(Vector3.ZERO, Vector3(0, -0.44, 0), 0.045, pale)
-		lower.cylinder(0.06, 0.07, Vector3(0, -0.49, -0.01), Color(0.12, 0.1, 0.08), 8, Vector3.ZERO, 0.04)
-		_legs(rig, leg.build(), 0.15, -0.4, 0.4, 0.95, 0.55, lower.build(), Vector3(0, -0.42, 0), 0.9)
+		var rig := Rig.creature("reindeer", {}, 2.0)
+		rig.gait = &"gallop"
 		return rig)
 
 
@@ -1242,7 +1091,13 @@ static func snowball() -> ArrayMesh:
 
 
 ## A static copy of a rig with its limbs frozen at the given gait phase.
+## A Blender-made person stands about (its idle, at that phase) and an
+## animal is caught mid-stride, baked into a plain mesh (see `baked`).
 static func posed(rig: Rig, phase: float) -> Node3D:
+	if rig.kind != "":
+		var still := MeshInstance3D.new()
+		still.mesh = baked(rig, phase)
+		return still
 	var root := Node3D.new()
 	var body := MeshInstance3D.new()
 	body.mesh = rig.body
@@ -1267,7 +1122,25 @@ static func posed(rig: Rig, phase: float) -> Node3D:
 
 ## Moves the limbs of a copy made by `posed` to another gait phase, for
 ## figures animated by hand (Santa's reindeer galloping through the air).
+static var _baked := {}
+
+
+## A creature rig frozen at a gait phase as one plain mesh, made once per
+## rig and eighth of a cycle and shared.
+static func baked(rig: Rig, phase: float) -> ArrayMesh:
+	var step := posmod(roundi(phase / TAU * 8.0), 8)
+	var key := "%d_%d" % [rig.get_instance_id(), step]
+	if not _baked.has(key):
+		var figure := rig.make()
+		_baked[key] = figure.bake(&"idle" if rig.kind == "person" else rig.gait, step / 8.0)
+		figure.free()
+	return _baked[key]
+
+
 static func repose(root: Node3D, rig: Rig, phase: float) -> void:
+	if root is CreatureRig:
+		(root as CreatureRig).freeze(&"idle" if rig.kind == "person" else rig.gait, phase / TAU)
+		return
 	for i in rig.limbs.size():
 		var limb := rig.limbs[i]
 		var angles := limb.pose(phase)

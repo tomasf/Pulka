@@ -1,11 +1,12 @@
 extends SceneTree
 ## Renders a contact sheet of models, each framed to fit its own cell, for
 ## reviewing how they look side by side.
-## Run: Godot --path . --script res://tools/gallery.gd -- <group> <out.png>
+## Run: Godot --path . --script res://tools/gallery.gd -- <group> <out.png> [cell size]
 ## Groups: nature, people, vehicles, town, shops, regions, rides, pickups, all.
 
-const CELL := 360
 const COLUMNS := 6
+
+var _cell := 360
 
 
 func _initialize() -> void:
@@ -99,6 +100,35 @@ static func _entries(group: String) -> Array:
 			["snowball", func() -> Node3D: return _mesh(Props.snowball())],
 		],
 	}
+	groups["rider3d"] = []
+	for model in VehicleSpec.Model.values():
+		groups["rider3d"].append([VehicleSpec.Model.keys()[model].to_lower(), func() -> Node3D: return _ride3d(model)])
+	groups["rider3d"].append(["face", func() -> Node3D: return _face3d()])
+	groups["riderside"] = [
+		["still side", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA), Vector3(-1, 0.15, 0))],
+		["tuck side", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA, 0.0, 1.0), Vector3(-1, 0.15, 0))],
+		["steer right back", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA, 1.0), Vector3(0, 0.3, 1))],
+		["air back", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA, 0.0, 0.0, true), Vector3(0, 0.3, 1))],
+		["air front", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA, 0.0, 0.0, true), Vector3(0.3, 0.2, -1))],
+		["air side", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.TEFAT, 0.0, 0.0, true), Vector3(-1, 0.2, 0))],
+	]
+	groups["riderpose"] = [
+		["still", func() -> Node3D: return _ride3d(VehicleSpec.Model.PULKA)],
+		["steer right", func() -> Node3D: return _ride3d(VehicleSpec.Model.PULKA, 1.0)],
+		["tuck", func() -> Node3D: return _ride3d(VehicleSpec.Model.PULKA, 0.0, 1.0)],
+		["air", func() -> Node3D: return _ride3d(VehicleSpec.Model.PULKA, 0.0, 0.0, true)],
+		["flail", func() -> Node3D: return _ride3d(VehicleSpec.Model.PULKA, 0.0, 0.0, false, true)],
+	]
+	groups["compare"] = [
+		["old", func() -> Node3D: return _ride(VehicleSpec.Model.PULKA, jacket, hat)],
+		["new", func() -> Node3D: return _ride3d(VehicleSpec.Model.PULKA)],
+		["old tefat", func() -> Node3D: return _ride(VehicleSpec.Model.TEFAT, jacket, hat)],
+		["new tefat", func() -> Node3D: return _ride3d(VehicleSpec.Model.TEFAT)],
+	]
+	groups["creatures"] = []
+	for kind in ["person", "moose", "deer", "reindeer", "dog", "hare"]:
+		for anim in [["walk", 0.0], ["walk", 0.5], ["idle", 0.3], ["wave", 0.2], ["gallop", 0.3], ["hop", 0.5], ["flail", 0.3]]:
+			groups["creatures"].append(["%s %s" % [kind, anim[0]], func() -> Node3D: return _creature(kind, anim[0], anim[1])])
 	groups["shops"] = []
 	for i in Shops.MALL.size():
 		groups["shops"].append(["mall%d" % i, func() -> Node3D: return _front(Shops.mall_front(i))])
@@ -118,6 +148,57 @@ static func _mesh(mesh: Mesh) -> Node3D:
 	var node := MeshInstance3D.new()
 	node.mesh = mesh
 	return node
+
+
+const RIDE_POSES := ["pulka", "stjartlapp", "snowracer", "tefat", "wok"]
+
+
+## The Blender-made rider on a ride, posed for it, optionally moving:
+## `steer`, `tuck`, a long jump (`air`) or a crash (`flail`).
+static func _ride3d(model: VehicleSpec.Model, steer := 0.0, tuck := 0.0, air := false, flail := false) -> Node3D:
+	var node := _mesh(RideModels.vehicle(model))
+	var rider := RiderRig.new()
+	rider.set_ride(model)
+	rider.dress(Color(0.9, 0.3, 0.6), Color(0.95, 0.8, 0.1))
+	var spec: VehicleSpec = VehicleSpec.all()[model]
+	rider.position = Vector3(0, spec.seat_height, 0.05)
+	node.add_child(rider)
+	# Posed once it is in the scene, where the skeleton keeps its poses.
+	node.set_meta("after_add", func() -> void:
+		for i in 60:
+			if flail:
+				rider.flail(1.0 / 60.0)
+			else:
+				rider.animate(1.0 / 60.0, steer, tuck, air))
+	return node
+
+
+## A Blender-made creature frozen part way through an animation (an empty
+## cell when it has no such animation or no model yet).
+static func _creature(kind: String, animation: String, fraction: float) -> Node3D:
+	var root := Node3D.new()
+	if not ResourceLoader.exists("res://models/%s.glb" % kind):
+		return root
+	var creature := CreatureRig.new(kind)
+	if not creature.has(animation):
+		creature.free()
+		root.set_meta("frame", AABB(Vector3(-0.5, 0, -0.5), Vector3(1, 1, 1)))
+		return root
+	root.add_child(creature)
+	creature.freeze(animation, fraction)
+	return root
+
+
+static func _viewed(node: Node3D, direction: Vector3) -> Node3D:
+	node.set_meta("view", direction)
+	return node
+
+
+static func _face3d() -> Node3D:
+	var root := _ride3d(VehicleSpec.Model.PULKA)
+	root.set_meta("frame", AABB(Vector3(-0.2, 0.84, -0.2), Vector3(0.4, 0.5, 0.4)))
+	root.set_meta("front", true)
+	return root
 
 
 ## A shop front seen straight on at its window.
@@ -171,6 +252,8 @@ func _run() -> void:
 	var args := OS.get_cmdline_user_args()
 	var group := args[0] if args.size() > 0 else "all"
 	var out := args[1] if args.size() > 1 else "user://gallery.png"
+	if args.size() > 2:
+		_cell = int(args[2])
 	var entries := _entries(group)
 	var world := Node3D.new()
 	root.add_child(world)
@@ -197,19 +280,25 @@ func _run() -> void:
 	camera.fov = 35.0
 	world.add_child(camera)
 	camera.current = true
-	root.size = Vector2i(CELL, CELL)
+	root.size = Vector2i(_cell, _cell)
 	var rows := ceili(entries.size() / float(COLUMNS))
-	var sheet := Image.create(CELL * mini(COLUMNS, entries.size()), CELL * rows, false, Image.FORMAT_RGBA8)
+	var sheet := Image.create(_cell * mini(COLUMNS, entries.size()), _cell * rows, false, Image.FORMAT_RGBA8)
 	for i in entries.size():
 		var builder: Callable = entries[i][1]
 		var model: Node3D = builder.call()
 		world.add_child(model)
+		if model.has_meta("after_add"):
+			(model.get_meta("after_add") as Callable).call()
 		var box := _bounds(model)
+		if OS.get_environment("GALLERY_DEBUG") != "":
+			print("bounds ", box)
 		ground.position.y = minf(box.position.y, 0.0) - 0.01
 		ground.visible = box.position.y > -1.0
 		var centre := box.get_center()
 		var radius := maxf(box.size.length() * 0.5, 0.05)
 		var direction := Vector3(0.0, 0.12, -1.0) if model.has_meta("front") else Vector3(-1.0, 0.55, -1.15)
+		if model.has_meta("view"):
+			direction = model.get_meta("view")
 		camera.position = centre + direction.normalized() * radius / tan(deg_to_rad(camera.fov * 0.5)) * 1.05
 		camera.look_at(centre)
 		camera.near = radius * 0.05
@@ -218,7 +307,7 @@ func _run() -> void:
 			await process_frame
 		var shot := root.get_viewport().get_texture().get_image()
 		shot.convert(Image.FORMAT_RGBA8)
-		sheet.blit_rect(shot, Rect2i(0, 0, CELL, CELL), Vector2i((i % COLUMNS) * CELL, (i / COLUMNS) * CELL))
+		sheet.blit_rect(shot, Rect2i(0, 0, _cell, _cell), Vector2i((i % COLUMNS) * _cell, (i / COLUMNS) * _cell))
 		print("%d %s %d verts" % [i, entries[i][0], _vertices(model)])
 		model.queue_free()
 		await process_frame

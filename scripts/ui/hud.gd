@@ -22,9 +22,10 @@ class Mittens extends Control:
 	var lives := 3
 	var max_lives := 3
 
+	## Drawn from the right edge, so extra mittens grow the row leftwards.
 	func _draw() -> void:
 		for i in max_lives:
-			var origin := Vector2(i * 46.0, 0.0)
+			var origin := Vector2(size.x - (max_lives - i) * 46.0, 0.0)
 			var color := Color(0.92, 0.18, 0.2) if i < lives else Color(0.4, 0.4, 0.45, 0.5)
 			draw_rect(Rect2(origin + Vector2(4, 30), Vector2(30, 10)), Color(1, 1, 1) if i < lives else color)
 			draw_circle(origin + Vector2(19, 14), 15.0, color)

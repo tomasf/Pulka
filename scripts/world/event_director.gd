@@ -246,15 +246,16 @@ func _spawn_sleigh() -> void:
 	_sleigh.add_child(sleigh)
 	for row in 2:
 		for side in [-1.0, 1.0]:
-			var deer := Props.posed(Props.reindeer(), row * 1.3 + (0.0 if side < 0.0 else 0.6))
+			var deer := Props.reindeer().make()
+			Props.repose(deer, Props.reindeer(), row * 1.3 + (0.0 if side < 0.0 else 0.6))
 			deer.position = Vector3(0.75 * side, 0.1, -3.4 - row * 2.4)
 			deer.set_meta("phase", row * 1.3 + (0.0 if side < 0.0 else 0.6))
 			_sleigh.add_child(deer)
 			_reindeer.append(deer)
 			if row == 1 and side < 0.0:
-				var nose := MeshInstance3D.new()
-				nose.mesh = MeshKit.new().sphere(0.07, Vector3(0, 1.57, -0.95), Color(1.0, 0.1, 0.1, 0.0)).build()
-				deer.add_child(nose)
+				# Rudolph's glowing nose, on the end of his snout as he gallops.
+				var nose := MeshKit.new().sphere(0.07, Vector3.ZERO, Color(1.0, 0.1, 0.1, 0.0)).build()
+				(deer as CreatureRig).attach_at(nose, "head", Transform3D(Basis.IDENTITY, Vector3(0, 1.56, -0.97)))
 	add_child(_sleigh)
 	# Swoops in from high up ahead of the player, then leads the way.
 	_sleigh_d = sled.distance() + 40.0

@@ -185,8 +185,31 @@ func _park_cars(chunk: Chunk, rng: RandomNumberGenerator, d0: float, d1: float) 
 		var car := Obstacle.new().configure(Obstacle.Kind.CAR, world.obstacle_rig(Obstacle.Kind.CAR, rng), field)
 		car.position = Vector3(x, field.height(x, d), -d)
 		car.rotation.y = -world.street_yaw(d) + (PI if rng.randf() < 0.5 else 0.0)
+		_rest_on_ground(car, 1.4, 0.8)
 		chunk.add_child(car)
 		chunk.obstacles.append(car)
+
+
+## Tilts a standing vehicle's model to lie on the slope under its wheels,
+## `reach` ahead and behind and `track` to either side of its middle. Only
+## the model tilts; the collision box stays upright on its yaw.
+func _rest_on_ground(vehicle: Obstacle, reach: float, track: float) -> void:
+	var yaw := vehicle.rotation.y
+	var ahead := Vector3(-sin(yaw), 0.0, -cos(yaw))
+	var right := Vector3(cos(yaw), 0.0, -sin(yaw))
+	var middle := vehicle.position
+	var points: Array[Vector3] = []
+	for offset in [ahead * reach, -ahead * reach, right * track, -right * track]:
+		var at: Vector3 = middle + offset
+		points.append(Vector3(at.x, field.height_world(at.x, at.z), at.z))
+	var along := points[0] - points[1]
+	var across := points[2] - points[3]
+	var normal := across.cross(along).normalized()
+	if normal.y < 0.0:
+		normal = -normal
+	vehicle.position.y = (points[0].y + points[1].y + points[2].y + points[3].y) * 0.25
+	var local := Basis(Vector3.UP, yaw).inverse() * normal
+	vehicle.visual.basis = Basis(Quaternion(Vector3.UP, local))
 
 
 # --- Ground ---

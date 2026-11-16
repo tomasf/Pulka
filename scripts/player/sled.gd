@@ -51,7 +51,7 @@ var _lean := 0.0
 var _up := Vector3.UP
 var _body: Node3D
 var _vehicle_mesh: MeshInstance3D
-var _rider: MeshInstance3D
+var _rider: RiderRig
 var _rider_velocity := Vector3.ZERO
 var _rider_spin := Vector3.ZERO
 var _spray: GPUParticles3D
@@ -76,7 +76,7 @@ func _ready() -> void:
 	add_child(_body)
 	_vehicle_mesh = MeshInstance3D.new()
 	_body.add_child(_vehicle_mesh)
-	_rider = MeshInstance3D.new()
+	_rider = RiderRig.new()
 	_body.add_child(_rider)
 	_spray = _make_snow_particles(220, 0.45, false)
 	_spray.position = Vector3(0, 0.1, 0.6)
@@ -94,7 +94,8 @@ func set_vehicle(new_spec: VehicleSpec, rng: RandomNumberGenerator, jacket := Co
 	_vehicle_mesh.mesh = RideModels.vehicle(spec.model)
 	_trail.set_model(spec.model)
 	var coat := Palette.pick(Palette.JACKETS, rng) if jacket.a == 0.0 else jacket
-	_rider.mesh = RideModels.rider(coat, Palette.pick(Palette.JACKETS, rng), spec.model)
+	_rider.set_ride(spec.model)
+	_rider.dress(coat, Palette.pick(Palette.JACKETS, rng))
 	_reset_rider()
 
 
@@ -358,6 +359,7 @@ func _step_crash(dt: float) -> void:
 		_rider_velocity.z *= 0.82
 		_rider_spin *= 0.75
 	_rider.global_position = p
+	_rider.flail(dt)
 	_rider.rotate_x(_rider_spin.x * dt)
 	_rider.rotate_y(_rider_spin.y * dt)
 	_rider.rotate_z(_rider_spin.z * dt)
@@ -415,9 +417,12 @@ func _update_visual(delta: float) -> void:
 		var pitch := -_tuck_visual * 0.32
 		if not on_ground:
 			pitch += clampf(velocity.y * 0.025, -0.2, 0.2)
-		_rider.rotation.z = -steer_visual * 0.25
-		_rider.rotation.x = pitch
+		_rider.rotation.z = -steer_visual * 0.12
+		_rider.rotation.x = pitch * 0.4
 		_rider.rotation.y = 0.0
+		# The body bends too: into the turn, forward to tuck, arms up in
+		# a long jump.
+		_rider.animate(delta, steer_visual, _tuck_visual, not on_ground)
 	_body.visible = invulnerable_time <= 0.0 or fmod(invulnerable_time, 0.2) < 0.12
 
 
