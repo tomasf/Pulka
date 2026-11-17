@@ -12,6 +12,7 @@ const CORAL := Color("ff907d")
 const MUTED := Color("a2accb")
 const WHITE := Color("f6f8ff")
 const DESIGN := Vector2(1600, 900)
+const PICKER_SHADE := Color(0.04, 0.07, 0.15, 0.88)
 
 signal pressed(action: StringName)
 
@@ -37,6 +38,8 @@ var _picker_hint: Label
 var _start_hint: Label
 var _controls_hint: Label
 var _background: WinterBackdrop
+var _picker_shade: TextureRect
+var _picker_fill: ColorRect
 var _transition: Tween
 var _thumb_views: Array[SubViewport] = []
 
@@ -132,6 +135,19 @@ static func style(fill: Color, border := Color.TRANSPARENT, radius := 20) -> Sty
 	return box
 
 
+## Expanded outlines need a larger outer radius to keep their corner centres
+## aligned with the button, including surfaces with individually rounded corners.
+static func focus_ring(surface: StyleBoxFlat, tint := LIME, margin := 5.0, width := 3) -> StyleBoxFlat:
+	var ring := surface.duplicate() as StyleBoxFlat
+	ring.draw_center = false
+	ring.border_color = tint
+	ring.set_border_width_all(width)
+	ring.set_expand_margin_all(margin)
+	for corner in 4:
+		ring.set_corner_radius(corner, surface.get_corner_radius(corner) + roundi(margin))
+	return ring
+
+
 static func skin(button: Button, accent := false) -> void:
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.add_theme_font_override("font", font())
@@ -145,11 +161,7 @@ static func skin(button: Button, accent := false) -> void:
 		button.add_theme_color_override("font_" + (state + "_" if state != "normal" else "") + "color", NIGHT if accent else WHITE)
 	button.add_theme_color_override("font_focus_color", NIGHT if accent else WHITE)
 	button.add_theme_color_override("font_hover_pressed_color", NIGHT if accent else WHITE)
-	var ring := style(Color.TRANSPARENT, LIME)
-	ring.draw_center = false
-	ring.set_border_width_all(3)
-	ring.set_expand_margin_all(5)
-	button.add_theme_stylebox_override("focus", ring)
+	button.add_theme_stylebox_override("focus", focus_ring(button.get_theme_stylebox("normal") as StyleBoxFlat))
 	button.mouse_entered.connect(func() -> void: _hover(button, true))
 	button.mouse_exited.connect(func() -> void: _hover(button, false))
 
@@ -205,8 +217,18 @@ func _page() -> Control:
 
 func _fit() -> void:
 	var fit := minf(size.x / DESIGN.x, size.y / DESIGN.y)
+	if fit <= 0.0: return
 	canvas.scale = Vector2.ONE * fit
 	canvas.position = (size - DESIGN * fit) * 0.5
+	if is_instance_valid(_picker_shade):
+		# Keep the existing fade beside the text; continue its leftmost tint
+		# across the extra viewport space outside the fitted design canvas.
+		var extra := canvas.position / fit
+		var height := DESIGN.y + extra.y * 2.0
+		_picker_fill.position = -extra
+		_picker_fill.size = Vector2(extra.x, height)
+		_picker_shade.position.y = -extra.y
+		_picker_shade.size.y = height
 
 
 func _text(parent: Control, text: String, points: int, at: Vector2, tint := WHITE, display := false) -> Label:
@@ -264,9 +286,14 @@ func _player_card(count: int, at: Vector2, tint: Color) -> Button:
 
 func _build_picker() -> void:
 	# A soft veil keeps the title readable without covering the 3D rider.
+	_picker_fill = ColorRect.new()
+	_picker_fill.color = PICKER_SHADE
+	_picker_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	picker.add_child(_picker_fill)
 	var shade := TextureRect.new()
+	_picker_shade = shade
 	var gradient := Gradient.new()
-	gradient.colors = PackedColorArray([Color(0.04, 0.07, 0.15, 0.88), Color(0.04, 0.07, 0.15, 0)])
+	gradient.colors = PackedColorArray([PICKER_SHADE, Color(PICKER_SHADE, 0.0)])
 	var texture := GradientTexture2D.new()
 	texture.gradient = gradient
 	texture.fill_from = Vector2.ZERO
@@ -436,7 +463,9 @@ func update_vehicle(spec: VehicleSpec, unlocked: bool, best_distance: float, bes
 		_stats[i].queue_redraw()
 	for i in cards.size():
 		var chosen := i == int(spec.model)
-		cards[i].add_theme_stylebox_override("normal", style(Color("364461") if chosen else Color("22273d"), LIME if chosen else Color(1, 1, 1, 0.08), 16))
+		var surface := style(Color("364461") if chosen else Color("22273d"), LIME if chosen else Color(1, 1, 1, 0.08), 16)
+		cards[i].add_theme_stylebox_override("normal", surface)
+		cards[i].add_theme_stylebox_override("focus", focus_ring(surface))
 		cards[i].modulate.a = 1.0 if best_distance >= VehicleSpec.all()[i].unlock_distance else 0.42
 	_record.text = "REKORD   %s m   /   %s poäng" % [Hud.group_digits(int(best_distance)), Hud.group_digits(best_score)] if best_distance > 0 else "5 ÅKDON"
 	start.accessibility_name = start.text

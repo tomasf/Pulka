@@ -232,13 +232,6 @@ func _button(text: String, action: StringName, font_size := 34, accent := false,
 	var button := Button.new()
 	button.text = text
 	button.focus_mode = Control.FOCUS_ALL if focusable else Control.FOCUS_NONE
-	var ring := StyleBoxFlat.new()
-	ring.draw_center = false
-	ring.border_color = WARM if not accent else Color(1, 1, 1)
-	ring.set_border_width_all(5)
-	ring.set_corner_radius_all(20)
-	ring.set_expand_margin_all(6)
-	button.add_theme_stylebox_override("focus", ring)
 	button.add_theme_font_size_override("font_size", font_size)
 	button.add_theme_color_override("font_color", INK if accent else Color(1, 1, 1))
 	button.add_theme_color_override("font_hover_color", INK if accent else WARM)
@@ -255,6 +248,7 @@ func _button(text: String, action: StringName, font_size := 34, accent := false,
 		box.content_margin_top = 8
 		box.content_margin_bottom = 10
 		button.add_theme_stylebox_override(state, box)
+	button.add_theme_stylebox_override("focus", MenuFlow.focus_ring(button.get_theme_stylebox("normal") as StyleBoxFlat, WARM if not accent else Color.WHITE, 6.0, 5))
 	button.pressed.connect(func() -> void: pressed.emit(action))
 	return button
 
@@ -724,6 +718,7 @@ func _update_toggle(button: Button, on: bool) -> void:
 		box.content_margin_top = 4
 		box.content_margin_bottom = 4
 		button.add_theme_stylebox_override(state, box)
+	button.add_theme_stylebox_override("focus", MenuFlow.focus_ring(button.get_theme_stylebox("normal") as StyleBoxFlat))
 	for key in ["font_color", "font_focus_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
 		button.add_theme_color_override(key, color)
 
