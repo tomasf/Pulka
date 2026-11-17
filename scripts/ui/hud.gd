@@ -92,6 +92,14 @@ var _time := 0.0
 var _settings: Control
 var _sliders: Array[HSlider] = []
 var _covered: Array[Control] = []
+var _reset_button: Button
+var _reset_confirm: Control
+var _reset_note: Label
+var _settings_done: Button
+var _reset_cancel: Button
+var _reset_yes: Button
+var reset_pending: bool:
+	get: return _reset_confirm.visible
 ## Full-screen backgrounds that must bleed past the safe area.
 var _backdrops: Array[Control] = []
 ## Over the split-screen menu: the players choice and how to go back.
@@ -455,8 +463,8 @@ func _build_lobby_bar() -> void:
 	settings.focus_mode = Control.FOCUS_NONE
 
 
-func update_menu(spec: VehicleSpec, unlocked: bool, best_distance: float, best_score: int) -> void:
-	_menu.update_vehicle(spec, unlocked, best_distance, best_score)
+func update_menu(spec: VehicleSpec, unlocked: bool, best_distance: float, best_score: int, unlocked_distance := -1.0) -> void:
+	_menu.update_vehicle(spec, unlocked, best_distance, best_score, unlocked_distance)
 
 
 # --- Pause and game over ---
@@ -665,6 +673,23 @@ func _build_settings() -> void:
 		_fullscreen_toggle = _settings_toggle(canvas, "Fullskärm", &"fullscreen", Rect2(350, 536, 438, 64))
 	_fps_toggle = _settings_toggle(canvas, "Visa FPS", &"show_fps", Rect2(812 if desktop else 350, 536, 438 if desktop else 900, 64))
 	var done := _dialog_button(canvas, "Klar", &"close_settings", Rect2(990, 680, 260, 76), true)
+	_settings_done = done
+	_reset_button = _dialog_button(canvas, "Nollställ high score", &"ask_reset_records", Rect2(350, 680, 450, 76))
+	_reset_button.add_theme_color_override("font_color", MenuFlow.CORAL)
+	_reset_note = _dialog_label(canvas, "", 22, Vector2(350, 630), MenuFlow.MUTED)
+	_reset_confirm = Control.new()
+	canvas.add_child(_reset_confirm)
+	_reset_cancel = _dialog_button(_reset_confirm, "Avbryt", &"cancel_reset_records", Rect2(350, 680, 240, 76))
+	_reset_yes = _dialog_button(_reset_confirm, "Ja, nollställ", &"reset_records", Rect2(610, 680, 340, 76))
+	_reset_yes.add_theme_color_override("font_color", MenuFlow.CORAL)
+	_reset_cancel.focus_neighbor_right = _reset_yes.get_path()
+	_reset_yes.focus_neighbor_left = _reset_cancel.get_path()
+	_reset_yes.focus_neighbor_right = done.get_path()
+	for button in [_reset_button, _reset_cancel, _reset_yes]:
+		button.focus_neighbor_top = (_fullscreen_toggle if desktop else _fps_toggle).get_path()
+		button.focus_neighbor_bottom = _sliders[0].get_path()
+	_reset_button.focus_neighbor_right = done.get_path()
+	_reset_confirm.hide()
 	for i in _sliders.size():
 		_sliders[i].focus_neighbor_top = (_sliders[i - 1] if i > 0 else done).get_path()
 		_sliders[i].focus_neighbor_bottom = (_sliders[i + 1] if i < _sliders.size() - 1 else (_fullscreen_toggle if desktop else _fps_toggle)).get_path()
@@ -673,10 +698,11 @@ func _build_settings() -> void:
 	if desktop:
 		_fullscreen_toggle.focus_neighbor_top = _sliders.back().get_path()
 		_fullscreen_toggle.focus_neighbor_right = _fps_toggle.get_path()
-		_fullscreen_toggle.focus_neighbor_bottom = done.get_path()
+		_fullscreen_toggle.focus_neighbor_bottom = _reset_button.get_path()
 		_fps_toggle.focus_neighbor_left = _fullscreen_toggle.get_path()
 	done.focus_neighbor_top = _fps_toggle.get_path()
 	done.focus_neighbor_bottom = _sliders[0].get_path()
+	done.focus_neighbor_left = _reset_button.get_path()
 	_settings.visible = false
 
 
@@ -728,6 +754,8 @@ func set_fps_visible(on: bool) -> void:
 
 
 func open_settings(master: float, music: float, effects: float) -> void:
+	cancel_record_reset()
+	_reset_note.text = ""
 	var values := [master, music, effects]
 	for i in _sliders.size():
 		_sliders[i].set_value_no_signal(round(values[i] * 100.0))
@@ -745,12 +773,37 @@ func open_settings(master: float, music: float, effects: float) -> void:
 
 
 func close_settings() -> void:
+	cancel_record_reset()
 	_settings.visible = false
 	for screen in _covered:
 		screen.visible = true
 		if screen == _pause: _animate_dialog(_pause)
 	_covered.clear()
 	_focus_current()
+
+
+func ask_record_reset() -> void:
+	_reset_button.hide()
+	_reset_confirm.show()
+	_reset_note.text = "Nollställa poäng och distans? Åkdonen behålls."
+	_settings_done.focus_neighbor_left = _reset_yes.get_path()
+	if _fullscreen_toggle: _fullscreen_toggle.focus_neighbor_bottom = _reset_cancel.get_path()
+	if not _touch_mode: _reset_cancel.grab_focus()
+
+
+func cancel_record_reset() -> void:
+	_reset_confirm.hide()
+	_reset_button.show()
+	_reset_note.text = ""
+	_settings_done.focus_neighbor_left = _reset_button.get_path()
+	if _fullscreen_toggle: _fullscreen_toggle.focus_neighbor_bottom = _reset_button.get_path()
+	if _settings.visible and not _touch_mode: _reset_button.grab_focus()
+
+
+func records_cleared() -> void:
+	cancel_record_reset()
+	_reset_note.text = "High score nollställd."
+	if not _touch_mode: _settings_done.grab_focus()
 
 
 ## True while one of the on-screen buttons has keyboard/controller focus.

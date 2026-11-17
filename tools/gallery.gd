@@ -100,6 +100,11 @@ static func _entries(group: String) -> Array:
 			["snowball", func() -> Node3D: return _mesh(Props.snowball())],
 		],
 	}
+	# Vehicle-only review: three-quarter, side and underside for each ride.
+	groups["ride_review"] = []
+	for model in VehicleSpec.Model.values():
+		for direction in [Vector3(-1, 0.85, -1.15), Vector3(-1, 0.12, 0), Vector3(-0.5, -0.7, -1)]:
+			groups["ride_review"].append([VehicleSpec.Model.keys()[model].to_lower(), func() -> Node3D: return _viewed(_mesh(RideModels.vehicle(model)), direction)])
 	groups["rider3d"] = []
 	for model in VehicleSpec.Model.values():
 		groups["rider3d"].append([VehicleSpec.Model.keys()[model].to_lower(), func() -> Node3D: return _ride3d(model)])

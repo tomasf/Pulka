@@ -451,7 +451,7 @@ func _enter(page: Control) -> void:
 	if page == picker: _transition.chain().tween_callback(_background.hide)
 
 
-func update_vehicle(spec: VehicleSpec, unlocked: bool, best_distance: float, best_score: int) -> void:
+func update_vehicle(spec: VehicleSpec, unlocked: bool, best_distance: float, best_score: int, unlocked_distance := -1.0) -> void:
 	_name.text = spec.title
 	_tagline.text = ["Den röda klassikern.", "Lätt. Hal. Härligt ostyrig.", "Ratt, skidor och attityd.", "Ett varv till.", "Från köket till backen."][int(spec.model)]
 	_locked.text = "Åk %s m för att låsa upp" % Hud.group_digits(int(spec.unlock_distance)) if not unlocked else ""
@@ -466,7 +466,7 @@ func update_vehicle(spec: VehicleSpec, unlocked: bool, best_distance: float, bes
 		var surface := style(Color("364461") if chosen else Color("22273d"), LIME if chosen else Color(1, 1, 1, 0.08), 16)
 		cards[i].add_theme_stylebox_override("normal", surface)
 		cards[i].add_theme_stylebox_override("focus", focus_ring(surface))
-		cards[i].modulate.a = 1.0 if best_distance >= VehicleSpec.all()[i].unlock_distance else 0.42
+		cards[i].modulate.a = 1.0 if maxf(best_distance, unlocked_distance) >= VehicleSpec.all()[i].unlock_distance else 0.42
 	_record.text = "REKORD   %s m   /   %s poäng" % [Hud.group_digits(int(best_distance)), Hud.group_digits(best_score)] if best_distance > 0 else "5 ÅKDON"
 	start.accessibility_name = start.text
 

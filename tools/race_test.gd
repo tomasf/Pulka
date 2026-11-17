@@ -20,6 +20,12 @@ func _run() -> void:
 	main.call("_on_hud_pressed", &"duo")
 	await _frames(3)
 	var players: Array = main.get("_players")
+	# This fixture shares the keyboard, regardless of any physical pads
+	# connected to the development machine (which otherwise claim player 2).
+	for i in players.size():
+		var controls := PlayerControls.new()
+		controls.keys = PlayerControls.Keys.LEFT if i == 0 else PlayerControls.Keys.RIGHT
+		players[i].controls = controls
 	_check("choosing two players splits the menu", int(main.get("state")) == 5 and main.get("_two_players"))
 	_check("two players in the lobby", players.size() == 2)
 	_check("the screen is split", main.get("_split") != null)
@@ -37,6 +43,16 @@ func _run() -> void:
 	_check("both ready starts the countdown", int(main.get("state")) == 1)
 	await create_timer(4.5).timeout
 	_check("the race is on", int(main.get("state")) == 2)
+	var field: TerrainField = main.get("_field")
+	await _key(KEY_ESCAPE)
+	_check("race pauses", paused and int(main.get("state")) == 3)
+	for down in [true, false]:
+		var back := InputEventJoypadButton.new()
+		back.button_index = JOY_BUTTON_B
+		back.pressed = down
+		Input.parse_input_event(back)
+		await _frames(2)
+	_check("B resumes the same race with both riders", not paused and int(main.get("state")) == 2 and main.get("_field") == field and players.size() == 2 and main.get("_split") != null)
 	var goal: float = float(main.get("_start_d")) + float(main.get("_race_length"))
 	var first: Sled = players[0].sled
 	first.place_at(goal - 3.0, 0.0, 20.0)

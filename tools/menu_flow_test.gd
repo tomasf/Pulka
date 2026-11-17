@@ -23,6 +23,7 @@ func _run() -> void:
 	main.set("_autopilot", true) # Never write test choices to the player's save.
 	main.set("_no_crash", true)
 	main.get("_save").best_distance = 0
+	main.get("_save").unlocked_distance = 0
 	main.set("_vehicle", 0)
 	main.call("_enter_menu")
 	var hud: Hud = main.get("_hud")

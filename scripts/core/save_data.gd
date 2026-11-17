@@ -6,6 +6,9 @@ const PATH := "user://pulka.cfg"
 
 var best_distance := 0.0
 var best_score := 0
+## Unlock progress survives clearing the records. Older saves migrate below.
+var unlocked_distance := 0.0
+var _path := PATH
 var vehicle_id := "pulka"
 var master_volume := 1.0
 var music_volume := 0.8
@@ -14,12 +17,14 @@ var fullscreen := false
 var show_fps := false
 
 
-static func load_saved() -> SaveData:
+static func load_saved(path := PATH) -> SaveData:
 	var data := SaveData.new()
+	data._path = path
 	var config := ConfigFile.new()
-	if config.load(PATH) == OK:
+	if config.load(path) == OK:
 		data.best_distance = float(config.get_value("records", "best_distance", 0.0))
 		data.best_score = int(config.get_value("records", "best_score", 0))
+		data.unlocked_distance = maxf(data.best_distance, float(config.get_value("progress", "distance", 0.0)))
 		data.vehicle_id = str(config.get_value("settings", "vehicle", "pulka"))
 		data.master_volume = float(config.get_value("audio", "master", 1.0))
 		data.music_volume = float(config.get_value("audio", "music", 0.8))
@@ -29,14 +34,21 @@ static func load_saved() -> SaveData:
 	return data
 
 
+func reset_records() -> void:
+	unlocked_distance = maxf(unlocked_distance, best_distance)
+	best_distance = 0.0
+	best_score = 0
+
+
 func store() -> void:
 	var config := ConfigFile.new()
 	config.set_value("records", "best_distance", best_distance)
 	config.set_value("records", "best_score", best_score)
+	config.set_value("progress", "distance", maxf(unlocked_distance, best_distance))
 	config.set_value("settings", "vehicle", vehicle_id)
 	config.set_value("settings", "fullscreen", fullscreen)
 	config.set_value("settings", "show_fps", show_fps)
 	config.set_value("audio", "master", master_volume)
 	config.set_value("audio", "music", music_volume)
 	config.set_value("audio", "effects", effects_volume)
-	config.save(PATH)
+	config.save(_path)

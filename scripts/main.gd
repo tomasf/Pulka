@@ -419,11 +419,11 @@ func _choose_solo() -> void:
 
 func _refresh_menu() -> void:
 	var spec := _specs[_vehicle]
-	_hud.update_menu(spec, _is_unlocked(spec), _save.best_distance, _save.best_score)
+	_hud.update_menu(spec, _is_unlocked(spec), _save.best_distance, _save.best_score, _save.unlocked_distance)
 
 
 func _is_unlocked(spec: VehicleSpec) -> bool:
-	return _save.best_distance >= spec.unlock_distance
+	return maxf(_save.best_distance, _save.unlocked_distance) >= spec.unlock_distance
 
 
 func _update_menu(delta: float) -> void:
@@ -1075,10 +1075,8 @@ func _set_paused(paused: bool) -> void:
 func _update_paused() -> void:
 	if _input_cooldown > 0.0 or _hud.settings_open:
 		return
-	if Input.is_action_just_pressed(&"pause") or _confirm_pressed():
+	if Input.is_action_just_pressed(&"pause") or Input.is_action_just_pressed(&"back") or _confirm_pressed():
 		_set_paused(false)
-	elif Input.is_action_just_pressed(&"back"):
-		_enter_menu()
 
 
 func _update_game_over(delta: float) -> void:
@@ -1142,6 +1140,16 @@ func _on_hud_pressed(action: StringName) -> void:
 				_hud.open_settings(_save.master_volume, _save.music_volume, _save.effects_volume)
 		&"close_settings":
 			_close_settings()
+		&"ask_reset_records":
+			if _hud.settings_open: _hud.ask_record_reset()
+		&"cancel_reset_records":
+			if _hud.settings_open: _hud.cancel_record_reset()
+		&"reset_records":
+			if _hud.settings_open and _hud.reset_pending:
+				_save.reset_records()
+				_save.store()
+				_refresh_menu()
+				_hud.records_cleared()
 		&"pause":
 			if state == State.PLAYING:
 				_set_paused(true)
@@ -1215,7 +1223,11 @@ func _update_go_back() -> void:
 func _update_settings_input() -> void:
 	if _hud.settings_open:
 		if Input.is_action_just_pressed(&"back") or Input.is_action_just_pressed(&"pause") or Input.is_action_just_pressed(&"settings"):
-			_close_settings()
+			if _hud.reset_pending:
+				_hud.cancel_record_reset()
+				_input_cooldown = 0.2
+			else:
+				_close_settings()
 	elif (state in [State.MENU, State.SELECT, State.PAUSED, State.LOBBY]) and _input_cooldown <= 0.0 and Input.is_action_just_pressed(&"settings"):
 		_hud.open_settings(_save.master_volume, _save.music_volume, _save.effects_volume)
 
@@ -1484,6 +1496,7 @@ func _game_over() -> void:
 	if record:
 		_save.best_distance = p.run_distance
 	_save.best_score = maxi(_save.best_score, p.score())
+	_save.unlocked_distance = maxf(_save.unlocked_distance, p.run_distance)
 	if not _autopilot:
 		_save.store()
 	_hud.show_game_over(GAME_OVER_LINES[_rng.randi_range(0, GAME_OVER_LINES.size() - 1)], p.last_crash_line, p.run_distance, p.score(), _save.best_distance, record)
