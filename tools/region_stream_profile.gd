@@ -34,7 +34,7 @@ func _run() -> void:
 		var chunk: Chunk = world._chunks.get(floori(d / 50))
 		if chunk:
 			for child in chunk.get_children():
-				if child is MeshInstance3D and child.name in ["IceCavern", "HarborRoutes", "HarborWater", "SewerPipe", "SewerStream", "SewerEmbankment"] and child.mesh == null:
+				if child is MeshInstance3D and child.name in ["IceCavern", "CaveMountain", "HarborRoutes", "HarborWater", "SewerPipe", "SewerStream", "SewerEmbankment"] and child.mesh == null:
 					missing = true
 		await process_frame
 	times.sort()

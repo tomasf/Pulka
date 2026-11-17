@@ -43,7 +43,8 @@ ett helt tak. Provkör med `godot --path . -- --start-region=roofs`.
 Kör `godot --headless --path . --script res://tools/roofs_test.gd` för tester,
 eller ta bilder med den vanliga renderaren och `-- --capture`.
 
-Isgrottan har ett slingrande, halt isgolv, blå glacierbelysning, istappar
+Isgrottan ligger inne i en bred snötäckt bergsrygg, med bruten klippa och
+iskanter runt båda mynningarna. Den har ett slingrande, halt isgolv, blå glacierbelysning, istappar
 och fasta ispelare. Väggar och valv har kollision och snöfallet stannar
 utanför portalerna. Provkör med `godot --path . -- --start-region=cave`.
 

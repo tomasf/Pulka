@@ -234,7 +234,18 @@ func _capture(main: Node, span: Vector3, kind: int) -> void:
 	atmo.cave = 0
 	atmo.update_atmosphere(0, camera, 0, 0, false)
 	await _shot("cave-entry" if cave else "harbor-overview")
-	if not cave:
+	if cave:
+		camera.position = target + Vector3(-72, 52, 100)
+		camera.look_at(target + Vector3.UP * 8)
+		atmo.update_atmosphere(0, camera, 0, 0, false)
+		await _shot("cave-mountain")
+		d = span.y - TerrainField.CAVE_INSET
+		target = Vector3(field.center_x(d), field.height(field.center_x(d), d) + 3, -d)
+		camera.position = target + Vector3(18, 12, -38)
+		camera.look_at(target)
+		atmo.update_atmosphere(0, camera, 0, 0, false)
+		await _shot("cave-exit")
+	else:
 		d = span.x + 205
 		sled.place_at(d, 0, 0)
 		camera.mode = ChaseCamera.Mode.CHASE
