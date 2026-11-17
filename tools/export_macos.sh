@@ -16,6 +16,8 @@ fi
 rm -rf export/macos
 mkdir -p export/macos
 "$godot_bin" --headless --path . --editor --import
+"$godot_bin" --headless --path . --script res://tools/bake_web_audio.gd
+"$godot_bin" --headless --path . --editor --import
 "$godot_bin" --headless --path . --export-release macOS export/macos/Pulka.app
 codesign --verify --deep --strict export/macos/Pulka.app
 echo "Mac-appen finns i export/macos/Pulka.app."

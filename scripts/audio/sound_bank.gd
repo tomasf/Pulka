@@ -28,10 +28,19 @@ var _song_plays := 0
 var _first_song := 0
 
 
-## The web build (single-threaded) and Apple TV (slow to synthesize, and it
-## would hold up startup and steal frames for over a minute) load baked audio.
+## Prefer the same pre-rendered audio on desktop too: seven concurrent
+## GDScript music renderers otherwise compete with streaming during play.
+## Source checkouts without generated audio retain the synthesis fallback.
 static func uses_baked_audio() -> bool:
-	return OS.has_feature("web") or Quality.is_tv()
+	if OS.has_feature("web") or Quality.is_tv():
+		return true
+	for name in ["effects", "engine", "wind", "scrape"]:
+		if not ResourceLoader.exists(WEB_AUDIO + name + ".res"):
+			return false
+	for i in MusicComposer.SONG_COUNT:
+		if not ResourceLoader.exists(WEB_AUDIO + "song_%d.res" % i):
+			return false
+	return true
 
 
 func _ready() -> void:

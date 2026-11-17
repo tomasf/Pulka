@@ -1099,10 +1099,18 @@ static func snowball() -> ArrayMesh:
 ## A static copy of a rig with its limbs frozen at the given gait phase.
 ## A Blender-made person stands about (its idle, at that phase) and an
 ## animal is caught mid-stride, baked into a plain mesh (see `baked`).
-static func posed(rig: Rig, phase: float) -> Node3D:
+static func posed(rig: Rig, phase: float, prepare_ahead := false) -> Node3D:
 	if rig.kind != "":
 		var still := MeshInstance3D.new()
-		still.mesh = baked(rig, phase)
+		var key := _pose_key(rig, phase)
+		if prepare_ahead and not _baked.has(key):
+			if not _pose_jobs.has(key):
+				_pose_jobs[key] = {"rig": rig, "phase": phase, "waiters": []}
+				_pose_order.append(key)
+			(_pose_jobs[key].waiters as Array).append({"node": weakref(still), "rig": rig})
+		else:
+			still.mesh = baked(rig, phase)
+			CreatureRig.dress_mesh(still, rig.colours)
 		return still
 	var root := Node3D.new()
 	var body := MeshInstance3D.new()
@@ -1126,21 +1134,47 @@ static func posed(rig: Rig, phase: float) -> Node3D:
 	return root
 
 
-## Moves the limbs of a copy made by `posed` to another gait phase, for
-## figures animated by hand (Santa's reindeer galloping through the air).
+## Geometry is shared by model, clip and eighth of a cycle. Clothes are
+## surface overrides on each instance, so eight outfits need no extra skinning.
 static var _baked := {}
+static var _pose_jobs := {}
+static var _pose_order: Array[String] = []
 
 
-## A creature rig frozen at a gait phase as one plain mesh, made once per
-## rig and eighth of a cycle and shared.
-static func baked(rig: Rig, phase: float) -> ArrayMesh:
+static func _pose_key(rig: Rig, phase: float) -> String:
 	var step := posmod(roundi(phase / TAU * 8.0), 8)
-	var key := "%d_%d" % [rig.get_instance_id(), step]
+	var clip := &"idle" if rig.kind == "person" else rig.gait
+	return "%s_%s_%d" % [rig.kind, clip, step]
+
+
+## Synchronous for tools and figures that need to appear immediately.
+static func baked(rig: Rig, phase: float) -> ArrayMesh:
+	var key := _pose_key(rig, phase)
 	if not _baked.has(key):
-		var figure := rig.make()
+		var step := posmod(roundi(phase / TAU * 8.0), 8)
+		var figure := CreatureRig.new(rig.kind)
 		_baked[key] = figure.bake(&"idle" if rig.kind == "person" else rig.gait, step / 8.0)
 		figure.free()
 	return _baked[key]
+
+
+## Prepare at most one pose this frame, ahead of the player. Weak references
+## let a removed chunk cancel its pending figures without retaining nodes.
+static func prepare_poses(deadline: int) -> void:
+	while not _pose_order.is_empty() and deadline - Time.get_ticks_usec() >= 1000:
+		var key: String = _pose_order.pop_front()
+		var job: Dictionary = _pose_jobs[key]
+		_pose_jobs.erase(key)
+		var live: Array = (job.waiters as Array).filter(func(entry: Dictionary) -> bool:
+			return (entry.node as WeakRef).get_ref() != null)
+		if live.is_empty():
+			continue
+		var mesh := baked(job.rig, job.phase)
+		for entry: Dictionary in live:
+			var node := (entry.node as WeakRef).get_ref() as MeshInstance3D
+			node.mesh = mesh
+			CreatureRig.dress_mesh(node, (entry.rig as Rig).colours)
+		return
 
 
 static func repose(root: Node3D, rig: Rig, phase: float) -> void:

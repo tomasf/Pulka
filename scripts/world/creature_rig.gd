@@ -8,7 +8,19 @@ extends Node3D
 ## Animations that repeat.
 const LOOPS := ["walk", "idle", "wave", "gallop", "hop", "flail"]
 
-static var _scenes := {}
+## Load model resources with the game scripts, before the run starts.
+## Lazy loading the rare bear alone cost about 10 ms in the streaming trace.
+static var _scenes := {
+	"person": preload("res://models/person.glb"),
+	"moose": preload("res://models/moose.glb"),
+	"bear": preload("res://models/bear.glb"),
+	"deer": preload("res://models/deer.glb"),
+	"reindeer": preload("res://models/reindeer.glb"),
+	"dog": preload("res://models/dog.glb"),
+	"hare": preload("res://models/hare.glb"),
+}
+## Reuse clothing materials across moving and baked figures.
+static var _dressed_materials := {}
 
 var _player: AnimationPlayer
 var _skeleton: Skeleton3D
@@ -65,13 +77,24 @@ func has(animation: StringName) -> bool:
 ## Recolours the materials named in `colours` (material name -> colour).
 func dress(colours: Dictionary) -> void:
 	for mesh in _meshes:
-		for surface in mesh.mesh.get_surface_count():
-			var original := mesh.mesh.surface_get_material(surface) as StandardMaterial3D
-			if original == null or not colours.has(original.resource_name):
-				continue
+		dress_mesh(mesh, colours)
+
+
+## Apply clothing without copying geometry or allocating a material per fan.
+static func dress_mesh(mesh: MeshInstance3D, colours: Dictionary) -> void:
+	for surface in mesh.mesh.get_surface_count():
+		var original := mesh.mesh.surface_get_material(surface) as StandardMaterial3D
+		if original == null or not colours.has(original.resource_name):
+			continue
+		var key := original.get_instance_id()
+		var palette: Dictionary = _dressed_materials.get(key, {})
+		var colour: Color = colours[original.resource_name]
+		if not palette.has(colour):
 			var dressed := original.duplicate() as StandardMaterial3D
-			dressed.albedo_color = colours[original.resource_name]
-			mesh.set_surface_override_material(surface, dressed)
+			dressed.albedo_color = colour
+			palette[colour] = dressed
+			_dressed_materials[key] = palette
+		mesh.set_surface_override_material(surface, palette[colour])
 
 
 ## Plays an animation (blending from the last) at `speed` times its pace.

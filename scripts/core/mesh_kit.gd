@@ -10,6 +10,11 @@ var _indices := PackedInt32Array()
 ## Arrays of primitives already added, so one added many times (sleepers,
 ## fence posts) is only generated once.
 var _arrays := {}
+## Reading a PrimitiveMesh back can synchronize with the GPU. Keep CPU
+## geometry for the common unit shapes, then size it with the transform.
+static var _unit_box: Array = []
+static var _unit_spheres := {}
+static var _unit_cylinders := {}
 
 
 func add(mesh: PrimitiveMesh, xform: Transform3D, color: Color) -> MeshKit:
@@ -17,6 +22,10 @@ func add(mesh: PrimitiveMesh, xform: Transform3D, color: Color) -> MeshKit:
 	if arrays.is_empty():
 		arrays = mesh.get_mesh_arrays()
 		_arrays[mesh] = arrays
+	return _add_arrays(arrays, xform, color)
+
+
+func _add_arrays(arrays: Array, xform: Transform3D, color: Color) -> MeshKit:
 	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
@@ -38,19 +47,34 @@ func add(mesh: PrimitiveMesh, xform: Transform3D, color: Color) -> MeshKit:
 
 
 func box(size: Vector3, pos: Vector3, color: Color, rot := Vector3.ZERO) -> MeshKit:
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	return add(mesh, Transform3D(Basis.from_euler(rot), pos), color)
+	if _unit_box.is_empty():
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3.ONE
+		_unit_box = mesh.get_mesh_arrays()
+	return _add_arrays(_unit_box, Transform3D(Basis.from_euler(rot) * Basis.from_scale(size), pos), color)
 
 
 func cylinder(radius: float, height: float, pos: Vector3, color: Color, segments := 12, rot := Vector3.ZERO, top_radius := -1.0) -> MeshKit:
-	var mesh := CylinderMesh.new()
-	mesh.bottom_radius = radius
-	mesh.top_radius = radius if top_radius < 0.0 else top_radius
-	mesh.height = height
-	mesh.radial_segments = segments
-	mesh.rings = 0
-	return add(mesh, Transform3D(Basis.from_euler(rot), pos), color)
+	var top := radius if top_radius < 0.0 else top_radius
+	# Keep the original path for degenerate shapes with no invertible scale.
+	if radius <= 0.0 or height <= 0.0:
+		var mesh := CylinderMesh.new()
+		mesh.bottom_radius = radius
+		mesh.top_radius = top
+		mesh.height = height
+		mesh.radial_segments = segments
+		mesh.rings = 0
+		return add(mesh, Transform3D(Basis.from_euler(rot), pos), color)
+	var key := Vector2(segments, top / radius)
+	if not _unit_cylinders.has(key):
+		var mesh := CylinderMesh.new()
+		mesh.bottom_radius = 1.0
+		mesh.top_radius = top / radius
+		mesh.height = 1.0
+		mesh.radial_segments = segments
+		mesh.rings = 0
+		_unit_cylinders[key] = mesh.get_mesh_arrays()
+	return _add_arrays(_unit_cylinders[key], Transform3D(Basis.from_euler(rot) * Basis.from_scale(Vector3(radius, height, radius)), pos), color)
 
 
 func cone(radius: float, height: float, pos: Vector3, color: Color, segments := 12, rot := Vector3.ZERO) -> MeshKit:
@@ -58,13 +82,20 @@ func cone(radius: float, height: float, pos: Vector3, color: Color, segments := 
 
 
 func sphere(radius: float, pos: Vector3, color: Color, scale := Vector3.ONE, segments := 14, rings := 8, hemisphere := false) -> MeshKit:
-	var mesh := SphereMesh.new()
-	mesh.radius = radius
-	mesh.height = radius * (1.0 if hemisphere else 2.0)
-	mesh.radial_segments = segments
-	mesh.rings = rings
-	mesh.is_hemisphere = hemisphere
-	return add(mesh, Transform3D(Basis.from_scale(scale), pos), color)
+	return _add_arrays(_sphere_arrays(segments, rings, hemisphere), Transform3D(Basis.from_scale(scale * radius), pos), color)
+
+
+static func _sphere_arrays(segments: int, rings: int, hemisphere := false) -> Array:
+	var key := Vector3i(segments, rings, int(hemisphere))
+	if not _unit_spheres.has(key):
+		var mesh := SphereMesh.new()
+		mesh.radius = 1.0
+		mesh.height = 1.0 if hemisphere else 2.0
+		mesh.radial_segments = segments
+		mesh.rings = rings
+		mesh.is_hemisphere = hemisphere
+		_unit_spheres[key] = mesh.get_mesh_arrays()
+	return _unit_spheres[key]
 
 
 ## Rounded limb or torso: a capsule along local Y, optionally rotated and squashed.
@@ -93,12 +124,7 @@ func capsule_between(a: Vector3, b: Vector3, radius: float, color: Color, segmen
 
 ## Ellipsoid: a sphere stretched by `radii` and rotated by `rot`.
 func ellipsoid(radii: Vector3, pos: Vector3, color: Color, rot := Vector3.ZERO) -> MeshKit:
-	var mesh := SphereMesh.new()
-	mesh.radius = 1.0
-	mesh.height = 2.0
-	mesh.radial_segments = 14
-	mesh.rings = 8
-	return add(mesh, Transform3D(Basis.from_euler(rot) * Basis.from_scale(radii), pos), color)
+	return _add_arrays(_sphere_arrays(14, 8), Transform3D(Basis.from_euler(rot) * Basis.from_scale(radii), pos), color)
 
 
 ## Surface of revolution around local Y from a profile of (radius, height)

@@ -12,6 +12,12 @@ Skala åkdonets fart med `--speed-multiplier=2` (dubbel fart) eller
 förflyttningen längs marken; hoppens kraft och tyngdkraften är oförändrade.
 Flaggorna kan kombineras: `godot --path . -- --no-crash --speed-multiplier=2`.
 
+Förbered ljudet med `godot --headless --path . --script res://tools/bake_web_audio.gd`
+vid en ny källkodsutcheckning eller efter ändringar i musik/ljud. Då slipper
+spelet syntetisera musiken i bakgrunden under åkturen. Exportskripten för
+macOS, webb och Apple TV gör detta automatiskt. Utan färdigt ljud använder
+skrivbordsversionen syntes som reserv.
+
 ## Apple TV
 
 Godot saknar officiellt tvOS-stöd, så Apple TV-versionen byggs med en egen

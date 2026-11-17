@@ -461,7 +461,7 @@ func _place_cliff(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, l
 			for k in 7:
 				var d := crowd + rng.randf_range(-14.0, 14.0)
 				var lx: float = side * (field.half_width(d) + rng.randf_range(2.0, 7.0))
-				var fan := Props.posed(Props.person(rng.randi_range(0, 7)), rng.randf() * TAU)
+				var fan := Props.posed(Props.person(rng.randi_range(0, 7)), rng.randf() * TAU, true)
 				fan.transform = world.ground_xform(field.center_x(d) + lx, d, (-PI / 2.0 if side > 0.0 else PI / 2.0) - world.street_yaw(d))
 				chunk.add_child(fan)
 
@@ -592,48 +592,90 @@ func _add_unshadowed(chunk: Chunk, mesh: Mesh, xform: Transform3D) -> void:
 
 ## A crisp painted surface over the track between lo and hi, one-metre
 ## cells that follow the ground. `painter(lx, d, half_width) -> Color`.
+class FloorBuild:
+	var target: WeakRef
+	var first: float
+	var rows: int
+	var columns: int
+	var half_width: float
+	var painter: Callable
+	var row := 0
+	var stage := 0
+	var grid := PackedVector3Array()
+	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var colors := PackedColorArray()
+
+var _floor_jobs: Array[FloorBuild] = []
+
+
+func cancel_preparations() -> void:
+	_floor_jobs.clear()
+
+
 func _floor(lo: float, hi: float, painter: Callable) -> MeshInstance3D:
 	var instance := MeshInstance3D.new()
 	var first := floorf(lo)
 	var last := ceilf(hi)
 	if last - first < 1.0:
 		return instance
-	var vertices := PackedVector3Array()
-	var normals := PackedVector3Array()
-	var colors := PackedColorArray()
-	var hw := field.half_width((first + last) * 0.5)
-	var columns := int(hw * 2.0)
-	var rows := int(last - first)
-	var grid := PackedVector3Array()
-	grid.resize((rows + 1) * (columns + 1))
-	for r in rows + 1:
-		var d := first + r
-		var cx := field.center_x(d)
-		for c in columns + 1:
-			var x := cx - hw + c * (hw * 2.0 / columns)
-			grid[r * (columns + 1) + c] = Vector3(x, field.height(x, d, false) + 0.03, -d)
-	for r in rows:
-		for c in columns:
-			var a := grid[r * (columns + 1) + c]
-			var b := grid[r * (columns + 1) + c + 1]
-			var e := grid[(r + 1) * (columns + 1) + c]
-			var f := grid[(r + 1) * (columns + 1) + c + 1]
-			var lx := -hw + (c + 0.5) * (hw * 2.0 / columns)
-			var color: Color = painter.call(lx, first + r + 0.5, hw)
-			var linear := color.srgb_to_linear()
-			linear.a = 1.0
-			world.triangle(vertices, normals, colors, a, e, b, linear)
-			world.triangle(vertices, normals, colors, b, e, f, linear)
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_COLOR] = colors
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	mesh.surface_set_material(0, Palette.surface())
-	instance.mesh = mesh
+	var job := FloorBuild.new()
+	job.target = weakref(instance)
+	job.first = first
+	job.rows = int(last - first)
+	job.half_width = field.half_width((first + last) * 0.5)
+	job.columns = int(job.half_width * 2.0)
+	job.painter = painter
+	job.grid.resize((job.rows + 1) * (job.columns + 1))
+	_floor_jobs.append(job)
 	return instance
+
+
+## Painted floors are scenery built far ahead of the rider. Resume one row
+## at a time rather than generating an entire rink or mall floor at once.
+func prepare_floors(deadline: int) -> void:
+	while not _floor_jobs.is_empty() and deadline - Time.get_ticks_usec() >= 500:
+		var job := _floor_jobs[0]
+		if job.target.get_ref() == null:
+			_floor_jobs.pop_front()
+			continue
+		if job.stage == 0:
+			var d := job.first + job.row
+			var cx := field.center_x(d)
+			for c in job.columns + 1:
+				var x := cx - job.half_width + c * (job.half_width * 2.0 / job.columns)
+				job.grid[job.row * (job.columns + 1) + c] = Vector3(x, field.height(x, d, false) + 0.03, -d)
+			job.row += 1
+			if job.row > job.rows:
+				job.stage = 1
+				job.row = 0
+		elif job.stage == 1:
+			var r := job.row
+			for c in job.columns:
+				var a := job.grid[r * (job.columns + 1) + c]
+				var b := job.grid[r * (job.columns + 1) + c + 1]
+				var e := job.grid[(r + 1) * (job.columns + 1) + c]
+				var f := job.grid[(r + 1) * (job.columns + 1) + c + 1]
+				var lx := -job.half_width + (c + 0.5) * (job.half_width * 2.0 / job.columns)
+				var color: Color = job.painter.call(lx, job.first + r + 0.5, job.half_width)
+				var linear := color.srgb_to_linear()
+				linear.a = 1.0
+				world.triangle(job.vertices, job.normals, job.colors, a, e, b, linear)
+				world.triangle(job.vertices, job.normals, job.colors, b, e, f, linear)
+			job.row += 1
+			if job.row == job.rows:
+				job.stage = 2
+		else:
+			var arrays := []
+			arrays.resize(Mesh.ARRAY_MAX)
+			arrays[Mesh.ARRAY_VERTEX] = job.vertices
+			arrays[Mesh.ARRAY_NORMAL] = job.normals
+			arrays[Mesh.ARRAY_COLOR] = job.colors
+			var mesh := ArrayMesh.new()
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+			mesh.surface_set_material(0, Palette.surface())
+			(job.target.get_ref() as MeshInstance3D).mesh = mesh
+			_floor_jobs.pop_front()
 
 
 # --- Rail yard ---
@@ -815,7 +857,7 @@ func _place_lake(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo
 		world.add_decor(decor, RegionProps.jetty(), Transform3D(Basis(Vector3.UP, -world.street_yaw(strip.x)), Vector3(jetty_x, level, -(strip.x - 1.0))))
 		world.add_decor(decor, Props.house(0), world.ground_xform(jetty_x - 9.0, strip.x - 10.0, PI / 2.0, 0.55, 0.3))
 		for k in 2:
-			var bather := Props.posed(Props.dressed("bather%d" % k, Palette.JACKETS[k + 2], Palette.JACKETS[k + 5], Color.WHITE, Color.WHITE, true), k * 1.5)
+			var bather := Props.posed(Props.dressed("bather%d" % k, Palette.JACKETS[k + 2], Palette.JACKETS[k + 5], Color.WHITE, Color.WHITE, true), k * 1.5, true)
 			bather.position = Vector3(jetty_x + (k - 0.5) * 0.8, level + 0.72, -(strip.x + 5.0 + k * 1.2))
 			bather.rotation.y = PI * 0.5 * (k * 2 - 1)
 			chunk.add_child(bather)
@@ -867,7 +909,7 @@ func _place_bandy(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, l
 			world.add_decor(decor, RegionProps.bleachers(), stands)
 			for k in 5:
 				var row := rng.randi_range(0, 3)
-				var fan := Props.posed(Props.person(rng.randi_range(0, 7)), rng.randf() * TAU)
+				var fan := Props.posed(Props.person(rng.randi_range(0, 7)), rng.randf() * TAU, true)
 				# Seated on the stand's steps, facing the ice.
 				fan.transform = stands * Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3(row * 1.0, 0.45 * (row + 1), rng.randf_range(-5.5, 5.5)))
 				chunk.add_child(fan)

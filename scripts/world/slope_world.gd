@@ -61,6 +61,10 @@ var _building: Dictionary = {}
 ## Budget (microseconds) that must be left this frame to start a building
 ## step that cannot be split: scenery, roads and obstacles.
 var _heavy_budget := 0.0
+## Optional streaming profiler; disabled during ordinary play.
+var profile_builds := false
+var last_update_us := 0
+var build_profile: Array[Dictionary] = []
 var _columns := PackedFloat32Array()
 var _chunks_ahead := Quality.chunks_ahead()
 
@@ -81,11 +85,15 @@ func _init() -> void:
 		x += 8.0
 
 
+func _exit_tree() -> void:
+	regions.cancel_preparations()
+
 func reset(new_field: TerrainField, start_d: float) -> void:
 	for chunk: Chunk in _chunks.values():
 		chunk.queue_free()
 	_chunks.clear()
 	_building.clear()
+	regions.cancel_preparations()
 	for node in _free:
 		node.queue_free()
 	_free.clear()
@@ -100,6 +108,7 @@ func reset(new_field: TerrainField, start_d: float) -> void:
 ## `others` are the distances of any riders behind the one in front: the
 ## world is kept and built around each of them too.
 func update_world(player_distance: float, delta: float, build_ms := BUILD_MS, others := PackedFloat32Array()) -> void:
+	var update_began := Time.get_ticks_usec() if profile_builds else 0
 	player_d = player_distance
 	rider_ds = PackedFloat32Array([player_d])
 	rider_ds.append_array(others)
@@ -122,6 +131,8 @@ func update_world(player_distance: float, delta: float, build_ms := BUILD_MS, ot
 		for i in range(current - CHUNKS_BEHIND, current + URGENT_AHEAD + 1):
 			if not _chunks.has(i) or _building.has(i):
 				_build(i, INF)
+	Props.prepare_poses(deadline)
+	regions.prepare_floors(deadline)
 	for current in currents:
 		for i in range(current + URGENT_AHEAD + 1, current + _chunks_ahead + 1):
 			if Time.get_ticks_usec() >= deadline:
@@ -141,6 +152,8 @@ func update_world(player_distance: float, delta: float, build_ms := BUILD_MS, ot
 				_free_obstacles.erase(obstacle)
 			_free.erase(node)
 			node.queue_free()
+	if profile_builds:
+		last_update_us = Time.get_ticks_usec() - update_began
 
 
 ## A horn from passing traffic, played where it happens.
@@ -214,6 +227,8 @@ func _build(index: int, deadline: float) -> void:
 		# with most of the frame's budget left, or it runs over.
 		if build.stage >= 2 and deadline - Time.get_ticks_usec() < _heavy_budget:
 			return
+		var stage := build.stage
+		var began := Time.get_ticks_usec() if profile_builds else 0
 		match build.stage:
 			0:
 				if _terrain_heights(build, deadline):
@@ -236,7 +251,11 @@ func _build(index: int, deadline: float) -> void:
 				_place_pickups(chunk, build.rng, d0, d1)
 				_flush_decor(chunk, build.decor)
 				_building.erase(index)
+				if profile_builds:
+					build_profile.append({"index": index, "stage": stage, "us": Time.get_ticks_usec() - began})
 				return
+		if profile_builds:
+			build_profile.append({"index": index, "stage": stage, "us": Time.get_ticks_usec() - began})
 		if Time.get_ticks_usec() >= deadline:
 			return
 
