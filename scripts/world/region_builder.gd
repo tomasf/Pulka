@@ -53,6 +53,10 @@ func place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, 
 			_place_bridge(chunk, decor, lo, hi, span)
 		TerrainField.Region.ROOFS:
 			_place_roofs(chunk, decor, lo, hi, span)
+		TerrainField.Region.ICE_CAVE:
+			IceCavern.populate(world, chunk, decor, lo, hi, span)
+		TerrainField.Region.HARBOR:
+			ContainerHarbor.populate(world, chunk, decor, lo, hi, span)
 
 
 func _place_town(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: float) -> void:
@@ -223,6 +227,13 @@ func _rest_on_ground(vehicle: Obstacle, reach: float, track: float) -> void:
 func ground_color(kind: TerrainField.Region, x: float, lx: float, d: float, hw: float) -> Color:
 	var outside := absf(lx) - hw
 	match kind:
+		TerrainField.Region.ICE_CAVE:
+			return Color("83c6dd") if outside < 0 else Palette.SNOW_EDGE
+		TerrainField.Region.HARBOR:
+			if field.harbor_water(x, d): return Color("163844")
+			if outside < 3:
+				var stripe := absf(absf(lx) - 10) < 0.14 and fposmod(d - field.region_span(d).x, 12) < 7
+				return Color("d6c793") if stripe else Color("87939f").lerp(Palette.SNOW_PACKED, 0.3 + 0.15 * sin(lx * 1.8 + d * 0.05))
 		TerrainField.Region.ROOFS:
 			return Color("656c79") if field.in_rooftops(d) and outside < 18.0 else Palette.SNOW_PACKED
 		TerrainField.Region.BRIDGE:
@@ -357,7 +368,7 @@ func obstacle_table(kind: TerrainField.Region) -> Array:
 
 func density(kind: TerrainField.Region) -> float:
 	match kind:
-		TerrainField.Region.BRIDGE, TerrainField.Region.ROOFS:
+		TerrainField.Region.BRIDGE, TerrainField.Region.ROOFS, TerrainField.Region.ICE_CAVE, TerrainField.Region.HARBOR:
 			return 0.0
 		TerrainField.Region.MALL:
 			return 0.8
@@ -550,6 +561,8 @@ func _spawn_traffic(kind: int, span: Vector3) -> void:
 			world.add_free(TrainLine.new().setup(world, span, TRAIN_LANES[1], -1.0, 24.0, 4, 0.0))
 		TerrainField.Region.HIGHWAY:
 			world.add_free(MotorwayTraffic.new().setup(world, span))
+		TerrainField.Region.HARBOR:
+			world.add_free(HarborCrane.new().setup(world, span))
 		TerrainField.Region.AIRPORT:
 			var rng := RandomNumberGenerator.new()
 			rng.seed = hash(Vector2i(field.world_seed, int(span.x)))
@@ -644,7 +657,7 @@ const MALL_INSET := 6.0
 ## True while d is under the mall roof.
 func indoors(d: float) -> bool:
 	var span := field.region_span(d)
-	return span.z == TerrainField.Region.MALL and d > span.x + MALL_INSET and d < span.y - MALL_INSET
+	return field.in_cave(d) or (span.z == TerrainField.Region.MALL and d > span.x + MALL_INSET and d < span.y - MALL_INSET)
 
 
 func _mall_tile(lx: float, d: float, hw: float) -> Color:
@@ -683,11 +696,13 @@ class FloorBuild:
 
 var _floor_jobs: Array[FloorBuild] = []
 var _roof_jobs: Array[Roofscape.BuildJob] = []
+var _region_jobs: Array[RefCounted] = []
 
 
 func cancel_preparations() -> void:
 	_floor_jobs.clear()
 	_roof_jobs.clear()
+	_region_jobs.clear()
 
 
 func _floor(lo: float, hi: float, painter: Callable) -> MeshInstance3D:
@@ -710,6 +725,15 @@ func _floor(lo: float, hi: float, painter: Callable) -> MeshInstance3D:
 
 ## Prepare distant roof sections and painted floors within the frame budget.
 func prepare_floors(deadline: int) -> void:
+	while not _region_jobs.is_empty() and deadline - Time.get_ticks_usec() >= 500:
+		var job: RefCounted = _region_jobs[0]
+		var target: MeshInstance3D = job.target.get_ref()
+		if target == null or target.is_queued_for_deletion() or target.get_parent().is_queued_for_deletion():
+			_region_jobs.pop_front()
+			continue
+		if job.step():
+			target.mesh = job.mesh
+			_region_jobs.pop_front()
 	while not _roof_jobs.is_empty() and deadline - Time.get_ticks_usec() >= 500:
 		var job := _roof_jobs[0]
 		var instance := job.target.get_ref() as MeshInstance3D

@@ -13,7 +13,7 @@ func _run() -> void:
 		var ends := field.bridge_span(span.x + 1)
 		var middle := (ends.x + ends.y) * 0.5
 		var cx := field.center_x(middle)
-		_check("bridge narrows to 7.6 m", is_equal_approx(field.half_width(middle), 3.8) and field.half_width(span.x - 1) > 10)
+		_check("bridge narrows to 7.6 m", is_equal_approx(field.half_width(middle), 3.8) and field.half_width(span.x - 1) > TerrainField.BRIDGE_HALF_WIDTH + 3)
 		_check("deck spans a real ravine", field.height(cx, middle) - field.height(cx, middle, false, false) > 30 and field.height(cx + 4.1, middle) < field.bridge_height(middle) - 30)
 		_check("edge normals stay on the deck", field.surface_world(cx + 3.75, -middle).y > 0.9)
 		_check("bridge centre is straight", absf(field.center_x(middle) - (field.center_x(ends.x) + field.center_x(ends.y)) * 0.5) < 0.001)

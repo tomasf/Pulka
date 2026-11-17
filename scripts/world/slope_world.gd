@@ -463,7 +463,7 @@ func _place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator,
 		var d := rng.randf_range(d0, d1)
 		if field.near_road(d, 4.0):
 			continue
-		if field.region(d) == TerrainField.Region.ROOFS: continue
+		if field.region(d) in [TerrainField.Region.ROOFS, TerrainField.Region.ICE_CAVE, TerrainField.Region.HARBOR]: continue
 		var side := -1.0 if rng.randf() < 0.5 else 1.0
 		var hw := field.half_width(d)
 		var kind := field.region(d)
@@ -695,7 +695,7 @@ func _place_obstacles(chunk: Chunk, rng: RandomNumberGenerator, d0: float, d1: f
 		if field.near_road(d, 22.0) or field.water_strip(d) != Vector2.ZERO:
 			continue
 		var here := field.region(d)
-		if here in [TerrainField.Region.BRIDGE, TerrainField.Region.ROOFS]:
+		if here in [TerrainField.Region.BRIDGE, TerrainField.Region.ROOFS, TerrainField.Region.ICE_CAVE, TerrainField.Region.HARBOR]:
 			continue
 		var cx := field.center_x(d)
 		var hw := field.half_width(d)
@@ -749,7 +749,7 @@ func random_sign(rng: RandomNumberGenerator) -> float:
 func _place_pickups(chunk: Chunk, rng: RandomNumberGenerator, d0: float, d1: float) -> void:
 	if d1 < 60.0:
 		return
-	if field.region((d0 + d1) * 0.5) == TerrainField.Region.ROOFS: return
+	if field.region((d0 + d1) * 0.5) in [TerrainField.Region.ROOFS, TerrainField.Region.ICE_CAVE, TerrainField.Region.HARBOR]: return
 	if rng.randf() < 0.65:
 		var start := rng.randf_range(d0, d1 - 25.0)
 		var offset := rng.randf_range(-0.6, 0.6)

@@ -72,6 +72,11 @@ func update_camera(delta: float) -> void:
 			_update_crash(delta)
 		Mode.START:
 			_update_start(delta)
+	# Keep the chase/crash camera within the same glacier vault as the rider.
+	if field.in_cave(-position.z):
+		var d := -position.z
+		position.x = clampf(position.x, field.center_x(d) - field.cave_half_width(d) + 1.2, field.center_x(d) + field.cave_half_width(d) - 1.2)
+		position.y = minf(position.y, field.cave_ceiling(position.x, d) - 0.45)
 
 
 func _update_start(delta: float) -> void:

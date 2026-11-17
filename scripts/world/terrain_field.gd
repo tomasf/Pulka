@@ -13,7 +13,7 @@ extends RefCounted
 ## run still feels like a sledding hill.
 
 enum Zone { OPEN, FOREST, MOGULS, VILLAGE, WILDLIFE }
-enum Region { SLOPE, TOWN, RIVER, PARK, WOODS, MALL, RAIL, AIRPORT, LAKE, BANDY, HIGHWAY, CLIFF, BRIDGE, ROOFS }
+enum Region { SLOPE, TOWN, RIVER, PARK, WOODS, MALL, RAIL, AIRPORT, LAKE, BANDY, HIGHWAY, CLIFF, BRIDGE, ROOFS, ICE_CAVE, HARBOR }
 ## How the ground meets the edge of the track.
 enum Edge { BANK, KERB, GORGE, FLOOR }
 
@@ -33,6 +33,8 @@ const REGION_STYLE := {
 	Region.CLIFF: {"width": 24.0, "edge": Edge.BANK, "grip": 1.0, "rough": 0.0, "length": 300.0, "roads": false, "ramps": false},
 	Region.BRIDGE: {"width": 3.8, "edge": Edge.FLOOR, "grip": 0.9, "rough": 0.0, "length": 280.0, "roads": false, "ramps": false},
 	Region.ROOFS: {"width": 17.5, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.0, "length": 340.0, "roads": false, "ramps": false},
+	Region.ICE_CAVE: {"width": 10.5, "edge": Edge.FLOOR, "grip": 0.28, "rough": 0.0, "length": 300.0, "roads": false, "ramps": false},
+	Region.HARBOR: {"width": 18.0, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.0, "length": 320.0, "roads": false, "ramps": false},
 }
 
 const ZONE_LENGTH := 280.0
@@ -81,6 +83,12 @@ const ROOF_WIDE_GAP_MAX := 16.0
 const ROOF_LANE := 11.5
 const ROOF_HALF_WIDTH := 5.35
 const ROOF_STREET_DEPTH := 12.0
+const CAVE_INSET := 30.0
+const HARBOR_INSET := 30.0
+const HARBOR_QUAY_EDGE := 20.0
+const HARBOR_ROUTE_X := -7.0
+const HARBOR_ROUTE_HALF_WIDTH := 2.6
+const HARBOR_ROUTE_HEIGHT := 4.0
 
 ## One building's analytic footprint and snow surface. Meshes, collisions,
 ## pickups and recovery all use these same immutable seeded descriptors.
@@ -150,14 +158,14 @@ func difficulty(d: float) -> float:
 func center_x(d: float) -> float:
 	var x := _slope_center(d)
 	var span := region_span(d)
-	if int(span.z) in [Region.BRIDGE, Region.ROOFS]:
-		var approach := BRIDGE_APPROACH if int(span.z) == Region.BRIDGE else ROOF_APPROACH
+	if int(span.z) in [Region.BRIDGE, Region.ROOFS, Region.HARBOR]:
+		var approach := BRIDGE_APPROACH if int(span.z) == Region.BRIDGE else (ROOF_APPROACH if int(span.z) == Region.ROOFS else HARBOR_INSET)
 		var ends := Vector2(span.x + approach, span.y - approach)
 		var t := (d - ends.x) / (ends.y - ends.x)
 		var straight := lerpf(_slope_center(ends.x), _slope_center(ends.y), t)
 		x = lerpf(x, straight, smoothstep(span.x, ends.x, d) * (1.0 - smoothstep(ends.y, span.y, d)))
 	# Forest trails wind back and forth between the trees.
-	return x + region_weight(d, Region.WOODS) * 7.0 * sin(d * 0.03 + _phases[6])
+	return x + region_weight(d, Region.WOODS) * 7.0 * sin(d * 0.03 + _phases[6]) + region_weight(d, Region.ICE_CAVE) * 4.0 * sin(d * 0.025 + _phases[7])
 
 
 func _slope_center(d: float) -> float:
@@ -173,7 +181,8 @@ func half_width(d: float) -> float:
 	var hw := 20.0 + 5.0 * sin(d * 0.0031 + _phases[2]) - 6.0 * difficulty(d)
 	var span := region_span(d)
 	if span.z != Region.SLOPE:
-		hw = lerpf(hw, style(int(span.z)).width, _span_weight(span, d))
+		var width: float = cave_half_width(d) if int(span.z) == Region.ICE_CAVE else style(int(span.z)).width
+		hw = lerpf(hw, width, _span_weight(span, d))
 	return hw
 
 
@@ -456,6 +465,9 @@ func below_structure(at: Vector3) -> bool:
 	if kind == Region.ROOFS:
 		var roof := roof_at(at.x, d)
 		return roof != null and at.y < roof_height(roof, at.x, d) - 0.5
+	if kind == Region.HARBOR:
+		var lift := harbor_surface_lift(at.x, d)
+		return lift >= 0.0 and at.y < harbor_height(d) + lift - 0.5
 	return false
 
 
@@ -468,6 +480,116 @@ func roof_recovery(d: float) -> float:
 		if roof.finish > d + 8.0:
 			return clampf(d, roof.start + 6.0, roof.finish - 8.0)
 	return span.y - ROOF_APPROACH + 2.0
+
+
+# --- Ice cavern ---
+
+func cave_span(d: float) -> Vector2:
+	var span := region_span(d)
+	return Vector2(span.x + CAVE_INSET, span.y - CAVE_INSET) if int(span.z) == Region.ICE_CAVE else Vector2.ZERO
+
+
+func in_cave(d: float) -> bool:
+	var ends := cave_span(d)
+	return ends != Vector2.ZERO and d >= ends.x and d <= ends.y
+
+
+func cave_weight(d: float) -> float:
+	var ends := cave_span(d)
+	return smoothstep(ends.x, ends.x + 10, d) * (1 - smoothstep(ends.y - 10, ends.y, d)) if ends != Vector2.ZERO else 0.0
+
+
+func cave_half_width(d: float) -> float:
+	return 10.0 + 1.0 * sin(d * 0.035 + _phases[7])
+
+
+func cave_vault_height(d: float) -> float:
+	return 9.0 + 0.7 * sin(d * 0.055 + _phases[6])
+
+
+func cave_arch_height(k: float, d: float) -> float:
+	var angle := PI * k / 16.0
+	return (cave_vault_height(d) + 1.1 * sin(k * 2.1 + d * 0.09) + 0.4 * sin(k * 0.9 - d * 0.04)) * sin(angle)
+
+
+func cave_ceiling(x: float, d: float) -> float:
+	var lx := clampf((x - center_x(d)) / cave_half_width(d), -1, 1)
+	var k := acos(lx) * 16 / PI
+	# Linear interpolation matches the facets that the player actually sees.
+	var left := floorf(k)
+	var t := inverse_lerp(cos(PI * left / 16), cos(PI * minf(left + 1, 16) / 16), lx) if left < 16 else 0.0
+	return height(center_x(d), d, false) + lerpf(cave_arch_height(left, d), cave_arch_height(minf(left + 1, 16), d), t)
+
+
+# --- Container harbour ---
+
+func harbor_span(d: float) -> Vector2:
+	var span := region_span(d)
+	return Vector2(span.x + HARBOR_INSET, span.y - HARBOR_INSET) if int(span.z) == Region.HARBOR else Vector2.ZERO
+
+
+func in_harbor(d: float) -> bool:
+	var ends := harbor_span(d)
+	return ends != Vector2.ZERO and d >= ends.x and d <= ends.y
+
+
+func harbor_height(d: float) -> float:
+	var ends := harbor_span(d)
+	return lerpf(base_height(ends.x), base_height(ends.y), (d - ends.x) / (ends.y - ends.x)) if ends != Vector2.ZERO else base_height(d)
+
+
+func harbor_route_lift(d: float) -> float:
+	var span := region_span(d)
+	if int(span.z) != Region.HARBOR: return -1.0
+	var u := d - span.x - 70.0
+	if u < 0 or u > 80 or (u > 38 and u < 42): return -1.0
+	if u < 22: return HARBOR_ROUTE_HEIGHT * u / 22
+	if u > 58: return HARBOR_ROUTE_HEIGHT * (80 - u) / 22
+	return HARBOR_ROUTE_HEIGHT
+
+
+func harbor_gangway_x(d: float) -> float:
+	var u := d - region_span(d).x - 160.0
+	return lerpf(16, 22, smoothstep(0, 24, u)) - 6 * smoothstep(54, 78, u)
+
+
+func on_harbor_gangway(x: float, d: float) -> bool:
+	var span := region_span(d)
+	return int(span.z) == Region.HARBOR and d >= span.x + 160 and d <= span.x + 238 and absf(x - center_x(d) - harbor_gangway_x(d)) <= 1.701
+
+
+func harbor_surface_lift(x: float, d: float) -> float:
+	if not in_harbor(d): return -1.0
+	if on_harbor_gangway(x, d): return 0.25
+	if absf(x - center_x(d) - HARBOR_ROUTE_X) <= HARBOR_ROUTE_HALF_WIDTH + 0.001:
+		return harbor_route_lift(d)
+	return -1.0
+
+
+func harbor_tunnel_ceiling(x: float, d: float) -> float:
+	if not in_harbor(d): return INF
+	var span := region_span(d)
+	if absf(x - center_x(d) - 5.5) > 2.3: return INF
+	var center := span.x + 78
+	while center < span.y - 48:
+		if absf(d - center) <= 5.2: return harbor_height(d) + 4.22
+		center += 62
+	return INF
+
+
+func harbor_water(x: float, d: float) -> bool:
+	return in_harbor(d) and x - center_x(d) > HARBOR_QUAY_EDGE
+
+
+func _harbor_surface(x: float, d: float, lift: float) -> Vector4:
+	var ends := harbor_span(d)
+	var slope := (base_height(ends.y) - base_height(ends.x)) / (ends.y - ends.x)
+	if not on_harbor_gangway(x, d):
+		var u := d - region_span(d).x - 70.0
+		if u < 22: slope += HARBOR_ROUTE_HEIGHT / 22
+		elif u > 58: slope -= HARBOR_ROUTE_HEIGHT / 22
+	var n := Vector3(0, 1, slope).normalized()
+	return Vector4(n.x, n.y, n.z, harbor_height(d) + lift + 0.035)
 
 
 ## Grip multiplier for the surface: patchy ice is glassy, frozen rivers,
@@ -600,6 +722,17 @@ func height(x: float, d: float, with_ramps := true, with_structures := true) -> 
 		if with_structures:
 			var roof := roof_at(x, d)
 			if roof != null: h = roof_height(roof, x, d)
+	if int(span.z) == Region.HARBOR:
+		var ends := Vector2(span.x + HARBOR_INSET, span.y - HARBOR_INSET)
+		var alignment := smoothstep(span.x, ends.x, d) * (1 - smoothstep(ends.y, span.y, d))
+		if x - center_x(d) >= -22 and x - center_x(d) <= HARBOR_QUAY_EDGE:
+			h = lerpf(h, harbor_height(d), alignment)
+		else:
+			h += (harbor_height(d) - base_height(d)) * alignment
+		if harbor_water(x, d): h = harbor_height(d) - 6.0
+		if with_structures:
+			var lift := harbor_surface_lift(x, d)
+			if lift >= 0: h = harbor_height(d) + lift + 0.035
 	return h
 
 
@@ -620,6 +753,8 @@ func surface_world(x: float, z: float, with_structures := true) -> Vector4:
 	if with_structures:
 		var roof := roof_at(x, -z)
 		if roof != null: return _roof_surface(roof, x, -z)
+		var lift := harbor_surface_lift(x, -z)
+		if lift >= 0: return _harbor_surface(x, -z, lift)
 	var e := 0.35
 	var h := height_world(x, z, with_structures)
 	var hx := (height_world(x + e, z, with_structures) - h) / e
@@ -629,6 +764,10 @@ func surface_world(x: float, z: float, with_structures := true) -> Vector4:
 
 
 func normal_world(x: float, z: float) -> Vector3:
+	var lift := harbor_surface_lift(x, -z)
+	if lift >= 0:
+		var surface := _harbor_surface(x, -z, lift)
+		return Vector3(surface.x, surface.y, surface.z)
 	var roof := roof_at(x, -z)
 	if roof != null:
 		var surface := _roof_surface(roof, x, -z)

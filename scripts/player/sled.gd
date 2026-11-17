@@ -452,7 +452,7 @@ func prune_trail(d: float) -> void:
 
 func _update_trail() -> void:
 	var d := distance()
-	if not on_ground or crashed or field.is_water(d) or field.region(d) == TerrainField.Region.MALL or field.on_bridge(d):
+	if not on_ground or crashed or field.is_water(d) or field.region(d) in [TerrainField.Region.MALL, TerrainField.Region.ICE_CAVE] or field.on_bridge(d) or field.harbor_surface_lift(position.x, d) >= 0:
 		_trail.lift()
 		return
 	# A spinning ride smears along where it is going, not where it points.

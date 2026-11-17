@@ -38,6 +38,23 @@ ett helt tak. Provkör med `godot --path . -- --start-region=roofs`.
 Kör `godot --headless --path . --script res://tools/roofs_test.gd` för tester,
 eller ta bilder med den vanliga renderaren och `-- --capture`.
 
+Isgrottan har ett slingrande, halt isgolv, blå glacierbelysning, istappar
+och fasta ispelare. Väggar och valv har kollision och snöfallet stannar
+utanför portalerna. Provkör med `godot --path . -- --start-region=cave`.
+
+Containerhamnen har staplad frakt, öppna containertunnlar, kaj och vatten.
+En ramp leder upp över containertak med ett riktigt mellanrum, och en smal
+landgång ger en alternativ väg över vattnet. Kranens last rör sig över banan
+och delas av båda spelarna. Provkör med
+`godot --path . -- --start-region=harbor`.
+
+Testa båda med
+`godot --headless --path . --script res://tools/cave_harbor_test.gd -- --autopilot`.
+Utelämna `--headless` och lägg till `--capture` efter `--` för spelbilder i `/tmp`.
+Streaming kan profileras separat med
+`godot --headless --path . --script res://tools/region_stream_profile.gd -- cave`
+(eller `harbor`).
+
 ## Apple TV
 
 Godot saknar officiellt tvOS-stöd, så Apple TV-versionen byggs med en egen

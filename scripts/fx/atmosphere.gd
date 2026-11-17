@@ -28,6 +28,10 @@ var aurora := 0.0
 var wind := 1.0
 ## Under a roof (the mall): no snow falls.
 var indoor := false
+## Fade the ambient light and fog through the glacier portals.
+var cave := 0.0
+var _day_ambient := 0.5
+var _day_fog := Color.WHITE
 var _environment: Environment
 var _sky: ProceduralSkyMaterial
 var _sun: DirectionalLight3D
@@ -123,9 +127,14 @@ func update_atmosphere(delta: float, camera: Camera3D, distance: float, speed_fa
 	_snow.global_position = camera.global_position - camera.global_basis.z * 16.0 + Vector3.UP * 5.0
 	if _sky_needs_repaint(Vector3(distance, storm, night_override)):
 		set_time_of_day(distance)
+	_snow.visible = not indoor
 	_snow.amount_ratio = 0.0 if indoor else 0.25 + 0.75 * storm
 	_snow_process.gravity = Vector3(wind * storm * 14.0, -1.5 - storm * 4.0, 0.0)
-	_environment.fog_density = Quality.base_fog() + storm * 0.032
+	_environment.fog_density = lerpf(Quality.base_fog() + storm * 0.032, 0.012, cave)
+	_environment.fog_light_color = _day_fog.lerp(Color("24546f"), cave)
+	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR if cave > 0.01 else Environment.AMBIENT_SOURCE_SKY
+	_environment.ambient_light_color = Color("6ca8d6")
+	_environment.ambient_light_energy = lerpf(_day_ambient, 0.65, cave)
 	_update_aurora(camera)
 	var target := clampf((speed_factor - 0.35) * 1.4, 0.0, 1.3) + (0.35 if boosting else 0.0)
 	_intensity = lerpf(_intensity, target, 1.0 - exp(-4.0 * delta))
@@ -165,6 +174,8 @@ func set_time_of_day(distance: float) -> void:
 		_sky.sky_horizon_color = horizon
 		_sky.ground_horizon_color = horizon
 		_sun.light_energy *= 1.0 - 0.55 * storm
+	_day_ambient = _environment.ambient_light_energy
+	_day_fog = horizon
 	_environment.fog_light_color = horizon
 
 
@@ -215,6 +226,7 @@ func follow_second_view(camera: Camera3D) -> void:
 		_second_snow.process_material = _snow_process
 		_second_snow.draw_pass_1 = _snow.draw_pass_1
 		add_child(_second_snow)
+	_second_snow.visible = _snow.visible
 	_second_snow.amount_ratio = _snow.amount_ratio
 	_second_snow.global_position = camera.global_position - camera.global_basis.z * 16.0 + Vector3.UP * 5.0
 

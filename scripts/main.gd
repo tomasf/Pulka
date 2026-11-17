@@ -24,6 +24,8 @@ const CRASH_LINES := {
 	Obstacle.Kind.TREE: ["Granen vann.", "Trädkramare!", "Barr i munnen.", "Granen stod där först."],
 	Obstacle.Kind.ROCK: ["Stenhårt!", "Stenen rörde sig inte en millimeter.", "Aj, aj, sten!"],
 	Obstacle.Kind.STUMP: ["Stubben var där först.", "Stubbad!"],
+	Obstacle.Kind.ICE_PILLAR: ["Ispelaren stod stadigt.", "Iskallt möte!"],
+	Obstacle.Kind.CONTAINER: ["Containern vann.", "Du blev fraktgods!"],
 	Obstacle.Kind.CHIMNEY: ["Skorstenen vann.", "Sotare för en dag!", "Rakt in i skorstenen!"],
 	Obstacle.Kind.PERSON: [
 		"Ursäkta! Ursäkta!", "%s såg dig inte komma.", "%s tappade termosen!", "%s spillde ut hela kaffet.",
@@ -320,6 +322,7 @@ func _process(delta: float) -> void:
 		_director.sled = lead.sled
 		_director.update(delta, playing)
 		_atmosphere.indoor = _world.regions.indoors(lead.sled.distance())
+		_atmosphere.cave = _field.cave_weight(lead.sled.distance())
 		for p in _players:
 			p.camera.update_camera(delta)
 		var rush := lead.sled.speed() / 45.0 if playing and not _racing else 0.0
@@ -1296,7 +1299,7 @@ func _contact(obstacle: Obstacle, probe: Vector3) -> Vector3:
 	if obstacle.overlaps(probe, Sled.RADIUS):
 		return probe
 	var chest := probe + Vector3.UP * RIDER_CHEST
-	if obstacle.kind == Obstacle.Kind.TREE and obstacle.overlaps(chest, Sled.RADIUS * 0.6):
+	if obstacle.kind in [Obstacle.Kind.TREE, Obstacle.Kind.CONTAINER] and obstacle.overlaps(chest, Sled.RADIUS * 0.6):
 		return chest
 	return Vector3.INF
 
@@ -1486,7 +1489,9 @@ func _after_crash(p: Player) -> void:
 	if _field.near_road(d, 8.0):
 		d = _field.nearest_road(d) + TerrainField.ROAD_HALF_WIDTH + 20.0
 	if _field.in_rooftops(d): d = _field.roof_recovery(d)
-	p.sled.place_at(d, 0.0, 12.0, true)
+	# A fixed clear line through the cave avoids respawning inside a column.
+	var lateral := -5.3 if _field.in_cave(d) else 0.0
+	p.sled.place_at(d, lateral, 12.0, true)
 	p.sled.invulnerable_time = 2.5
 	p.camera.mode = ChaseCamera.Mode.CHASE
 	p.camera.snap()
@@ -1515,6 +1520,18 @@ func _check_bounds(p: Player = null) -> void:
 	var outside := absf(p.sled.position.x - _field.center_x(d)) - _field.half_width(d)
 	var in_town := _field.region(d) == TerrainField.Region.TOWN
 	var kind := _field.region(d)
+	if _field.in_cave(d):
+		if outside > -0.65 or p.sled.position.y + 1.25 > _field.cave_ceiling(p.sled.position.x, d):
+			_crash("Rakt in i isväggen!", p)
+		return
+	if _field.in_harbor(d):
+		if _field.below_structure(p.sled.position) or p.sled.position.y + 1.25 > _field.harbor_tunnel_ceiling(p.sled.position.x, d):
+			_crash("Rakt in i containern!", p)
+		elif _field.harbor_water(p.sled.position.x, d) and p.sled.position.y < _field.harbor_height(d) - 0.7:
+			_crash("Plums mellan kajerna!", p)
+		elif p.sled.position.x - _field.center_x(d) < -22:
+			_crash("Fel väg till lagret!", p)
+		return
 	if _field.in_rooftops(d):
 		if _field.below_structure(p.sled.position) or p.sled.position.y < _field.roof_base_height(d) - 2.0:
 			_crash("Du missade taket!", p)
@@ -1653,6 +1670,7 @@ func _find_region(name: String) -> float:
 		"airport": TerrainField.Region.AIRPORT, "highway": TerrainField.Region.HIGHWAY, "lake": TerrainField.Region.LAKE, "bandy": TerrainField.Region.BANDY, "cliff": TerrainField.Region.CLIFF,
 		"bridge": TerrainField.Region.BRIDGE,
 		"roofs": TerrainField.Region.ROOFS,
+		"cave": TerrainField.Region.ICE_CAVE, "harbor": TerrainField.Region.HARBOR,
 	}.get(name, TerrainField.Region.TOWN) as TerrainField.Region
 	# A region can be skipped for a whole seeded cycle. Search slots directly
 	# and return the exact start, rather than silently falling back at 40 km.

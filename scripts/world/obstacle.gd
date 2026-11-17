@@ -5,7 +5,7 @@ extends Node3D
 ## jump over or land on. Mass decides how hard a hit is and whether the
 ## obstacle goes flying.
 
-enum Kind { TREE, ROCK, STUMP, SNOWMAN, PERSON, KID, DOG, MOOSE, DEER, HARE, CAR, PLOW, BIN, TENT, LOG, CART, PLANT, FOUNTAIN, CONE, TRAIN, PLANE, TUG, GOAL, TRUCK, BEAR, CHIMNEY }
+enum Kind { TREE, ROCK, STUMP, SNOWMAN, PERSON, KID, DOG, MOOSE, DEER, HARE, CAR, PLOW, BIN, TENT, LOG, CART, PLANT, FOUNTAIN, CONE, TRAIN, PLANE, TUG, GOAL, TRUCK, BEAR, CHIMNEY, ICE_PILLAR, CONTAINER }
 
 ## Weight in kilograms; INF for things rooted to the ground.
 const MASS := {
@@ -14,7 +14,7 @@ const MASS := {
 	Kind.CAR: 1300.0, Kind.PLOW: 9000.0, Kind.BIN: 25.0, Kind.TENT: 35.0, Kind.LOG: INF,
 	Kind.CART: 30.0, Kind.PLANT: 45.0, Kind.FOUNTAIN: INF, Kind.CONE: 2.0, Kind.TRAIN: INF,
 	Kind.PLANE: INF, Kind.TUG: 2500.0, Kind.GOAL: 70.0, Kind.TRUCK: 15000.0,
-	Kind.BEAR: 250.0, Kind.CHIMNEY: INF,
+	Kind.BEAR: 250.0, Kind.CHIMNEY: INF, Kind.ICE_PILLAR: INF, Kind.CONTAINER: INF,
 }
 ## Heavier than this and a hit does not move it.
 const MOVABLE_MASS := 1000.0
@@ -42,6 +42,11 @@ var velocity := Vector3.ZERO
 var min_x := -INF
 var max_x := INF
 var follow_terrain := true
+## Static dock cargo follows the quay plane rather than a level Y box.
+var collision_slope := 0.0
+var collision_sweep := 0.0
+## Grounded props tolerate terrain irregularities; suspended cargo does not.
+var bottom_margin := 1.5
 var field: TerrainField
 var hit := false
 var close_call := false
@@ -109,6 +114,15 @@ func configure(which: Kind, rig: Props.Rig, terrain: TerrainField) -> Obstacle:
 		Kind.STUMP:
 			radius = 0.5
 			top = 0.6
+		Kind.ICE_PILLAR:
+			radius = 1.35
+			top = 9.0
+			landable = false
+		Kind.CONTAINER:
+			bottom_margin = 0
+			half_extents = Vector2(2.6, 8)
+			top = 4
+			landable = false
 		Kind.CHIMNEY:
 			half_extents = Vector2(0.60, 0.55)
 			top = 1.75
@@ -375,6 +389,7 @@ func _face_velocity() -> void:
 func clearance(p: Vector3) -> float:
 	var dx := p.x - position.x
 	var dz := p.z - position.z
+	dx += collision_sweep * dz
 	if kind == Kind.TREE:
 		var h := (p.y - position.y) / scale.y
 		var reach := radius * scale.x
@@ -391,7 +406,8 @@ func clearance(p: Vector3) -> float:
 
 
 func overlaps(p: Vector3, r: float) -> bool:
-	if hit or p.y > position.y + height() or p.y < position.y - 1.5:
+	var base := position.y - collision_slope * (p.z - position.z)
+	if hit or p.y > base + height() or p.y < base - bottom_margin:
 		return false
 	return clearance(p) < r
 
