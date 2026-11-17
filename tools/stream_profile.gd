@@ -17,6 +17,8 @@ func _run() -> void:
 	var cold: Array[Dictionary] = []
 	for frame in frames:
 		var d := frame * 0.6
+		world.bird_observers = PackedVector3Array([Vector3(field.center_x(d), field.height(field.center_x(d), d), -d)])
+		world.bird_speeds = PackedFloat32Array([36])
 		var began := Time.get_ticks_usec()
 		world.update_world(d, 1.0 / 60)
 		var us := Time.get_ticks_usec() - began

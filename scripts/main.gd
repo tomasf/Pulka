@@ -431,7 +431,7 @@ func _is_unlocked(spec: VehicleSpec) -> bool:
 
 
 func _update_menu(delta: float) -> void:
-	_world.update_world(_players[0].sled.distance(), delta)
+	_update_world(delta)
 	_players[0].sled.step(delta, 0.0, 0.0, false)
 	if _input_cooldown > 0.0 or _hud.settings_open:
 		return
@@ -440,7 +440,7 @@ func _update_menu(delta: float) -> void:
 
 
 func _update_selection(delta: float) -> void:
-	_world.update_world(_players[0].sled.distance(), delta)
+	_update_world(delta)
 	_players[0].sled.step(delta, 0.0, 0.0, false)
 	if _input_cooldown > 0.0 or _hud.settings_open:
 		return
@@ -613,8 +613,12 @@ const TRAIL_BEHIND := 120.0
 func _update_world(delta: float, build_ms := SlopeWorld.BUILD_MS) -> void:
 	var lead := _leader()
 	var others := PackedFloat32Array()
+	_world.bird_observers.clear()
+	_world.bird_speeds.clear()
 	var last := lead.sled.distance()
 	for p in _players:
+		_world.bird_observers.append(p.sled.position)
+		_world.bird_speeds.append(p.sled.speed())
 		if p != lead:
 			others.append(p.sled.distance())
 		last = minf(last, p.sled.distance())

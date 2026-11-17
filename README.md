@@ -55,6 +55,13 @@ Streaming kan profileras separat med
 `godot --headless --path . --script res://tools/region_stream_profile.gd -- cave`
 (eller `harbor`).
 
+Kråkor, skator och domherrar ger liv åt backen. De går och pickar i snön
+eller sitter på riktiga grenar, stenar och stubbar. När någon av spelarna
+kommer nära lyfter de och flyger bort med animerade vingslag. Fåglarna är
+dekoration och orsakar inga krascher. Beteende och placering testas med
+`godot --headless --path . --script res://tools/birds_test.gd -- --autopilot`.
+Kör utan `--headless` och lägg till `--capture` efter `--` för granskningsbilder.
+
 ## Apple TV
 
 Godot saknar officiellt tvOS-stöd, så Apple TV-versionen byggs med en egen

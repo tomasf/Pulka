@@ -114,6 +114,7 @@ static func _legs(rig: Rig, leg: ArrayMesh, half_width: float, front_z: float, b
 static func spruce(variant: int) -> ArrayMesh:
 	return cached_mesh("spruce%d" % variant, func() -> ArrayMesh:
 		var kit := MeshKit.new()
+		var perches := PackedVector3Array()
 		var green: Color = Palette.SPRUCE[variant % Palette.SPRUCE.size()]
 		kit.cylinder(0.17, 1.6, Vector3(0, 0.8, 0), Palette.TRUNK, 8, Vector3.ZERO, 0.1)
 		# Tiers of drooping branches, each a skirt whose rim goes in and out
@@ -147,17 +148,21 @@ static func spruce(variant: int) -> ArrayMesh:
 			kit.loft(skirt, PackedFloat32Array([1, 1, 1, 1]), Transform3D.IDENTITY, shade)
 			var under: Array[PackedVector3Array] = [MeshKit.lobed(0.12, y + 0.12, lobes, 0.0, seed), skirt[0]]
 			kit.loft(under, PackedFloat32Array([1, 1]), Transform3D.IDENTITY, shade.darkened(0.35))
+			if i in [1, 3, 4]: perches.append(snow[0][(i * 4) % snow[0].size()] + Vector3.UP * 0.02)
 			kit.loft(snow, PackedFloat32Array([1, 1, 1, 1]), Transform3D.IDENTITY, Palette.SNOW)
 			crown = y + rise
 		# The leader shoot at the very top, capped with snow.
 		kit.cone(0.12, 0.8, Vector3(0, crown + 0.3, 0), green, 6)
 		kit.cone(0.09, 0.3, Vector3(0, crown + 0.6, 0), Palette.SNOW, 6)
-		return kit.build())
+		var mesh := kit.build()
+		mesh.set_meta(&"bird_perches", perches)
+		return mesh)
 
 
 static func birch() -> ArrayMesh:
 	return cached_mesh("birch", func() -> ArrayMesh:
 		var kit := MeshKit.new()
+		var perches := PackedVector3Array()
 		var bark := Color(0.93, 0.92, 0.88)
 		var black := Color(0.13, 0.12, 0.12)
 		var rng := RandomNumberGenerator.new()
@@ -197,6 +202,7 @@ static func birch() -> ArrayMesh:
 			var elbow := start + out * reach * 0.55 + Vector3.UP * reach * 0.45
 			var tip := elbow + out * reach * 0.5 + Vector3.UP * reach * 0.05
 			kit.capsule_between(start, elbow, 0.035, frost.darkened(0.25), 5)
+			if i in [2, 5, 9]: perches.append(tip + Vector3.UP * 0.025)
 			kit.capsule_between(elbow, tip, 0.022, frost.darkened(0.15), 4)
 			for k in 9:
 				var along := lerpf(0.3, 1.0, k / 8.0)
@@ -211,7 +217,9 @@ static func birch() -> ArrayMesh:
 			var top_at := spine[spine.size() - 1] + lean + Vector3.DOWN * 0.25
 			kit.add(strand, Transform3D(Basis.from_scale(Vector3(0.08, 0.35, 0.06)), top_at), frost)
 		kit.ellipsoid(Vector3(0.07, 0.04, 0.07), spine[spine.size() - 1], Palette.SNOW)
-		return kit.build())
+		var mesh := kit.build()
+		mesh.set_meta(&"bird_perches", perches)
+		return mesh)
 
 
 ## Point a fraction t of the way along a polyline of evenly spaced points.
@@ -245,7 +253,9 @@ static func rock(variant: int) -> ArrayMesh:
 			kit.ellipsoid(Vector3(0.12, 0.08, 0.02) * rng.randf_range(0.6, 1.4), at, Color(0.62, 0.66, 0.42), Vector3(0, -angle + PI / 2.0, 0))
 		kit.ellipsoid(Vector3(main.x * 0.82, 0.24, main.z * 0.76), Vector3(0.05, 0.84, 0), Palette.SNOW, Vector3(0.08, variant, 0.05))
 		kit.ellipsoid(Vector3(main.x * 0.4, 0.14, main.z * 0.35), Vector3(0.55, 0.62, 0.3), Palette.SNOW)
-		return kit.build())
+		var mesh := kit.build()
+		mesh.set_meta(&"bird_perches", PackedVector3Array([Vector3(0.05, 1.08, 0)]))
+		return mesh)
 
 
 ## A low-poly lump with flat facets, like broken stone.
@@ -279,7 +289,9 @@ static func stump() -> ArrayMesh:
 			var out := Vector3(cos(angle), 0, sin(angle))
 			kit.capsule_between(out * 0.36 + Vector3.UP * 0.08, out * (0.58 + 0.08 * (i % 2)) + Vector3.DOWN * 0.02, 0.075 - (i % 2) * 0.015, bark, 7)
 		kit.ellipsoid(Vector3(0.75, 0.12, 0.75), Vector3(0, -0.02, 0), Palette.SNOW)
-		return kit.build())
+		var mesh := kit.build()
+		mesh.set_meta(&"bird_perches", PackedVector3Array([Vector3(0.06, 0.65, 0.05)]))
+		return mesh)
 
 
 static func _taper(bottom: float, top: float, height: float) -> CylinderMesh:

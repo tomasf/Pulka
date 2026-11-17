@@ -50,6 +50,9 @@ var regions: RegionBuilder
 ## With two players this is the one in front; `rider_ds` has them all.
 var player_d := 0.0
 var rider_ds := PackedFloat32Array()
+## Full positions, not just distance: wildlife sees either split-screen rider.
+var bird_observers := PackedVector3Array()
+var bird_speeds := PackedFloat32Array()
 ## Testing aid (--spawn=bear): half of all obstacles are this kind, or -1.
 var forced_kind := -1
 ## Moving things that are not tied to one chunk (trains run through many).
@@ -99,6 +102,8 @@ func reset(new_field: TerrainField, start_d: float) -> void:
 	_free.clear()
 	_free_obstacles.clear()
 	field = new_field
+	bird_observers.clear()
+	bird_speeds.clear()
 	var first := int(floorf(start_d / CHUNK_LENGTH))
 	for i in range(first - CHUNKS_BEHIND, first + 5):
 		_ensure(i)
@@ -140,7 +145,7 @@ func update_world(player_distance: float, delta: float, build_ms := BUILD_MS, ot
 			if not _chunks.has(i) or _building.has(i):
 				_build(i, float(deadline))
 	for chunk: Chunk in _chunks.values():
-		chunk.tick(delta)
+		chunk.tick(delta, bird_observers, bird_speeds)
 	var last := player_d
 	for d in rider_ds:
 		last = minf(last, d)
@@ -249,6 +254,7 @@ func _build(index: int, deadline: float) -> void:
 			4:
 				_place_obstacles(chunk, build.rng, d0, d1)
 				_place_pickups(chunk, build.rng, d0, d1)
+				BirdPopulation.populate(self, chunk, build.decor, d0, d1)
 				_flush_decor(chunk, build.decor)
 				_building.erase(index)
 				if profile_builds:

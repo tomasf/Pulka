@@ -7,9 +7,12 @@ var obstacles: Array[Obstacle] = []
 var movers: Array[Obstacle] = []
 var pickups: Array[Pickup] = []
 var roads: Array[RoadCrossing] = []
+var birds: Array[AmbientBird] = []
 
 
-func tick(delta: float) -> void:
+func tick(delta: float, observers := PackedVector3Array(), speeds := PackedFloat32Array()) -> void:
+	for bird in birds:
+		bird.tick(delta, observers, speeds)
 	for mover in movers:
 		mover.tick(delta)
 	for road in roads:
