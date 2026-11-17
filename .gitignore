@@ -2,4 +2,5 @@
 /export/
 /music_preview/
 /generated/web_audio/
+/generated/world_meshes/
 __pycache__/

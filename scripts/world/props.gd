@@ -4,9 +4,24 @@ extends RefCounted
 ## shared. Convention: origin at ground level, front facing -Z.
 
 static var _cache: Dictionary = {}
+const BAKED_WORLD := "res://generated/world_meshes/cache.res"
+static var use_baked_world := true
+static var _checked_world_cache := false
+static var _pipeline_meshes: Array = []
+
+
+static func _load_world_cache() -> void:
+	if _checked_world_cache or not use_baked_world: return
+	_checked_world_cache = true
+	if ResourceLoader.exists(BAKED_WORLD):
+		var archive: Resource = load(BAKED_WORLD)
+		_cache.merge(archive.get_meta("meshes", {}), false)
+		_baked.merge(archive.get_meta("poses", {}), false)
+		_pipeline_meshes = archive.get_meta("pipeline_meshes", [])
 
 
 static func cached_mesh(key: String, builder: Callable) -> ArrayMesh:
+	_load_world_cache()
 	if not _cache.has(key):
 		_cache[key] = builder.call()
 	return _cache[key]
@@ -1161,6 +1176,7 @@ static func _pose_key(rig: Rig, phase: float) -> String:
 
 ## Synchronous for tools and figures that need to appear immediately.
 static func baked(rig: Rig, phase: float) -> ArrayMesh:
+	_load_world_cache()
 	var key := _pose_key(rig, phase)
 	if not _baked.has(key):
 		var step := posmod(roundi(phase / TAU * 8.0), 8)

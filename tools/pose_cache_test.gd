@@ -21,6 +21,10 @@ func _run() -> void:
 	assert(checked)
 	a.free()
 	b.free()
+	# Deliberately make these two poses misses even when an export cache is
+	# present, so the deferred fallback and cancellation are still exercised.
+	Props._baked.erase(Props._pose_key(red, TAU * 0.25))
+	Props._baked.erase(Props._pose_key(red, TAU * 0.5))
 
 	var pending := Props.posed(red, TAU * 0.25, true) as MeshInstance3D
 	var same := Props.posed(blue, TAU * 0.25, true) as MeshInstance3D

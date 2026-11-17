@@ -40,6 +40,7 @@ var _day_sun_energy := 1.0
 var _day_fog := Color.WHITE
 var _environment: Environment
 var _sky: ProceduralSkyMaterial
+var _day_sky: ShaderMaterial
 var _sun: DirectionalLight3D
 var _snow: GPUParticles3D
 var _flash := 0.0
@@ -54,7 +55,9 @@ func _ready() -> void:
 	_sky = ProceduralSkyMaterial.new()
 	_sky.sun_angle_max = 20.0
 	var sky := Sky.new()
-	sky.sky_material = _sky
+	_day_sky = ShaderMaterial.new()
+	_day_sky.shader = preload("res://shaders/day_sky.gdshader")
+	sky.sky_material = _day_sky
 	if Quality.reduced_effects():
 		# Spread the occasional repaint over several frames.
 		sky.process_mode = Sky.PROCESS_MODE_INCREMENTAL
@@ -69,6 +72,7 @@ func _ready() -> void:
 	_environment.fog_density = 0.0028
 	_environment.fog_aerial_perspective = 0.6
 	_environment.fog_sky_affect = 0.15
+	_environment.fog_sun_scatter = 0
 	_environment.glow_enabled = Quality.glow()
 	_environment.glow_intensity = 0.6
 	_environment.glow_bloom = 0.05
@@ -209,6 +213,13 @@ func set_time_of_day(distance: float) -> void:
 	_day_sun_energy = _sun.light_energy
 	_day_fog = horizon
 	_environment.fog_light_color = horizon
+	_day_sky.set_shader_parameter("top_color", _sky.sky_top_color)
+	_day_sky.set_shader_parameter("horizon_color", horizon)
+	_day_sky.set_shader_parameter("ground_color", _sky.ground_bottom_color)
+	_day_sky.set_shader_parameter("sun_direction", _sun.global_basis.z.normalized())
+	_day_sky.set_shader_parameter("sun_color", _sun.light_color)
+	_day_sky.set_shader_parameter("sun_energy", _day_sun_energy)
+	_day_sky.set_shader_parameter("sun_radius_cos", cos(deg_to_rad(_sun.light_angular_distance)))
 
 
 ## True (and remembered) when the sky has drifted far enough from how it was

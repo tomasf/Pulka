@@ -66,6 +66,7 @@ mkdir -p export/tvos
 # Apple TV plays audio baked ahead of time (see SoundBank.uses_baked_audio).
 "$editor" --headless --path . --editor --import
 "$editor" --headless --path . --script res://tools/bake_web_audio.gd
+"$editor" --headless --path . --script res://tools/bake_world_meshes.gd
 "$editor" --headless --path . --editor --import
 "$editor" --headless --path . --export-release tvOS export/tvos/Pulka.ipa
 # Running from Xcode otherwise validates every Metal call and keeps GPU frame

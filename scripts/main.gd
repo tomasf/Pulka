@@ -146,6 +146,13 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	InputSetup.configure()
 	_parse_args()
+	var device_profile := OS.get_environment("PULKA_DEVICE_PROFILE") == "1"
+	if device_profile:
+		_autopilot = true
+		_muted = true
+		_no_crash = true
+	# Silence automation before any looping audio players are constructed.
+	if _muted: AudioServer.set_bus_mute(AudioServer.get_bus_index(&"Master"), true)
 	get_window().content_scale_factor = Quality.ui_scale()
 	_save = SaveData.load_saved()
 	if _graphics_override >= 0:
@@ -209,7 +216,11 @@ func _ready() -> void:
 		if not _autopilot: _enter_lobby()
 	if _open_settings_at_start:
 		_hud.open_settings(_save.master_volume, _save.music_volume, _save.effects_volume)
-	if _autopilot:
+	if device_profile:
+		var profiler: Node = load("res://scripts/debug/device_profile.gd").new()
+		add_child(profiler)
+		profiler.run.call_deferred(self)
+	elif _autopilot:
 		_start_run()
 
 

@@ -84,3 +84,24 @@ Godot saknar officiellt tvOS-stöd, så Apple TV-versionen byggs med en egen
 Godot 4.7.2 med tvOS-plattformen från godotengine/godot#123885. Bygg den en gång
 med `tools/tvos/build_godot.sh` (hamnar i `../godot-tvos`) och exportera sedan
 med `tools/tvos/export.sh`, som skapar ett Xcode-projekt i `export/tvos`.
+
+Exporten förbereder också delade modeller och publikens stillbilder i
+`generated/world_meshes/cache.res`. Geometrin är identisk med de procedurbyggda
+modellerna; förberedelsen flyttar arbete från pågående åkning till bygget.
+Kör `godot --headless --path . --script res://tools/bake_world_meshes.gd` igen
+efter modelländringar, eller ta bort `generated/world_meshes` under utveckling
+för att använda de vanliga byggarna. Saknad cache fungerar som tidigare.
+
+Tyst profilering på en fysisk enhet aktiveras vid appstart med miljövariabeln
+`PULKA_DEVICE_PROFILE=1`. Valfri `PULKA_PROFILE_ARGS` innehåller JSON, till
+exempel `{"seconds":20,"cases":["sewer","woods/blizzard"],"modes":[1,2]}`.
+Standardkörningen omfattar 19 miljö-/väderfall för en och två spelare, inklusive
+övergångar mellan inne och ute. Den stänger av ljudet innan ljudspelare skapas.
+Resultatet uppdateras efter varje fall i appens cachekatalog som
+`pulka_device_profile.json`. Hämta det med `devicectl device copy from`,
+`--domain-type appDataContainer`, `--domain-identifier se.tomasf.pulka` och
+`--source Library/Caches/pulka_device_profile.json`. Skapa en tabell med
+`python3 tools/tvos/profile_report.py resultat.json`. Stoppa appen efter testet;
+tvOS avslutar inte processen när Godot anropar `quit()`.
+
+Mätningar och begränsningar finns i [Apple TV-profileringen](docs/profiling/apple-tv-2026-11-17.md).
