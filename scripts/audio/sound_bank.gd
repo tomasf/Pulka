@@ -8,6 +8,7 @@ const MUSIC_BUS := &"Music"
 const SFX_BUS := &"SFX"
 ## Audio baked ahead of time by tools/bake_web_audio.gd.
 const WEB_AUDIO := "res://generated/web_audio/"
+const MENU_THEME := preload("res://audio/menu_snodag.ogg")
 
 var engine_sound: AudioStreamWAV
 var music_player: AudioStreamPlayer
@@ -26,6 +27,10 @@ var _songs: Dictionary = {}
 var _song := -1
 var _song_plays := 0
 var _first_song := 0
+var _menu_player: AudioStreamPlayer
+var _in_menu := false
+var _music_blend: Tween
+var _music_level := -8.0
 
 
 ## Prefer the same pre-rendered audio on desktop too: seven concurrent
@@ -65,6 +70,14 @@ func _ready() -> void:
 	music_player.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(music_player)
 	music_player.finished.connect(_next_song)
+	_menu_player = AudioStreamPlayer.new()
+	var menu_theme := MENU_THEME.duplicate() as AudioStreamOggVorbis
+	menu_theme.loop = true
+	_menu_player.stream = menu_theme
+	_menu_player.bus = MUSIC_BUS
+	_menu_player.volume_db = -60.0
+	_menu_player.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(_menu_player)
 	_first_song = randi() % MusicComposer.SONG_COUNT
 	if uses_baked_audio():
 		for i in MusicComposer.SONG_COUNT:
@@ -91,11 +104,14 @@ func _process(_delta: float) -> void:
 			_music_threads.erase(thread)
 	if _song < 0 and _songs.has(_first_song):
 		_song = _first_song
-		_start_song()
+		if not _in_menu:
+			_start_song()
 
 
 ## Each tune plays twice, then the next finished tune takes over.
 func _next_song() -> void:
+	if _in_menu:
+		return
 	_song_plays += 1
 	if _song_plays >= 2:
 		for step in range(1, MusicComposer.SONG_COUNT + 1):
@@ -173,4 +189,33 @@ func set_motion(delta: float, speed: float, grounded: bool, active: bool) -> voi
 
 
 func set_music_ducked(ducked: bool) -> void:
-	music_player.volume_db = -16.0 if ducked else -8.0
+	_music_level = -16.0 if ducked else -8.0
+	if _music_blend != null and _music_blend.is_running():
+		return
+	(_menu_player if _in_menu else music_player).volume_db = _music_level
+
+
+## Crossfade two players so the menu's loop can dissolve into a different
+## arrangement without stopping either stream halfway through the fade.
+func set_menu_music(enabled: bool) -> void:
+	if enabled == _in_menu and (not enabled or _menu_player.playing):
+		return
+	_in_menu = enabled
+	if _music_blend != null: _music_blend.kill()
+	if enabled and not _menu_player.playing:
+		_menu_player.play()
+	elif not enabled and not music_player.playing:
+		if _song < 0 and _songs.has(_first_song): _song = _first_song
+		if _song >= 0: _start_song()
+	var from_menu := db_to_linear(_menu_player.volume_db) if _menu_player.playing else 0.0
+	var from_ride := db_to_linear(music_player.volume_db) if music_player.playing else 0.0
+	var level := db_to_linear(_music_level)
+	var to_menu := level if enabled else 0.0
+	var to_ride := 0.0 if enabled else level
+	_music_blend = create_tween()
+	# Interpolate power, not dB: the middle must not dip into near silence.
+	_music_blend.tween_method(func(t: float) -> void:
+		_menu_player.volume_db = linear_to_db(maxf(0.0001, sqrt(lerpf(from_menu * from_menu, to_menu * to_menu, t))))
+		music_player.volume_db = linear_to_db(maxf(0.0001, sqrt(lerpf(from_ride * from_ride, to_ride * to_ride, t))))
+	, 0.0, 1.0, 0.9).set_trans(Tween.TRANS_SINE)
+	_music_blend.tween_callback(music_player.stop if enabled else _menu_player.stop)

@@ -18,6 +18,10 @@ spelet syntetisera musiken i bakgrunden under åkturen. Exportskripten för
 macOS, webb och Apple TV gör detta automatiskt. Utan färdigt ljud använder
 skrivbordsversionen syntes som reserv.
 
+Menyn börjar med spelarval och sedan åkdon på den riktiga banan. Starten går
+vidare med en kamerarörelse och 3–2–1. Menylåten **Snödag** är separat från
+åkmusiken. [Menyflöde, musik och tester](tools/MENU_REVIEW.md).
+
 ## Apple TV
 
 Godot saknar officiellt tvOS-stöd, så Apple TV-versionen byggs med en egen

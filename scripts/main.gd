@@ -1,9 +1,9 @@
 extends Node3D
-## Game flow: menu → countdown → run (crashes cost a mitten) → game over.
-## With two players: menu → lobby (each picks a ride) → countdown → a
-## split-screen race to the finish line, where crashes only cost time.
+## Game flow: players → live ride selection → camera turn → countdown → run.
+## The preview and the run share a world. With two players, each picks their
+## ride in split screen before racing; crashes then only cost time.
 
-enum State { MENU, COUNTDOWN, PLAYING, PAUSED, GAME_OVER, LOBBY }
+enum State { MENU, COUNTDOWN, PLAYING, PAUSED, GAME_OVER, LOBBY, SELECT }
 
 const START_LIVES := 3
 const MAX_LIVES := 5
@@ -84,6 +84,7 @@ var _hud: Hud
 
 var _countdown := 0.0
 var _countdown_step := 0
+var _intro_remaining := 0.0
 var _input_cooldown := 0.0
 ## Set when the ride goes over a cliff edge, until it lands.
 var _elapsed := 0.0
@@ -197,7 +198,11 @@ func _ready() -> void:
 	_restore_fullscreen.call_deferred()
 	_hud.set_fps_visible(_save.show_fps or _show_fps)
 	_apply_graphics()
+	var launch_duo := _two_players
 	_enter_menu()
+	if launch_duo:
+		_two_players = true
+		if not _autopilot: _enter_lobby()
 	if _open_settings_at_start:
 		_hud.open_settings(_save.master_volume, _save.music_volume, _save.effects_volume)
 	if _autopilot:
@@ -298,6 +303,8 @@ func _process(delta: float) -> void:
 			_update_menu(delta)
 		State.LOBBY:
 			_update_lobby(delta)
+		State.SELECT:
+			_update_selection(delta)
 		State.COUNTDOWN:
 			_update_countdown(delta)
 		State.PLAYING:
@@ -372,27 +379,42 @@ func _new_world() -> void:
 
 func _enter_menu() -> void:
 	get_tree().paused = false
-	# With two players the menu is the split screen where each picks a ride.
-	if _two_players and not _autopilot:
-		_hud.close_settings()
-		_enter_lobby()
-		return
-	if _director.field:
-		_director.reset(START_D)
-		_director.stop()
 	_hud.close_settings()
 	_leave_split()
+	_two_players = false
 	state = State.MENU
-	_new_world()
+	_prepare_preview_world()
 	var p := _players[0]
-	p.sled.set_vehicle(_specs[_vehicle], _rng)
+	p.sled.set_vehicle(_specs[_vehicle], _rng, Player.COLORS[0])
 	p.sled.frozen = true
-	p.sled.place_at(START_D)
+	p.sled.place_at(_start_d)
 	p.camera.mode = ChaseCamera.Mode.ORBIT
-	_hud.show_screen("menu")
+	p.camera.centered = false
+	p.camera.update_camera(0.0)
+	_hud.show_screen("players")
 	_refresh_menu()
 	_sound.set_music_ducked(false)
+	_sound.set_menu_music(true)
 	_input_cooldown = 0.3
+
+
+func _prepare_preview_world() -> void:
+	_new_world()
+	_start_d = START_D
+	if _start_region != "":
+		_start_d = _find_region(_start_region) - 120.0
+		_world.reset(_field, _start_d)
+	_director.reset(_start_d)
+	_director.stop()
+
+
+func _choose_solo() -> void:
+	_two_players = false
+	state = State.SELECT
+	_hud.show_screen("menu")
+	_refresh_menu()
+	_sound.play("whoosh", -6.0, 1.2)
+	_input_cooldown = 0.2
 
 
 func _refresh_menu() -> void:
@@ -409,6 +431,18 @@ func _update_menu(delta: float) -> void:
 	_players[0].sled.step(delta, 0.0, 0.0, false)
 	if _input_cooldown > 0.0 or _hud.settings_open:
 		return
+	if _confirm_pressed():
+		_choose_solo()
+
+
+func _update_selection(delta: float) -> void:
+	_world.update_world(_players[0].sled.distance(), delta)
+	_players[0].sled.step(delta, 0.0, 0.0, false)
+	if _input_cooldown > 0.0 or _hud.settings_open:
+		return
+	if Input.is_action_just_pressed(&"back") or Input.is_action_just_pressed(&"pause"):
+		_enter_menu()
+		return
 	if Input.is_action_just_pressed(&"menu_left"):
 		_change_vehicle(-1)
 	elif Input.is_action_just_pressed(&"menu_right"):
@@ -421,8 +455,8 @@ func _change_vehicle(step: int) -> void:
 	var p := _players[0]
 	_vehicle = (_vehicle + step + _specs.size()) % _specs.size()
 	p.vehicle = _vehicle
-	p.sled.set_vehicle(_specs[_vehicle], _rng)
-	p.sled.place_at(START_D)
+	p.sled.set_vehicle(_specs[_vehicle], _rng, Player.COLORS[0])
+	p.sled.place_at(_start_d)
 	_refresh_menu()
 	_sound.play("whoosh", -6.0, 1.4)
 
@@ -439,27 +473,34 @@ func _start_run() -> void:
 	_save.vehicle_id = spec.id
 	if not _autopilot:
 		_save.store()
-	_new_world()
-	_start_d = START_D
-	if _start_region != "":
-		_start_d = _find_region(_start_region) - 120.0
-		_world.reset(_field, _start_d)
+	# Starting from the picker keeps the exact world, rider and camera.
+	# Retry and automation prepare a fresh starting point before the intro.
 	var p := _players[0]
-	p.sled.set_vehicle(spec, _rng)
+	if state != State.SELECT:
+		_prepare_preview_world()
+		p.sled.set_vehicle(spec, _rng, Player.COLORS[0])
+		p.sled.place_at(_start_d)
 	p.sled.frozen = true
-	p.sled.place_at(_start_d)
 	p.sled.invulnerable_time = 0.0
 	_reset_player(p)
 	_director.reset(_start_d)
 	_force_event()
 	_touch.reset()
-	p.camera.mode = ChaseCamera.Mode.CHASE
-	p.camera.snap()
-	_countdown = 3.0
-	_countdown_step = 4
+	_begin_countdown()
+
+
+func _begin_countdown() -> void:
+	for p in _players:
+		p.camera.begin_run()
+	_countdown = 3.0 * CountdownDisplay.BEAT_SECONDS
+	_countdown_step = 0
+	_intro_remaining = ChaseCamera.START_SECONDS
 	state = State.COUNTDOWN
-	_hud.show_screen("game")
+	_hud.show_screen("countdown")
 	_sound.set_music_ducked(false)
+	# Fade the menu arrangement while the camera turns. The riding track
+	# arrives before the countdown ends, with no abrupt audio cut.
+	_sound.set_menu_music(false)
 
 
 func _reset_player(p: Player) -> void:
@@ -484,12 +525,22 @@ func _force_event() -> void:
 
 
 func _update_countdown(delta: float) -> void:
-	# The countdown stands still, so it can afford to build more ahead.
-	_world.update_world(_players[0].sled.distance(), delta, 8.0)
+	_update_world(delta)
 	for p in _players:
 		p.sled.step(delta, 0.0, 0.0, false)
-	_countdown -= delta
-	var step := ceili(_countdown)
+	var remaining := delta
+	if _intro_remaining > 0.0:
+		var used := minf(remaining, _intro_remaining)
+		_intro_remaining -= used
+		remaining -= used
+		if _intro_remaining > 0.0:
+			return
+	if _countdown_step == 0:
+		_countdown_step = 3
+		_show_center("3")
+		_sound.play("beep")
+	_countdown = maxf(0.0, _countdown - remaining)
+	var step := ceili(_countdown / CountdownDisplay.BEAT_SECONDS)
 	if step != _countdown_step and step > 0:
 		_countdown_step = step
 		_show_center(str(step))
@@ -499,13 +550,15 @@ func _update_countdown(delta: float) -> void:
 		for p in _players:
 			p.sled.frozen = false
 			p.sled.velocity = _field.track_dir(_start_d) * 9.0
-		_show_center("ÅK!", Hud.HOT)
+			if _racing: p.race_hud.show_race()
+		_hud.show_screen("race" if _racing else "game")
+		_show_center("ÅK!", MenuFlow.LIME)
 		_sound.play("go")
 	_update_hud()
 
 
 ## Big text in the middle of every player's screen.
-func _show_center(text: String, color := Hud.WARM) -> void:
+func _show_center(text: String, color := Color.WHITE) -> void:
 	if _racing:
 		for p in _players:
 			p.race_hud.show_center(text, color)
@@ -615,8 +668,7 @@ func _lane(p: Player) -> float:
 func _enter_lobby() -> void:
 	get_tree().paused = false
 	_build_split()
-	_new_world()
-	_director.reset(START_D)
+	_director.reset(_start_d)
 	_director.stop()
 	state = State.LOBBY
 	_ready_flags = [false, false]
@@ -624,11 +676,16 @@ func _enter_lobby() -> void:
 	for p in _players:
 		p.sled.set_vehicle(_specs[p.vehicle], _rng, Player.COLORS[p.index])
 		p.sled.frozen = true
-		p.sled.place_at(START_D, _lane(p))
+		p.sled.place_at(_start_d, _lane(p))
 		p.camera.mode = ChaseCamera.Mode.ORBIT
+		p.camera.centered = true
+		p.camera.update_camera(0.0)
 		p.race_hud.clear()
 		_show_lobby(p)
 	_hud.show_screen("lobby")
+	# Prepare the finish while choosing rides, so Ready has no mesh-building
+	# work to interrupt the camera's first frame.
+	_place_finish_line()
 	_input_cooldown = 0.4
 
 
@@ -658,6 +715,17 @@ func _update_lobby(delta: float) -> void:
 		_start_race()
 
 
+func _on_lobby_action(action: StringName, p: Player) -> void:
+	if state != State.LOBBY or _hud.settings_open or _input_cooldown > 0.0:
+		return
+	if action == &"ready":
+		_ready_flags[p.index] = not _ready_flags[p.index]
+		_sound.play("beep", -4.0, 1.3)
+		_show_lobby(p)
+	elif not _ready_flags[p.index]:
+		_pick(p, -1 if action == &"previous" else 1)
+
+
 ## From the split-screen menu back to the menu for one.
 func _back_to_solo() -> void:
 	_two_players = false
@@ -669,7 +737,7 @@ func _back_to_solo() -> void:
 func _pick(p: Player, step: int) -> void:
 	p.vehicle = _next_unlocked(p.vehicle, step)
 	p.sled.set_vehicle(_specs[p.vehicle], _rng, Player.COLORS[p.index])
-	p.sled.place_at(START_D, _lane(p))
+	p.sled.place_at(_start_d, _lane(p))
 	_show_lobby(p)
 	_sound.play("whoosh", -6.0, 1.4)
 
@@ -732,6 +800,7 @@ func _build_split() -> void:
 		view.add_child(p.camera)
 		p.camera.current = true
 		p.race_hud = RaceHud.new().setup(p.index, Player.COLORS[p.index])
+		p.race_hud.lobby_action.connect(_on_lobby_action.bind(p))
 		half.add_child(p.race_hud)
 		row.add_child(half)
 	add_child(_split)
@@ -770,31 +839,25 @@ func _leave_split() -> void:
 func _start_race() -> void:
 	get_tree().paused = false
 	_build_split()
-	_new_world()
-	_start_d = START_D
-	if _start_region != "":
-		_start_d = _find_region(_start_region) - 120.0
-		_world.reset(_field, _start_d)
+	var reuse_preview := state == State.LOBBY
+	if not reuse_preview:
+		_prepare_preview_world()
 	for p in _players:
-		p.sled.set_vehicle(_specs[p.vehicle], _rng, Player.COLORS[p.index])
+		if not reuse_preview:
+			p.sled.set_vehicle(_specs[p.vehicle], _rng, Player.COLORS[p.index])
+			p.sled.place_at(_start_d, _lane(p))
 		p.sled.frozen = true
-		p.sled.place_at(_start_d, _lane(p))
 		p.sled.invulnerable_time = 0.0
 		_reset_player(p)
-		p.camera.mode = ChaseCamera.Mode.CHASE
-		p.camera.snap()
 		p.race_hud.clear()
 		p.race_hud.hide_lobby()
 	_director.reset(_start_d)
 	_force_event()
 	_race_time = 0.0
 	_grace = -1.0
-	_place_finish_line()
-	_countdown = 3.0
-	_countdown_step = 4
-	state = State.COUNTDOWN
-	_hud.show_screen("race")
-	_sound.set_music_ducked(false)
+	if not reuse_preview or _finish_line == null:
+		_place_finish_line()
+	_begin_countdown()
 
 
 ## An inflatable arch across the track at the finish.
@@ -1046,6 +1109,11 @@ func _confirm_pressed() -> bool:
 # --- On-screen buttons and app lifecycle ---
 
 func _on_hud_pressed(action: StringName) -> void:
+	if String(action).begins_with("vehicle_") and state == State.SELECT:
+		var index := String(action).trim_prefix("vehicle_").to_int()
+		if index >= 0 and index < _specs.size():
+			_change_vehicle(index - _vehicle)
+		return
 	match action:
 		&"fullscreen":
 			_toggle_fullscreen()
@@ -1053,21 +1121,24 @@ func _on_hud_pressed(action: StringName) -> void:
 			_save.show_fps = not _save.show_fps
 			_hud.set_fps_visible(_save.show_fps)
 		&"start":
-			if state == State.MENU:
+			if state == State.SELECT:
 				_start_run()
 		&"duo":
-			if state == State.MENU:
+			if state == State.MENU and not Quality.is_mobile():
 				_two_players = true
 				_sound.play("whoosh", -6.0, 1.2)
 				_enter_lobby()
 		&"solo":
-			if state == State.LOBBY:
-				_back_to_solo()
-		&"previous", &"next":
 			if state == State.MENU:
+				_choose_solo()
+		&"players":
+			if state == State.SELECT or state == State.LOBBY:
+				_enter_menu()
+		&"previous", &"next":
+			if state == State.SELECT:
 				_change_vehicle(-1 if action == &"previous" else 1)
 		&"settings":
-			if state == State.MENU or state == State.PAUSED or state == State.LOBBY:
+			if state in [State.MENU, State.SELECT, State.PAUSED, State.LOBBY]:
 				_hud.open_settings(_save.master_volume, _save.music_volume, _save.effects_volume)
 		&"close_settings":
 			_close_settings()
@@ -1145,7 +1216,7 @@ func _update_settings_input() -> void:
 	if _hud.settings_open:
 		if Input.is_action_just_pressed(&"back") or Input.is_action_just_pressed(&"pause") or Input.is_action_just_pressed(&"settings"):
 			_close_settings()
-	elif (state == State.MENU or state == State.PAUSED or state == State.LOBBY) and _input_cooldown <= 0.0 and Input.is_action_just_pressed(&"settings"):
+	elif (state in [State.MENU, State.SELECT, State.PAUSED, State.LOBBY]) and _input_cooldown <= 0.0 and Input.is_action_just_pressed(&"settings"):
 		_hud.open_settings(_save.master_volume, _save.music_volume, _save.effects_volume)
 
 

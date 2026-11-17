@@ -13,13 +13,15 @@ var _tag: Label
 var _place: Label
 var _left: Label
 var _speed: Label
-var _center: Label
+var _center: CountdownDisplay
 ## The ride picker shown on this half before a race.
 var _lobby: Control
 var _lobby_ride: Label
 var _lobby_who: Label
-var _lobby_about: Label
-var _lobby_bars: Array[Hud.StatBar] = []
+var _lobby_bars: Array[MenuFlow.Stat] = []
+var _lobby_preview: TextureRect
+var _ready_button: Button
+signal lobby_action(action: StringName)
 var _lobby_controls: Label
 var _lobby_status: Label
 var _flash: ColorRect
@@ -57,11 +59,7 @@ func setup(index: int, color: Color) -> RaceHud:
 	_speed.offset_left = -260
 	_speed.offset_right = -28
 	add_child(_speed)
-	_center = Hud.label("", 110, Hud.WARM, 18)
-	_center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_center.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_center.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_center.modulate.a = 0.0
+	_center = CountdownDisplay.new()
 	add_child(_center)
 	_build_lobby()
 	return self
@@ -75,67 +73,88 @@ func _build_lobby() -> void:
 	_lobby.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_lobby.visible = false
 	add_child(_lobby)
-	var panel := ColorRect.new()
-	panel.color = Color(0.05, 0.08, 0.2, 0.45)
-	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	panel.offset_top = -340
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_lobby.add_child(panel)
-	var column := VBoxContainer.new()
-	column.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	column.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	column.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	column.offset_bottom = -30
-	column.custom_minimum_size = Vector2(560, 0)
-	column.offset_left = -280
-	column.offset_right = 280
-	column.add_theme_constant_override("separation", 4)
-	_lobby.add_child(column)
-	_lobby_who = Hud.label(_tag.text, 28, _tag.get_theme_color("font_color"), 8)
-	_lobby_who.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_lobby_who)
-	_lobby_ride = Hud.label("", 48, Color(1, 1, 1), 12)
+	var canvas := Control.new()
+	canvas.size = Vector2(800, 900)
+	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_lobby.add_child(canvas)
+	var fit := func() -> void:
+		var factor := minf(size.x / 800.0, size.y / 900.0)
+		canvas.scale = Vector2.ONE * factor
+		canvas.position = (size - Vector2(800, 900) * factor) * 0.5
+	resized.connect(fit)
+	fit.call_deferred()
+	var badge := Panel.new()
+	badge.position = Vector2(34, 108)
+	badge.size = Vector2(180, 42)
+	badge.add_theme_stylebox_override("panel", MenuFlow.style(Color(0.055, 0.07, 0.15, 0.88), Color.TRANSPARENT, 14))
+	canvas.add_child(badge)
+	_lobby_who = MenuFlow.caption(_tag.text.to_upper(), 20, _tag.get_theme_color("font_color"))
+	_lobby_who.position = Vector2(48, 116)
+	canvas.add_child(_lobby_who)
+	var panel := Panel.new()
+	panel.position = Vector2(34, 654)
+	panel.size = Vector2(732, 218)
+	panel.add_theme_stylebox_override("panel", MenuFlow.style(Color(0.055, 0.07, 0.15, 0.94), Color(1, 1, 1, 0.18), 24))
+	canvas.add_child(panel)
+	_lobby_ride = MenuFlow.caption("", 38, Color.WHITE, true)
+	_lobby_ride.position = Vector2(120, 682)
+	_lobby_ride.size.x = 340
 	_lobby_ride.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_lobby_ride)
-	_lobby_about = Hud.label("", 22, Color(1, 1, 1, 0.9), 6)
-	_lobby_about.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_lobby_about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_lobby_about.custom_minimum_size = Vector2(560, 50)
-	column.add_child(_lobby_about)
-	for stat in ["Fart", "Styrning", "Grepp"]:
-		var row := HBoxContainer.new()
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.add_theme_constant_override("separation", 14)
-		var name_label := Hud.label(stat, 22, Color(1, 1, 1), 6)
-		name_label.custom_minimum_size = Vector2(120, 0)
-		row.add_child(name_label)
-		var bar := Hud.StatBar.new()
-		bar.custom_minimum_size = Vector2(260, 16)
-		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		bar.tint = [Hud.HOT, Hud.COOL, Hud.WARM][_lobby_bars.size()]
-		row.add_child(bar)
+	canvas.add_child(_lobby_ride)
+	for side in [-1, 1]:
+		var arrow := Button.new()
+		arrow.text = "‹" if side < 0 else "›"
+		arrow.position = Vector2(52 if side < 0 else 466, 681)
+		arrow.size = Vector2(56, 58)
+		MenuFlow.skin(arrow)
+		arrow.focus_mode = Control.FOCUS_NONE
+		var action := &"previous" if side < 0 else &"next"
+		arrow.pressed.connect(func() -> void: lobby_action.emit(action))
+		canvas.add_child(arrow)
+	_lobby_preview = TextureRect.new()
+	_lobby_preview.position = Vector2(540, 664)
+	_lobby_preview.size = Vector2(210, 112)
+	_lobby_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_lobby_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_lobby_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(_lobby_preview)
+	for i in 3:
+		var name_label := MenuFlow.caption(["Fart", "Styrning", "Grepp"][i], 16, MenuFlow.MUTED)
+		name_label.position = Vector2(64, 750 + i * 28)
+		canvas.add_child(name_label)
+		var bar := MenuFlow.Stat.new()
+		bar.position = Vector2(174, 756 + i * 28)
+		bar.size = Vector2(170, 12)
+		bar.tint = [MenuFlow.CORAL, MenuFlow.ICE, MenuFlow.LIME][i]
+		canvas.add_child(bar)
 		_lobby_bars.append(bar)
-		column.add_child(row)
-	_lobby_controls = Hud.label("", 22, Hud.COOL, 6)
-	_lobby_controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_lobby_controls)
-	_lobby_status = Hud.label("", 36, Color(1, 1, 1), 10)
-	_lobby_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_lobby_status)
+	_ready_button = Button.new()
+	_ready_button.text = "KLAR  ✓"
+	_ready_button.position = Vector2(538, 783)
+	_ready_button.size = Vector2(206, 64)
+	_ready_button.focus_mode = Control.FOCUS_NONE
+	MenuFlow.skin(_ready_button, true)
+	_ready_button.pressed.connect(func() -> void: lobby_action.emit(&"ready"))
+	canvas.add_child(_ready_button)
+	_lobby_controls = MenuFlow.caption("", 15, MenuFlow.MUTED)
+	_lobby_controls.position = Vector2(64, 843)
+	canvas.add_child(_lobby_controls)
+	_lobby_status = MenuFlow.caption("", 16, MenuFlow.ICE)
+	_lobby_status.position = Vector2(378, 795)
+	canvas.add_child(_lobby_status)
 
 
-## Before the race: the ride this player has picked, how they steer and
-## whether they are ready. The race readouts are hidden meanwhile.
 func show_lobby(spec: VehicleSpec, controls: String, ready: bool) -> void:
-	_lobby_ride.text = spec.title if ready else "‹  %s  ›" % spec.title
-	_lobby_about.text = spec.description
+	_lobby.modulate.a = 1.0
+	_lobby_ride.text = spec.title
+	_lobby_preview.texture = MenuFlow.vehicle_texture(spec.model)
 	var values := [spec.stat_speed, spec.stat_handling, spec.stat_grip]
 	for i in _lobby_bars.size():
 		_lobby_bars[i].value = values[i]
 		_lobby_bars[i].queue_redraw()
-	_lobby_controls.text = "Styr med %s" % controls
-	_lobby_status.text = "KLAR! Väntar på den andra…" if ready else "Styr för att byta • Hoppa när du är klar"
-	_lobby_status.add_theme_color_override("font_color", Hud.WARM if ready else Color(1, 1, 1))
+	_lobby_controls.text = controls.replace("tangentbordet", "A/D, Space").replace("Styr med ", "")
+	_lobby_status.text = "Väntar…" if ready else ""
+	_ready_button.text = "✓  REDO" if ready else "KLAR  ✓"
 	_lobby.visible = true
 	_tag.visible = false
 	_left.visible = false
@@ -144,11 +163,17 @@ func show_lobby(spec: VehicleSpec, controls: String, ready: bool) -> void:
 
 
 func hide_lobby() -> void:
-	_lobby.visible = false
-	_tag.visible = true
-	_left.visible = true
-	_speed.visible = true
-	_place.visible = true
+	var fade := create_tween()
+	fade.tween_property(_lobby, "modulate:a", 0.0, 0.25)
+	fade.tween_callback(_lobby.hide)
+	_tag.visible = false
+	_left.visible = false
+	_speed.visible = false
+	_place.visible = false
+
+
+func show_race() -> void:
+	for readout in [_tag, _left, _speed, _place]: readout.visible = true
 
 
 ## `left` is metres still to go; `place` is 1 or 2.
@@ -194,17 +219,8 @@ func _retire(note: Label) -> void:
 		_notes[i].offset_bottom = ROW_TOP + i * ROW_HEIGHT + ROW_HEIGHT
 
 
-func show_center(text: String, color := Hud.WARM, hold := 0.6) -> void:
-	_center.text = text
-	_center.add_theme_color_override("font_color", color)
-	_center.pivot_offset = size * 0.5
-	_center.scale = Vector2.ONE * 1.5
-	_center.modulate.a = 1.0
-	var tween := create_tween()
-	tween.tween_property(_center, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	if hold > 0.0:
-		tween.tween_interval(hold)
-		tween.tween_property(_center, "modulate:a", 0.0, 0.25)
+func show_center(text: String, color := Color.WHITE, hold := 0.65) -> void:
+	_center.show_count(text, color, hold)
 
 
 func flash(color: Color, amount := 0.6) -> void:
@@ -227,5 +243,5 @@ func clear() -> void:
 	for note in _notes:
 		note.queue_free()
 	_notes.clear()
-	_center.modulate.a = 0.0
+	_center.clear()
 	_shown_place = 0

@@ -207,6 +207,58 @@ static func render(index: int) -> AudioStreamWAV:
 			return _humppa()
 
 
+## Snödag: a separate, unhurried 108 BPM menu arrangement in D major.
+## Music-box answers, soft accordion offbeats and a round two-beat bass.
+## Notes and room tails wrap at the bar boundary for a seamless loop.
+static func render_menu() -> AudioStreamWAV:
+	var eighth := 60.0 / 108.0 / 2.0
+	var bar := eighth * 8.0
+	var chords := [[50, false], [47, true], [43, false], [45, false],
+		[50, false], [42, true], [43, false], [45, false],
+		[47, true], [43, false], [50, false], [45, false],
+		[43, false], [45, false], [50, false], [50, false]]
+	var melody := [
+		[[74, 2], [78, 1], [81, 1], [78, 2], [76, 2]],
+		[[74, 3], [73, 1], [71, 2], [-1, 2]],
+		[[71, 2], [74, 2], [79, 3], [78, 1]],
+		[[76, 4], [73, 2], [-1, 2]],
+		[[74, 2], [78, 1], [81, 1], [86, 2], [81, 2]],
+		[[85, 2], [81, 2], [78, 3], [-1, 1]],
+		[[79, 2], [78, 1], [76, 1], [74, 2], [71, 2]],
+		[[73, 3], [76, 1], [74, 2], [-1, 2]],
+		[[78, 2], [81, 2], [83, 3], [81, 1]],
+		[[79, 3], [78, 1], [74, 4]],
+		[[78, 2], [81, 2], [86, 2], [85, 2]],
+		[[81, 4], [76, 2], [-1, 2]],
+		[[79, 2], [78, 2], [74, 2], [71, 2]],
+		[[73, 2], [76, 2], [81, 2], [79, 2]],
+		[[78, 3], [76, 1], [74, 4]],
+		[[81, 2], [78, 2], [74, 2], [-1, 2]],
+	]
+	var buffer := _buffer(bar * chords.size())
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1082026
+	var lead := Voice.new(Wave.WARM, 0.025, 3.8, 0.28, 0.18, 2400.0, 0.003)
+	for i in chords.size():
+		var root: int = chords[i][0]
+		var minor: bool = chords[i][1]
+		var t := i * bar
+		_chord(buffer, t, bar, root + 12, minor, 0.032, Voice.pad())
+		for beat in 4:
+			if beat % 2 == 0:
+				_note(buffer, t + beat * eighth * 2, eighth * 2.5, root - 12 if beat == 0 else root - 5, 0.20, Voice.bass())
+			for interval in [0, 3 if minor else 4, 7]:
+				_note(buffer, t + (beat * 2 + 1) * eighth, eighth * 0.7, root + interval + 12, 0.024, Voice.stab())
+			_bells(buffer, t + beat * eighth * 2, 0.016 if beat % 2 == 0 else 0.009, rng)
+		var tick := 0
+		for note: Array in melody[i]:
+			if note[0] >= 0:
+				_note(buffer, t + tick * eighth, note[1] * eighth * 0.88, note[0], 0.11, lead)
+				_note(buffer, t + tick * eighth, eighth * 0.8, note[0] + 12, 0.038, Voice.bell())
+			tick += note[1]
+	return _finish(buffer, 0.32)
+
+
 static func _buffer(seconds: float) -> PackedFloat32Array:
 	var buffer := PackedFloat32Array()
 	buffer.resize(int(seconds * RATE))

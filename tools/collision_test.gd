@@ -37,7 +37,7 @@ func _run() -> void:
 	main.set("_vehicle", 0)
 	main.set("_autopilot", true)
 	main.call("_start_run")
-	await create_timer(3.5).timeout
+	await create_timer(4.5).timeout
 	var sled: Sled = main.get("_sled")
 	var no_crash := OS.get_cmdline_user_args().has("--no-crash")
 	_check("landing on a head is survived", await _try(main, sled, Obstacle.Kind.PERSON, Props.person(0), 1.75, false) == false)
@@ -69,6 +69,9 @@ func _run() -> void:
 		main.call("_crash", "Test")
 		_check("other crash causes are disabled", not sled.crashed and main.get("_lives") == lives)
 	print("collision test: %s" % ("all passed" if _failures == 0 else "%d failed" % _failures))
+	main.queue_free()
+	await process_frame
+	await process_frame
 	quit(_failures)
 
 

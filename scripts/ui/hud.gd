@@ -74,17 +74,12 @@ var _score: Label
 var _speed: Label
 var _speed_unit: Label
 var _mittens: Mittens
-var _center: Label
+var _center: CountdownDisplay
 var _popups: Control
 ## The pop-ups on screen, oldest (top row) first.
 var _notes: Array[PopupNote] = []
 
-var _menu: Control
-var _menu_vehicle: Label
-var _menu_description: Label
-var _menu_locked: Label
-var _menu_bars: Array[StatBar] = []
-var _menu_best: Label
+var _menu: MenuFlow
 
 var _pause: Control
 var _over: Control
@@ -99,10 +94,6 @@ var _sliders: Array[HSlider] = []
 var _covered: Array[Control] = []
 ## Full-screen backgrounds that must bleed past the safe area.
 var _backdrops: Array[Control] = []
-var _menu_column: VBoxContainer
-var _menu_start: Button
-var _menu_settings: Button
-var _menu_players: Button
 ## Over the split-screen menu: the players choice and how to go back.
 var _lobby_bar: Control
 ## In a split-screen race each player has their own HUD; this one only
@@ -112,7 +103,6 @@ var _touch_mode := false
 var _last_row_first: Button
 ## The button each screen focuses first, for keyboard and controller play.
 var _default_focus: Dictionary = {}
-var _menu_panel: ColorRect
 
 ## Emitted while a volume slider moves: 0 = master, 1 = music, 2 = effects.
 signal volume_changed(channel: int, value: float)
@@ -146,16 +136,6 @@ func _ready() -> void:
 		_build_fullscreen_button()
 	_fps_meter = FpsMeter.new()
 	add_child(_fps_meter)
-	_default_focus[_menu] = _menu_start
-	# Left/right on the menu pick a ride, so focus only moves up and down there.
-	for button in [_menu_start, _menu_players, _menu_settings]:
-		button.focus_neighbor_left = button.get_path()
-		button.focus_neighbor_right = button.get_path()
-	_menu_start.focus_neighbor_bottom = _menu_settings.get_path()
-	_menu_settings.focus_neighbor_top = _menu_start.get_path()
-	if _menu_players.visible:
-		_menu_start.focus_neighbor_top = _menu_players.get_path()
-		_menu_players.focus_neighbor_bottom = _menu_start.get_path()
 	show_screen("")
 	get_viewport().size_changed.connect(_fit_safe_area)
 	_fit_safe_area()
@@ -165,24 +145,13 @@ func _process(delta: float) -> void:
 	_time += delta
 	var fullscreen := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 	if is_instance_valid(_fullscreen_toggle):
-		_fullscreen_toggle.text = "På" if fullscreen else "Av"
-	_fps_toggle.text = "På" if _fps_meter.visible else "Av"
+		_update_toggle(_fullscreen_toggle, fullscreen)
+	_update_toggle(_fps_toggle, _fps_meter.visible)
 	if is_instance_valid(_fullscreen_button):
 		_fullscreen_button.text = "Fönsterläge" if fullscreen else "Fullskärm"
 		_fullscreen_button.tooltip_text = "Lämna fullskärm (Esc / F)" if fullscreen else "Visa i fullskärm (F)"
 	if _over.visible:
 		_over_record.scale = Vector2.ONE * (1.0 + 0.06 * sin(_time * 6.0))
-	if _menu.visible:
-		_fit_menu()
-
-
-## Shrinks the menu column to fit short screens (phones in landscape).
-func _fit_menu() -> void:
-	var needed := _menu_column.get_combined_minimum_size().y
-	var room := _menu.size.y - _menu_column.position.y - 24.0
-	var fit := clampf(room / needed, 0.5, 1.0) if needed > 0.0 else 1.0
-	_menu_column.scale = Vector2.ONE * fit
-	_menu_panel.offset_right = 720.0 * fit
 
 
 static func label(text: String, font_size: int, color := Color(1, 1, 1), outline := 10) -> Label:
@@ -311,6 +280,7 @@ func _hint(text: String, touch_text: String, font_size: int, color: Color, outli
 ## Swaps every hint between keyboard/pad wording and touch wording.
 func set_touch_mode(touch: bool) -> void:
 	_touch_mode = touch
+	_menu.set_touch_mode(touch)
 	if touch:
 		_release_focus()
 	else:
@@ -366,11 +336,7 @@ func _build_game() -> void:
 	_pause_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	_game.add_child(_pause_button)
 
-	_center = label("", 150, WARM, 22)
-	_center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_center.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_center.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_center.pivot_offset = Vector2(800, 450)
+	_center = CountdownDisplay.new()
 	add_child(_center)
 
 	_popups = _full_rect()
@@ -406,16 +372,8 @@ func splat() -> void:
 	tween.tween_callback(blot.queue_free)
 
 
-func show_center(text: String, color := WARM) -> void:
-	_center.text = text
-	_center.add_theme_color_override("font_color", color)
-	_center.pivot_offset = _center.size * 0.5
-	_center.scale = Vector2.ONE * 1.6
-	_center.modulate.a = 1.0
-	var tween := create_tween()
-	tween.tween_property(_center, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_interval(0.45)
-	tween.tween_property(_center, "modulate:a", 0.0, 0.25)
+func show_center(text: String, color := Color.WHITE) -> void:
+	_center.show_count(text, color)
 
 
 ## Shows a callout under the ones already up, the oldest at the top. A full
@@ -468,142 +426,128 @@ func _note_y(row: int) -> float:
 # --- Menu ---
 
 func _build_menu() -> void:
-	_menu = _full_rect()
-	var gradient := ColorRect.new()
-	gradient.color = Color(0.05, 0.08, 0.2, 0.35)
-	gradient.set_anchors_preset(Control.PRESET_LEFT_WIDE)
-	gradient.offset_right = 720
-	_menu.add_child(gradient)
-	_backdrops.append(gradient)
-	_menu_panel = gradient
-	var column := VBoxContainer.new()
-	_menu_column = column
-	column.position = Vector2(80, 36)
-	column.custom_minimum_size = Vector2(600, 0)
-	column.add_theme_constant_override("separation", 9)
-	_menu.add_child(column)
-	var title := label("PULKA!", 100, WARM, 22)
-	title.rotation = -0.05
-	column.add_child(title)
-	column.add_child(label("Den oändliga backen", 34, COOL, 10))
-	# One player or two, chosen first: two splits the screen, and each
-	# player then picks their own ride on their half. Not on phones.
-	var players := _players_row(1)
-	_menu_players = players.get_child(1) as Button
-	players.visible = not Quality.is_mobile()
-	column.add_child(players)
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 8)
-	column.add_child(spacer)
-	column.add_child(label("Välj åkdon", 26, Color(1, 1, 1, 0.7), 6))
-	var picker := HBoxContainer.new()
-	picker.add_theme_constant_override("separation", 18)
-	picker.add_child(_button("‹", &"previous", 44, false, false))
-	_menu_vehicle = label("Pulka", 64, Color(1, 1, 1), 14)
-	_menu_vehicle.custom_minimum_size = Vector2(330, 0)
-	_menu_vehicle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	picker.add_child(_menu_vehicle)
-	picker.add_child(_button("›", &"next", 44, false, false))
-	column.add_child(picker)
-	_menu_description = label("", 26, Color(1, 1, 1), 8)
-	_menu_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_menu_description.custom_minimum_size = Vector2(600, 70)
-	column.add_child(_menu_description)
-	_menu_locked = label("", 28, HOT, 8)
-	column.add_child(_menu_locked)
-	for stat in ["Fart", "Styrning", "Grepp"]:
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 16)
-		var name_label := label(stat, 26, Color(1, 1, 1), 6)
-		name_label.custom_minimum_size = Vector2(150, 0)
-		row.add_child(name_label)
-		var bar := StatBar.new()
-		bar.custom_minimum_size = Vector2(300, 20)
-		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		bar.tint = [HOT, COOL, WARM][_menu_bars.size()]
-		row.add_child(bar)
-		_menu_bars.append(bar)
-		column.add_child(row)
-	var spacer2 := Control.new()
-	spacer2.custom_minimum_size = Vector2(0, 8)
-	column.add_child(spacer2)
-	var go_row := HBoxContainer.new()
-	go_row.add_theme_constant_override("separation", 20)
-	_menu_start = _button("Åk!", &"start", 44, true)
-	go_row.add_child(_menu_start)
-	column.add_child(go_row)
-	var keys := "Styr: A/D, pilar eller spak\nLuta fram: W / RT • Hopp: Space / A"
-	if Quality.is_tv():
-		keys = "Styr: svep eller håll kanten på fjärrkontrollen, eller spak\nHopp: klicka / A • Paus: ▶︎❙❙"
-	column.add_child(_hint(keys,
-		"Håll vänster eller höger sida för att styra\nSvep uppåt för att hoppa", 20, Color(1, 1, 1, 0.85), 6))
-	_menu_best = label("", 28, COOL, 8)
-	column.add_child(_menu_best)
-	var settings := _button("Inställningar", &"settings", 26)
-	_menu_settings = settings
-	settings.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	settings.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	settings.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	settings.offset_right = -36
-	settings.offset_bottom = -32
-	_menu.add_child(settings)
+	_menu = MenuFlow.new()
+	add_child(_menu)
+	_menu.pressed.connect(func(action: StringName) -> void: pressed.emit(action))
 
 
-## "1 spelare | 2 spelare", the current choice lit up and the other a
-## button that switches to it.
-func _players_row(current: int) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	row.add_child(_button("1 spelare", &"solo", 28, current == 1, current != 1))
-	row.add_child(_button("2 spelare", &"duo", 28, current == 2, current != 2))
-	return row
-
-
-## Across the top of the split-screen menu.
 func _build_lobby_bar() -> void:
 	_lobby_bar = _full_rect()
-	var column := VBoxContainer.new()
-	column.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	column.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	column.offset_top = 18
-	column.alignment = BoxContainer.ALIGNMENT_CENTER
-	column.add_theme_constant_override("separation", 6)
-	var center := CenterContainer.new()
-	center.add_child(_players_row(2))
-	column.add_child(center)
-	var hint := label("Esc / B: tillbaka till en spelare", 20, Color(1, 1, 1, 0.85), 6)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(hint)
-	_lobby_bar.add_child(column)
+	var back := _button("‹  Spelare", &"players", 24)
+	MenuFlow.skin(back)
+	back.position = Vector2(30, 24)
+	_lobby_bar.add_child(back)
+	var title := MenuFlow.caption("PULKA!", 40, Color.WHITE, true)
+	title.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	title.offset_left = -100
+	title.offset_right = 100
+	title.offset_top = 24
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lobby_bar.add_child(title)
+	var settings := _button("⚙", &"settings", 26)
+	MenuFlow.skin(settings)
+	settings.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	settings.offset_left = -110
+	settings.offset_right = -30
+	settings.offset_top = 24
+	settings.offset_bottom = 80
+	settings.tooltip_text = "Inställningar"
+	settings.accessibility_name = "Inställningar"
+	MenuFlow.gear_icon(settings)
+	_lobby_bar.add_child(settings)
+	# Each rider's A/Space readies their own side; this bar has no default
+	# focus so a shared ui_accept cannot also activate Back.
+	back.focus_mode = Control.FOCUS_NONE
+	settings.focus_mode = Control.FOCUS_NONE
 
 
 func update_menu(spec: VehicleSpec, unlocked: bool, best_distance: float, best_score: int) -> void:
-	_menu_vehicle.text = spec.title
-	_menu_description.text = spec.description
-	_menu_locked.text = "" if unlocked else "Låst – åk %s m för att låsa upp" % group_digits(int(spec.unlock_distance))
-	_menu_locked.visible = not unlocked
-	var values := [spec.stat_speed, spec.stat_handling, spec.stat_grip]
-	for i in _menu_bars.size():
-		_menu_bars[i].value = values[i]
-		_menu_bars[i].modulate.a = 1.0 if unlocked else 0.4
-		_menu_bars[i].queue_redraw()
-	if best_distance > 0.0:
-		_menu_best.text = "Rekord: %s m  •  %s poäng" % [group_digits(int(best_distance)), group_digits(best_score)]
-	else:
-		_menu_best.text = "Inget rekord än. Dags att ändra på det!"
+	_menu.update_vehicle(spec, unlocked, best_distance, best_score)
 
 
 # --- Pause and game over ---
 
+## Dialogs share the menu's fitted canvas, fonts, card surfaces and lime
+## focus/primary actions, including when the game tree itself is paused.
+func _dialog_canvas(parent: Control) -> Control:
+	var canvas := Control.new()
+	canvas.size = MenuFlow.DESIGN
+	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(canvas)
+	var fit := func() -> void:
+		var factor := minf(parent.size.x / MenuFlow.DESIGN.x, parent.size.y / MenuFlow.DESIGN.y)
+		canvas.scale = Vector2.ONE * factor
+		canvas.position = (parent.size - MenuFlow.DESIGN * factor) * 0.5
+	parent.resized.connect(fit)
+	fit.call_deferred()
+	return canvas
+
+
+func _dialog_panel(canvas: Control, rect: Rect2) -> void:
+	var panel := Panel.new()
+	panel.position = rect.position
+	panel.size = rect.size
+	var box := MenuFlow.style(Color(0.055, 0.07, 0.15, 0.98), Color(1, 1, 1, 0.15), 28)
+	box.shadow_color = Color(0, 0, 0, 0.28)
+	box.shadow_size = 28
+	box.shadow_offset = Vector2(0, 14)
+	panel.add_theme_stylebox_override("panel", box)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(panel)
+
+
+func _dialog_label(canvas: Control, text: String, points: int, at: Vector2, color := MenuFlow.WHITE, display := false) -> Label:
+	var title := MenuFlow.caption(text, points, color, display)
+	title.position = at
+	canvas.add_child(title)
+	return title
+
+
+func _dialog_button(canvas: Control, text: String, action: StringName, rect: Rect2, accent := false) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.accessibility_name = text
+	button.position = rect.position
+	button.size = rect.size
+	MenuFlow.skin(button, accent)
+	button.pressed.connect(func() -> void: pressed.emit(action))
+	canvas.add_child(button)
+	return button
+
+
+func _animate_dialog(screen: Control) -> void:
+	if screen.has_meta(&"fade"):
+		(screen.get_meta(&"fade") as Tween).kill()
+	screen.modulate.a = 0.0
+	var fade := create_tween()
+	fade.tween_property(screen, "modulate:a", 1.0, 0.16).set_trans(Tween.TRANS_SINE)
+	screen.set_meta(&"fade", fade)
+
+
 func _build_pause() -> void:
 	_pause = _full_rect()
-	_dim(_pause, 0.55)
-	var column := _centered_column(_pause)
-	var title := label("Paus", 110, WARM, 20)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(title)
-	column.add_child(_button_row([["Fortsätt", &"resume", true], ["Börja om", &"retry", false], ["Inställningar", &"settings", false], ["Till menyn", &"menu", false]]))
-	_default_focus[_pause] = _last_row_first
+	_dim(_pause, 0.64)
+	var canvas := _dialog_canvas(_pause)
+	_dialog_panel(canvas, Rect2(450, 166, 700, 542))
+	_dialog_label(canvas, "PULKA!", 20, Vector2(490, 197), MenuFlow.LIME, true)
+	_dialog_label(canvas, "Paus", 76, Vector2(486, 233), MenuFlow.WHITE, true)
+	var resume := _dialog_button(canvas, "Fortsätt", &"resume", Rect2(490, 358, 620, 84), true)
+	var retry := _dialog_button(canvas, "Börja om", &"retry", Rect2(490, 460, 300, 72))
+	var settings := _dialog_button(canvas, "Inställningar", &"settings", Rect2(810, 460, 300, 72))
+	var menu := _dialog_button(canvas, "Till menyn", &"menu", Rect2(490, 550, 620, 64))
+	var arrow := MenuFlow.caption("→", 30, MenuFlow.NIGHT)
+	arrow.position = Vector2(564, 18)
+	resume.add_child(arrow)
+	# Keep the ordered actions reachable both vertically and horizontally.
+	var buttons: Array[Button] = [resume, retry, settings, menu]
+	for i in buttons.size():
+		var previous := buttons[posmod(i - 1, buttons.size())].get_path()
+		var next := buttons[(i + 1) % buttons.size()].get_path()
+		buttons[i].focus_neighbor_top = previous
+		buttons[i].focus_neighbor_left = previous
+		buttons[i].focus_neighbor_bottom = next
+		buttons[i].focus_neighbor_right = next
+	_default_focus[_pause] = resume
 
 
 func _build_game_over() -> void:
@@ -663,76 +607,125 @@ func show_game_over(title: String, cause: String, distance: float, score: int, b
 func _build_settings() -> void:
 	_settings = _full_rect()
 	_dim(_settings, 0.7)
-	var column := _centered_column(_settings, 26)
-	var title := label("Inställningar", 84, WARM, 18)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(title)
-	var track := StyleBoxFlat.new()
-	track.bg_color = Color(1, 1, 1, 0.25)
-	track.content_margin_top = 8
-	track.content_margin_bottom = 8
-	track.set_corner_radius_all(6)
+	var canvas := _dialog_canvas(_settings)
+	_dialog_panel(canvas, Rect2(310, 100, 980, 700))
+	_dialog_label(canvas, "PULKA!", 20, Vector2(350, 130), MenuFlow.LIME, true)
+	_dialog_label(canvas, "Inställningar", 60, Vector2(346, 164), MenuFlow.WHITE, true)
+	var track := MenuFlow.style(Color("3d465e"), Color.TRANSPARENT, 5)
+	track.set_border_width_all(0)
+	track.content_margin_top = 5
+	track.content_margin_bottom = 5
 	var fill := track.duplicate() as StyleBoxFlat
-	fill.bg_color = COOL
+	fill.bg_color = MenuFlow.LIME
 	var focused_fill := track.duplicate() as StyleBoxFlat
-	focused_fill.bg_color = WARM
-	var focus := StyleBoxFlat.new()
+	focused_fill.bg_color = MenuFlow.ICE
+	var focus := MenuFlow.style(Color.TRANSPARENT, MenuFlow.LIME, 12)
 	focus.draw_center = false
-	focus.border_color = WARM
-	focus.set_border_width_all(3)
-	focus.set_corner_radius_all(10)
-	focus.set_expand_margin_all(8)
-	var channel := 0
-	for name in ["Huvudvolym", "Musik", "Ljudeffekter"]:
+	focus.set_border_width_all(2)
+	focus.set_expand_margin_all(5)
+	var thumb := _slider_thumb(MenuFlow.WHITE)
+	var highlighted_thumb := _slider_thumb(MenuFlow.LIME)
+	for channel in 3:
+		var panel := PanelContainer.new()
+		panel.position = Vector2(350, 272 + channel * 80)
+		panel.size = Vector2(900, 72)
+		panel.add_theme_stylebox_override("panel", MenuFlow.style(MenuFlow.PANEL, Color(1, 1, 1, 0.06), 16))
+		canvas.add_child(panel)
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 28)
-		var caption := label(name, 36, Color(1, 1, 1), 8)
-		caption.custom_minimum_size = Vector2(300, 0)
+		row.add_theme_constant_override("separation", 24)
+		panel.add_child(row)
+		var caption := MenuFlow.caption(["Huvudvolym", "Musik", "Ljudeffekter"][channel], 24)
+		caption.custom_minimum_size = Vector2(240, 0)
+		caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		row.add_child(caption)
 		var slider := HSlider.new()
 		slider.min_value = 0
 		slider.max_value = 100
 		slider.step = 5
+		slider.accessibility_name = caption.text
 		slider.custom_minimum_size = Vector2(440, 44)
+		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		slider.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		slider.add_theme_stylebox_override("slider", track)
 		slider.add_theme_stylebox_override("grabber_area", fill)
 		slider.add_theme_stylebox_override("grabber_area_highlight", focused_fill)
 		slider.add_theme_stylebox_override("focus", focus)
+		slider.add_theme_icon_override("grabber", thumb)
+		slider.add_theme_icon_override("grabber_highlight", highlighted_thumb)
 		row.add_child(slider)
-		var amount := label("100 %", 32, COOL, 8)
-		amount.custom_minimum_size = Vector2(120, 0)
+		var amount := MenuFlow.caption("100 %", 24, MenuFlow.ICE)
+		amount.custom_minimum_size = Vector2(100, 0)
+		amount.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		amount.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		row.add_child(amount)
 		var index := channel
 		slider.value_changed.connect(func(value: float) -> void:
 			amount.text = "%d %%" % int(value)
 			volume_changed.emit(index, value / 100.0))
-		slider.focus_entered.connect(func() -> void: caption.add_theme_color_override("font_color", WARM))
-		slider.focus_exited.connect(func() -> void: caption.add_theme_color_override("font_color", Color(1, 1, 1)))
-		column.add_child(row)
+		slider.focus_entered.connect(func() -> void: caption.add_theme_color_override("font_color", MenuFlow.LIME))
+		slider.focus_exited.connect(func() -> void: caption.add_theme_color_override("font_color", MenuFlow.WHITE))
 		_sliders.append(slider)
-		channel += 1
-	if not Quality.is_mobile() and not Quality.is_tv():
-		_fullscreen_toggle = _toggle_row(column, "Fullskärm", &"fullscreen")
-	_fps_toggle = _toggle_row(column, "Visa FPS", &"show_fps")
-	column.add_child(_button_row([["Klar", &"close_settings", true]]))
+	var desktop := not Quality.is_mobile() and not Quality.is_tv()
+	if desktop:
+		_fullscreen_toggle = _settings_toggle(canvas, "Fullskärm", &"fullscreen", Rect2(350, 536, 438, 64))
+	_fps_toggle = _settings_toggle(canvas, "Visa FPS", &"show_fps", Rect2(812 if desktop else 350, 536, 438 if desktop else 900, 64))
+	var done := _dialog_button(canvas, "Klar", &"close_settings", Rect2(990, 680, 260, 76), true)
+	for i in _sliders.size():
+		_sliders[i].focus_neighbor_top = (_sliders[i - 1] if i > 0 else done).get_path()
+		_sliders[i].focus_neighbor_bottom = (_sliders[i + 1] if i < _sliders.size() - 1 else (_fullscreen_toggle if desktop else _fps_toggle)).get_path()
+	_fps_toggle.focus_neighbor_top = _sliders.back().get_path()
+	_fps_toggle.focus_neighbor_bottom = done.get_path()
+	if desktop:
+		_fullscreen_toggle.focus_neighbor_top = _sliders.back().get_path()
+		_fullscreen_toggle.focus_neighbor_right = _fps_toggle.get_path()
+		_fullscreen_toggle.focus_neighbor_bottom = done.get_path()
+		_fps_toggle.focus_neighbor_left = _fullscreen_toggle.get_path()
+	done.focus_neighbor_top = _fps_toggle.get_path()
+	done.focus_neighbor_bottom = _sliders[0].get_path()
 	_settings.visible = false
 
 
-## A settings row with a caption and an on/off button sending `action`.
-func _toggle_row(column: Container, text: String, action: StringName) -> Button:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 28)
-	var caption := label(text, 36, Color(1, 1, 1), 8)
-	caption.custom_minimum_size = Vector2(300, 0)
-	row.add_child(caption)
-	var toggle := _button("Av", action, 30)
-	toggle.custom_minimum_size = Vector2(140, 0)
-	toggle.focus_entered.connect(func() -> void: caption.add_theme_color_override("font_color", WARM))
-	toggle.focus_exited.connect(func() -> void: caption.add_theme_color_override("font_color", Color(1, 1, 1)))
-	row.add_child(toggle)
-	column.add_child(row)
+func _slider_thumb(color: Color) -> Texture2D:
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.84, 1.0])
+	gradient.colors = PackedColorArray([color, color, Color(color, 0.0)])
+	var texture := GradientTexture2D.new()
+	texture.width = 28
+	texture.height = 28
+	texture.fill = GradientTexture2D.FILL_RADIAL
+	texture.fill_from = Vector2(0.5, 0.5)
+	texture.fill_to = Vector2(1.0, 0.5)
+	texture.gradient = gradient
+	return texture
+
+
+func _settings_toggle(canvas: Control, text: String, action: StringName, rect: Rect2) -> Button:
+	var panel := Panel.new()
+	panel.position = rect.position
+	panel.size = rect.size
+	panel.add_theme_stylebox_override("panel", MenuFlow.style(MenuFlow.PANEL, Color(1, 1, 1, 0.06), 16))
+	canvas.add_child(panel)
+	_dialog_label(panel, text, 22, Vector2(22, 16))
+	var toggle := _dialog_button(panel, "Av", action, Rect2(rect.size.x - 112, 10, 92, 44))
+	toggle.add_theme_font_size_override("font_size", 22)
+	toggle.accessibility_name = text
 	return toggle
+
+
+func _update_toggle(button: Button, on: bool) -> void:
+	if button.has_meta(&"on") and bool(button.get_meta(&"on")) == on: return
+	button.set_meta(&"on", on)
+	button.text = "På" if on else "Av"
+	var color := MenuFlow.NIGHT if on else MenuFlow.WHITE
+	for state in ["normal", "hover", "pressed"]:
+		var fill := MenuFlow.LIME if on else Color("343950")
+		var box := MenuFlow.style(fill.lightened(0.08) if state == "hover" else fill, Color.TRANSPARENT, 12)
+		box.content_margin_top = 4
+		box.content_margin_bottom = 4
+		button.add_theme_stylebox_override(state, box)
+	for key in ["font_color", "font_focus_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
+		button.add_theme_color_override(key, color)
 
 
 func set_fps_visible(on: bool) -> void:
@@ -746,11 +739,12 @@ func open_settings(master: float, music: float, effects: float) -> void:
 		var amount := _sliders[i].get_parent().get_child(2) as Label
 		amount.text = "%d %%" % int(_sliders[i].value)
 	_covered.clear()
-	for screen in [_menu, _pause]:
+	for screen in [_menu, _pause, _lobby_bar]:
 		if screen.visible:
 			screen.visible = false
 			_covered.append(screen)
 	_settings.visible = true
+	_animate_dialog(_settings)
 	if not _touch_mode:
 		_sliders[0].grab_focus()
 
@@ -759,6 +753,7 @@ func close_settings() -> void:
 	_settings.visible = false
 	for screen in _covered:
 		screen.visible = true
+		if screen == _pause: _animate_dialog(_pause)
 	_covered.clear()
 	_focus_current()
 
@@ -778,6 +773,9 @@ func _release_focus() -> void:
 func _focus_current() -> void:
 	if _touch_mode or _settings.visible:
 		return
+	if _menu.visible:
+		_menu.default_focus().grab_focus()
+		return
 	for screen: Control in _default_focus:
 		if screen.visible:
 			(_default_focus[screen] as Button).grab_focus()
@@ -793,11 +791,17 @@ func show_screen(screen: String, focus_delay := 0.0) -> void:
 		get_tree().create_timer(focus_delay, true).timeout.connect(_focus_current)
 	else:
 		_focus_current.call_deferred()
-	_menu.visible = screen == "menu"
+	if screen == "countdown" and _menu.visible:
+		_menu.dismiss()
+	else:
+		_menu.visible = screen == "menu" or screen == "players"
+		if screen == "menu": _menu.show_picker()
+		elif screen == "players": _menu.show_players()
 	_game.visible = (screen == "game" or screen == "pause") and not racing
 	_lobby_bar.visible = screen == "lobby"
 	_popups.visible = screen == "game"
 	_pause.visible = screen == "pause"
+	if screen == "pause": _animate_dialog(_pause)
 	_over.visible = screen == "over"
-	if screen != "game":
-		_center.modulate.a = 0.0
+	if screen not in ["game", "race", "countdown"]:
+		_center.clear()

@@ -35,7 +35,7 @@ func _run() -> void:
 	_check("Space readies the first player", main.get("_ready_flags")[0] and int(main.get("state")) == 5)
 	await _key(KEY_ENTER)
 	_check("both ready starts the countdown", int(main.get("state")) == 1)
-	await create_timer(3.6).timeout
+	await create_timer(4.5).timeout
 	_check("the race is on", int(main.get("state")) == 2)
 	var goal: float = float(main.get("_start_d")) + float(main.get("_race_length"))
 	var first: Sled = players[0].sled
@@ -52,7 +52,9 @@ func _run() -> void:
 	_check("the first home is first", main.call("_place_of", players[0]) == 1)
 	main.call("_enter_menu")
 	await _frames(3)
-	_check("the menu after a race is the split one", int(main.get("state")) == 5)
+	_check("menu after a race returns to player choice", int(main.get("state")) == 0)
+	main.call("_on_hud_pressed", &"duo")
+	await _frames(3)
 	await create_timer(0.5).timeout
 	await _key(KEY_ESCAPE)
 	_check("back to one player", (main.get("_players") as Array).size() == 1 and main.get("_split") == null)
@@ -63,6 +65,9 @@ func _run() -> void:
 	await _frames(3)
 	_check("a run alone still starts", int(main.get("state")) == 1 and not main.get("_racing"))
 	print("race test: %s" % ("all passed" if _failures == 0 else "%d failed" % _failures))
+	main.queue_free()
+	await process_frame
+	await process_frame
 	quit(_failures)
 
 

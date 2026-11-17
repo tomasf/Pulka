@@ -1,0 +1,174 @@
+extends SceneTree
+## Whole menu → live preview → camera → countdown → run, for both modes.
+## Add --capture with the native renderer to save the review screenshots.
+var main: Node
+var failures := 0
+var capture := false
+var steps: Array[int] = []
+var max_camera_step := 0.0
+var max_camera_angle := 0.0
+var min_camera_radius := INF
+var compact := false
+
+func _initialize() -> void:
+	_run.call_deferred()
+
+func _run() -> void:
+	compact = OS.get_cmdline_user_args().has("--compact")
+	root.size = Vector2i(960, 540) if compact else Vector2i(1600, 900)
+	capture = OS.get_cmdline_user_args().has("--capture")
+	main = load("res://scenes/main.tscn").instantiate()
+	root.add_child(main)
+	main.set_process(false)
+	main.set("_autopilot", true) # Never write test choices to the player's save.
+	main.set("_no_crash", true)
+	main.get("_save").best_distance = 0
+	main.set("_vehicle", 0)
+	main.call("_enter_menu")
+	var hud: Hud = main.get("_hud")
+	if Quality.is_mobile(): hud.set_touch_mode(true)
+	await _tick(35)
+	_check("first screen only chooses players", main.get("state") == 0 and hud._menu.players.visible and not hud._menu.picker.visible)
+	_check("menu theme is a separate playing loop", main.get("_sound")._in_menu and main.get("_sound")._menu_player.playing)
+	var fitted := Rect2(hud._menu.canvas.position, MenuFlow.DESIGN * hud._menu.canvas.scale)
+	_check("fitted menu stays inside the viewport", fitted.position.x >= -1 and fitted.position.y >= -1 and fitted.end.x <= hud._menu.size.x + 1 and fitted.end.y <= hud._menu.size.y + 1)
+	_check("menu fonts contain Swedish letters", MenuFlow.font(true).has_char(197) and MenuFlow.font().has_char(228))
+	await _shot("players")
+	var field: TerrainField = main.get("_field")
+	main.call("_on_hud_pressed", &"solo")
+	await _tick(25)
+	_check("solo opens ride selection", main.get("state") == 6 and hud._menu.picker.visible)
+	_check("selection keeps the preview world", main.get("_field") == field)
+	main.call("_on_hud_pressed", &"vehicle_3")
+	_check("locked rides can be previewed but not started", hud._menu.start.disabled and main.get("_vehicle") == 3)
+	main.call("_start_run")
+	_check("locked ride stays in the picker", main.get("state") == 6)
+	main.call("_on_hud_pressed", &"vehicle_2")
+	await _tick(15)
+	await _shot("vehicle")
+	var sled: Sled = main.get("_sled")
+	var camera: ChaseCamera = main.get("_camera")
+	var before := camera.transform
+	var position := sled.position
+	var body: Mesh = sled.get("_vehicle_mesh").mesh
+	var chunk_ids := []
+	for chunk in main.get("_world")._chunks.values(): chunk_ids.append(chunk.get_instance_id())
+	var start_began := Time.get_ticks_usec()
+	main.call("_start_run")
+	print("solo start CPU: %.2f ms" % ((Time.get_ticks_usec() - start_began) / 1000.0))
+	_check("start keeps world, mesh and rider position", main.get("_field") == field and sled.get("_vehicle_mesh").mesh == body and sled.position == position)
+	_check("start does not snap the camera", camera.transform.is_equal_approx(before) and camera.mode == ChaseCamera.Mode.START)
+	for chunk in main.get("_world")._chunks.values():
+		_check("start retains each visible chunk", chunk_ids.has(chunk.get_instance_id()))
+	await _tick(25)
+	_check("rider waits while the camera turns", sled.frozen and main.get("_countdown_step") == 0)
+	await _shot("camera")
+	await _tick(44)
+	_check("countdown starts with three after the camera arrives", main.get("_countdown_step") == 3 and camera.mode == ChaseCamera.Mode.CHASE)
+	await _shot("countdown")
+	await _tick(180)
+	_check("countdown shows every number in order", steps == [3, 2, 1])
+	_check("camera has no position jumps", max_camera_step < 0.4)
+	_check("camera turns without rotation jumps", max_camera_angle < 0.15)
+	_check("camera stays outside the rider", min_camera_radius > 4.0)
+	print("camera: max step %.3f m, max turn %.2f degrees, min radius %.2f m" % [max_camera_step, rad_to_deg(max_camera_angle), min_camera_radius])
+	_check("go releases the rider and hides selection", main.get("state") == 2 and not sled.frozen and not hud._menu.visible)
+	_check("run crossfades away from menu music", not main.get("_sound")._in_menu and not main.get("_sound")._menu_player.playing)
+	await _shot("ride")
+
+	# Replacing a number must cancel the old number's delayed fade.
+	var number := CountdownDisplay.new()
+	root.add_child(number)
+	number.show_count("3")
+	await _tick(30)
+	number.show_count("2")
+	await _tick(14)
+	_check("old number cannot fade a new number", number.text == "2" and number.modulate.a > 0.99)
+	number.queue_free()
+	if Quality.is_mobile():
+		_check("phone shows touch instructions", hud._menu._controls_hint.text.contains("Svep"))
+		main.queue_free()
+		await process_frame
+		print("menu flow mobile test: %s" % ("all passed" if failures == 0 else "%d failed" % failures))
+		quit(failures)
+		return
+
+	main.call("_enter_menu")
+	await _tick(25)
+	field = main.get("_field")
+	main.call("_on_hud_pressed", &"duo")
+	await _tick(30)
+	var racers: Array = main.get("_players")
+	_check("two players choose rides in a split preview", main.get("state") == 5 and racers.size() == 2)
+	_check("duo selection uses the same world", main.get("_field") == field)
+	var second_ride: int = racers[1].vehicle
+	main.call("_on_lobby_action", &"next", racers[0])
+	_check("each player's picker is independent", racers[1].vehicle == second_ride)
+	await _shot("duo")
+	main.call("_on_lobby_action", &"ready", racers[0])
+	await _tick(2)
+	_check("one ready waits for the other", main.get("state") == 5)
+	main.call("_on_lobby_action", &"ready", racers[1])
+	await _tick(2)
+	_check("both ready starts one countdown on the same world", main.get("state") == 1 and main.get("_field") == field)
+	await _tick(252)
+	_check("both players start together", main.get("state") == 2 and not racers[0].sled.frozen and not racers[1].sled.frozen)
+	_check("both intro cameras remain smooth", max_camera_step < 0.4 and max_camera_angle < 0.15)
+	_camera_angles_test(racers[0].sled, racers[0].camera)
+	main.queue_free()
+	await process_frame
+	await process_frame
+	print("menu flow test: %s" % ("all passed" if failures == 0 else "%d failed" % failures))
+	quit(failures)
+
+func _camera_angles_test(sled: Sled, camera: ChaseCamera) -> void:
+	sled.frozen = true
+	sled.velocity = Vector3.ZERO
+	for phase in [0.0, PI * 0.5, PI - 0.001, PI, PI + 0.001, TAU - 0.001]:
+		camera.set("_orbit_angle", phase)
+		camera.mode = ChaseCamera.Mode.ORBIT
+		camera.update_camera(0.0)
+		camera.begin_run()
+		var smooth := true
+		for frame in 70:
+			var position := camera.position
+			var rotation := camera.quaternion
+			camera.update_camera(1.0 / 60.0)
+			var towards := (sled.position + Vector3.UP * 0.8 - camera.position).normalized()
+			smooth = smooth and position.distance_to(camera.position) < 0.4 and rotation.angle_to(camera.quaternion) < 0.15 and (-camera.basis.z).dot(towards) > 0.9
+		_check("camera keeps the rider framed from %.1f degrees" % rad_to_deg(phase), smooth)
+
+func _tick(frames: int) -> void:
+	for frame in frames:
+		var cameras: Array[ChaseCamera] = []
+		var positions: Array[Vector3] = []
+		var orientations: Array[Quaternion] = []
+		for player in main.get("_players"):
+			cameras.append(player.camera)
+			positions.append(player.camera.position)
+			orientations.append(player.camera.quaternion)
+		var state_before: int = main.get("state")
+		var began := Time.get_ticks_usec()
+		main.call("_process", 1.0 / 60.0)
+		if state_before == 5 and main.get("state") == 1:
+			print("race start CPU: %.2f ms" % ((Time.get_ticks_usec() - began) / 1000.0))
+		if main.get("state") == 1:
+			for i in cameras.size():
+				var camera := cameras[i]
+				max_camera_step = maxf(max_camera_step, positions[i].distance_to(camera.position))
+				max_camera_angle = maxf(max_camera_angle, orientations[i].angle_to(camera.quaternion))
+				if camera.mode == ChaseCamera.Mode.START:
+					var relative := camera.position - camera.target.position
+					min_camera_radius = minf(min_camera_radius, Vector2(relative.x, relative.z).length())
+			var step: int = main.get("_countdown_step")
+			if step > 0 and not steps.has(step): steps.append(step)
+		await process_frame
+
+func _shot(name: String) -> void:
+	if capture:
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_png("/tmp/pulka-menu-%s%s.png" % ["compact-" if compact else "", name])
+
+func _check(message: String, condition: bool) -> void:
+	print(("  ok    " if condition else "  FAIL  ") + message)
+	if not condition: failures += 1

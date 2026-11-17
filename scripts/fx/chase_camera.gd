@@ -3,7 +3,8 @@ extends Camera3D
 ## Third-person camera tuned for a sense of speed: it drops lower, pulls in and
 ## widens its field of view as you go faster, and shakes on bumps and impacts.
 
-enum Mode { ORBIT, CHASE, CRASH }
+enum Mode { ORBIT, CHASE, CRASH, START }
+const START_SECONDS := 1.1
 
 var mode := Mode.ORBIT
 ## Orbit with the rider in the middle of the view (a racer who has won),
@@ -15,8 +16,16 @@ var field: TerrainField
 var _look_dir := Vector3.FORWARD
 var _shake := 0.0
 var _time := 0.0
-var _orbit_angle := 0.6
+var _orbit_angle := 2.4
 var _noise := FastNoiseLite.new()
+var _start_fov := 60.0
+var _start_offset := 0.0
+var _start_vertical := 0.0
+var _start_elapsed := 0.0
+var _start_duration := START_SECONDS
+var _start_relative := Vector3.ZERO
+var _start_angles := Vector3.ZERO
+var _end_angles := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -35,6 +44,22 @@ func snap() -> void:
 	update_camera(1.0)
 
 
+## Keep the live preview's exact pose, then ease into the riding camera.
+func begin_run(seconds := START_SECONDS) -> void:
+	_start_fov = fov
+	_start_offset = h_offset
+	_start_vertical = v_offset
+	_start_relative = position - target.position
+	_start_angles = basis.get_rotation_quaternion().get_euler()
+	_start_elapsed = 0.0
+	_start_duration = seconds
+	_look_dir = target.forward()
+	var destination := target.position - _look_dir * 4.4 + Vector3.UP * 2.9
+	destination.y = maxf(destination.y, field.height_world(destination.x, destination.z) + 1.0)
+	_end_angles = Basis.looking_at(target.position + _look_dir * 12.0 - destination, Vector3.UP).get_euler()
+	mode = Mode.START
+
+
 func update_camera(delta: float) -> void:
 	_time += delta
 	_shake = maxf(0.0, _shake - delta * 2.2)
@@ -45,6 +70,31 @@ func update_camera(delta: float) -> void:
 			_update_chase(delta)
 		Mode.CRASH:
 			_update_crash(delta)
+		Mode.START:
+			_update_start(delta)
+
+
+func _update_start(delta: float) -> void:
+	_start_elapsed += delta
+	var t := smoothstep(0.0, 1.0, minf(_start_elapsed / _start_duration, 1.0))
+	# Travel around the rider, never on a chord through their body when the
+	# preview happens to be facing them from the front.
+	var from_angle := atan2(_start_relative.x, _start_relative.z)
+	var to_angle := atan2(-_look_dir.x, -_look_dir.z)
+	var angle := lerp_angle(from_angle, to_angle, t)
+	var radius := lerpf(Vector2(_start_relative.x, _start_relative.z).length(), 4.4, t)
+	position = target.position + Vector3(sin(angle) * radius, lerpf(_start_relative.y, 2.9, t), cos(angle) * radius)
+	position.y = maxf(position.y, field.height_world(position.x, position.z) + lerpf(0.65, 1.0, t))
+	# Drive heading along the same arc as position. Two independently chosen
+	# shortest rotations can disagree when the preview is almost head-on.
+	var from_heading := wrapf(_start_angles.y - from_angle, -PI, PI)
+	var to_heading := wrapf(_end_angles.y - to_angle, -PI, PI)
+	basis = Basis.from_euler(Vector3(lerpf(_start_angles.x, _end_angles.x, t), angle + lerpf(from_heading, to_heading, t), lerpf(_start_angles.z, _end_angles.z, t)))
+	fov = lerpf(_start_fov, 53.0, t)
+	h_offset = lerpf(_start_offset, 0.0, t)
+	v_offset = lerpf(_start_vertical, 0.0, t)
+	if _start_elapsed >= _start_duration:
+		mode = Mode.CHASE
 
 
 func _speed_factor() -> float:
@@ -82,13 +132,14 @@ func _update_chase(delta: float) -> void:
 func _update_orbit(delta: float) -> void:
 	_orbit_angle += delta * 0.2
 	var center := target.position + Vector3.UP * 0.6
-	var angle := 0.5 + sin(_orbit_angle) * 0.9
-	position = center + Vector3(sin(angle) * 4.8, 1.5, cos(angle) * 4.8 - 0.5)
-	look_at(center + Vector3(0, 0.2, -1.0), Vector3.UP)
+	var angle := _orbit_angle - target.yaw
+	position = center + Vector3(sin(angle) * 4.8, 1.5, cos(angle) * 4.8)
+	position.y = maxf(position.y, field.height_world(position.x, position.z) + 0.65)
+	look_at(center + Vector3.UP * 0.2 + target.forward() * 0.15, Vector3.UP)
 	fov = 60.0
 	# Keep the rider in the right half of the screen, clear of the menu panel.
-	h_offset = 0.0 if centered else -1.7
-	v_offset = 0.0
+	h_offset = 0.0 if centered else -1.1
+	v_offset = 0.0 if centered else -0.18
 
 
 func _update_crash(delta: float) -> void:
