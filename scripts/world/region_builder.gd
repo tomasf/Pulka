@@ -51,6 +51,8 @@ func place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, 
 			_place_cliff(chunk, decor, rng, lo, hi, span)
 		TerrainField.Region.BRIDGE:
 			_place_bridge(chunk, decor, lo, hi, span)
+		TerrainField.Region.ROOFS:
+			_place_roofs(chunk, decor, lo, hi, span)
 
 
 func _place_town(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: float) -> void:
@@ -221,6 +223,8 @@ func _rest_on_ground(vehicle: Obstacle, reach: float, track: float) -> void:
 func ground_color(kind: TerrainField.Region, x: float, lx: float, d: float, hw: float) -> Color:
 	var outside := absf(lx) - hw
 	match kind:
+		TerrainField.Region.ROOFS:
+			return Color("656c79") if field.in_rooftops(d) and outside < 18.0 else Palette.SNOW_PACKED
 		TerrainField.Region.BRIDGE:
 			var ends := field.bridge_span(d)
 			var lip := minf(d - ends.x, ends.y - d)
@@ -353,7 +357,7 @@ func obstacle_table(kind: TerrainField.Region) -> Array:
 
 func density(kind: TerrainField.Region) -> float:
 	match kind:
-		TerrainField.Region.BRIDGE:
+		TerrainField.Region.BRIDGE, TerrainField.Region.ROOFS:
 			return 0.0
 		TerrainField.Region.MALL:
 			return 0.8
@@ -489,6 +493,52 @@ func _place_bridge(chunk: Chunk, decor: Dictionary, lo: float, hi: float, span: 
 			# Deck cross sections and cables use world X too, so the portal's
 			# posts meet both cables even when the span crosses diagonally.
 			world.add_decor(decor, SuspensionBridge.tower(), Transform3D(Basis.IDENTITY, Vector3(field.center_x(d), field.bridge_height(d), -d)))
+
+
+# --- Rooftop district ---
+
+func _place_roofs(chunk: Chunk, decor: Dictionary, lo: float, hi: float, span: Vector3) -> void:
+	for roof in field.roofs(span.x + 1):
+		var middle := (roof.start + roof.finish) * 0.5
+		if middle < lo or middle >= hi: continue
+		var instance := MeshInstance3D.new()
+		instance.name = "RideableRoof_%d_%d" % [roof.lane, roof.index]
+		var job := Roofscape.BuildJob.new(field, roof)
+		job.target = weakref(instance)
+		_roof_jobs.append(job)
+		chunk.add_child(instance)
+		# Chimneys stand off the main landing line and use solid box collisions.
+		var d := lerpf(roof.start, roof.finish, 0.62)
+		var x := roof.center(d) + (1.0 if roof.variant % 2 == 0 else -1.0) * (roof.half_width - 1.0)
+		var chimney := Obstacle.new().configure(Obstacle.Kind.CHIMNEY, Props.Rig.of(Roofscape.chimney()), field)
+		chimney.position = Vector3(x, field.roof_height(roof, x, d), -d)
+		chunk.add_child(chimney)
+		chunk.obstacles.append(chimney)
+		# Cookies describe the landing line, with a floating cookie over the gap.
+		var count := mini(5 if roof.lane < 0 else 3, maxi(1, int((roof.finish - roof.start - 12) / 4) + 1))
+		for i in count:
+			d = lerpf(roof.start + 6, roof.finish - 6, (i + 0.5) / count)
+			world._add_pickup(chunk, Pickup.Kind.GINGERBREAD, roof.center(d), d)
+		if roof.gap_after > 0:
+			var arc_count := 3 if roof.requires_jump else 1
+			var launch_y := field.roof_height(roof, roof.center(roof.finish), roof.finish)
+			for i in arc_count:
+				var t := (i + 1.0) / (arc_count + 1.0)
+				var along := roof.gap_after * t
+				d = roof.finish + along
+				x = roof.center(d)
+				var y := launch_y + roof.dy * along + 0.9 + sin(PI * t) * (1.0 if roof.requires_jump else 0.6)
+				var cookie := Pickup.new().configure(Pickup.Kind.GINGERBREAD, Vector3(x, y, -d))
+				chunk.add_child(cookie)
+				chunk.pickups.append(cookie)
+	# Neighbouring blocks frame the playable roof rows without hiding landings.
+	var d := ceilf(lo / 30.0) * 30.0
+	while d < hi:
+		for side in [-1.0, 1.0]:
+			var x: float = field.center_x(d) + side * 29.0
+			var y := field.height(x, d, false, false)
+			world.add_decor(decor, Props.town_house(int(field.hash01(int(d), int(side)) * 11)), Transform3D(Basis(Vector3.UP, -side * PI / 2), Vector3(x, y, -d)))
+		d += 30
 
 
 # --- Traffic that lives as long as the region ---
@@ -632,10 +682,12 @@ class FloorBuild:
 	var colors := PackedColorArray()
 
 var _floor_jobs: Array[FloorBuild] = []
+var _roof_jobs: Array[Roofscape.BuildJob] = []
 
 
 func cancel_preparations() -> void:
 	_floor_jobs.clear()
+	_roof_jobs.clear()
 
 
 func _floor(lo: float, hi: float, painter: Callable) -> MeshInstance3D:
@@ -656,9 +708,17 @@ func _floor(lo: float, hi: float, painter: Callable) -> MeshInstance3D:
 	return instance
 
 
-## Painted floors are scenery built far ahead of the rider. Resume one row
-## at a time rather than generating an entire rink or mall floor at once.
+## Prepare distant roof sections and painted floors within the frame budget.
 func prepare_floors(deadline: int) -> void:
+	while not _roof_jobs.is_empty() and deadline - Time.get_ticks_usec() >= 500:
+		var job := _roof_jobs[0]
+		var instance := job.target.get_ref() as MeshInstance3D
+		if instance == null or instance.is_queued_for_deletion() or instance.get_parent().is_queued_for_deletion():
+			_roof_jobs.pop_front()
+			continue
+		if job.step():
+			instance.mesh = job.mesh
+			_roof_jobs.pop_front()
 	while not _floor_jobs.is_empty() and deadline - Time.get_ticks_usec() >= 500:
 		var job := _floor_jobs[0]
 		if job.target.get_ref() == null:

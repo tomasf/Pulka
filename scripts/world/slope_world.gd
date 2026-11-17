@@ -463,6 +463,7 @@ func _place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator,
 		var d := rng.randf_range(d0, d1)
 		if field.near_road(d, 4.0):
 			continue
+		if field.region(d) == TerrainField.Region.ROOFS: continue
 		var side := -1.0 if rng.randf() < 0.5 else 1.0
 		var hw := field.half_width(d)
 		var kind := field.region(d)
@@ -611,6 +612,8 @@ func obstacle_rig(kind: Obstacle.Kind, rng: RandomNumberGenerator) -> Props.Rig:
 			return Props.Rig.of(Props.rock(rng.randi_range(0, 1)))
 		Obstacle.Kind.STUMP:
 			return Props.Rig.of(Props.stump())
+		Obstacle.Kind.CHIMNEY:
+			return Props.Rig.of(Roofscape.chimney())
 		Obstacle.Kind.SNOWMAN:
 			return Props.Rig.of(Props.snowman())
 		Obstacle.Kind.PERSON, Obstacle.Kind.KID:
@@ -692,7 +695,7 @@ func _place_obstacles(chunk: Chunk, rng: RandomNumberGenerator, d0: float, d1: f
 		if field.near_road(d, 22.0) or field.water_strip(d) != Vector2.ZERO:
 			continue
 		var here := field.region(d)
-		if here == TerrainField.Region.BRIDGE:
+		if here in [TerrainField.Region.BRIDGE, TerrainField.Region.ROOFS]:
 			continue
 		var cx := field.center_x(d)
 		var hw := field.half_width(d)
@@ -746,6 +749,7 @@ func random_sign(rng: RandomNumberGenerator) -> float:
 func _place_pickups(chunk: Chunk, rng: RandomNumberGenerator, d0: float, d1: float) -> void:
 	if d1 < 60.0:
 		return
+	if field.region((d0 + d1) * 0.5) == TerrainField.Region.ROOFS: return
 	if rng.randf() < 0.65:
 		var start := rng.randf_range(d0, d1 - 25.0)
 		var offset := rng.randf_range(-0.6, 0.6)
@@ -766,6 +770,8 @@ func _place_pickups(chunk: Chunk, rng: RandomNumberGenerator, d0: float, d1: flo
 
 
 func _add_pickup(chunk: Chunk, kind: Pickup.Kind, x: float, d: float) -> void:
+	# Rooftop pickups are placed with their building, including arcs over gaps.
+	if field.in_rooftops(d) and field.roof_at(x, d) == null: return
 	var pickup := Pickup.new().configure(kind, Vector3(x, field.height(x, d) + 0.9, -d))
 	chunk.add_child(pickup)
 	chunk.pickups.append(pickup)

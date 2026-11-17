@@ -13,7 +13,7 @@ extends RefCounted
 ## run still feels like a sledding hill.
 
 enum Zone { OPEN, FOREST, MOGULS, VILLAGE, WILDLIFE }
-enum Region { SLOPE, TOWN, RIVER, PARK, WOODS, MALL, RAIL, AIRPORT, LAKE, BANDY, HIGHWAY, CLIFF, BRIDGE }
+enum Region { SLOPE, TOWN, RIVER, PARK, WOODS, MALL, RAIL, AIRPORT, LAKE, BANDY, HIGHWAY, CLIFF, BRIDGE, ROOFS }
 ## How the ground meets the edge of the track.
 enum Edge { BANK, KERB, GORGE, FLOOR }
 
@@ -32,6 +32,7 @@ const REGION_STYLE := {
 	Region.BANDY: {"width": 24.0, "edge": Edge.KERB, "grip": 0.35, "rough": 0.0, "length": 200.0, "roads": false, "ramps": false},
 	Region.CLIFF: {"width": 24.0, "edge": Edge.BANK, "grip": 1.0, "rough": 0.0, "length": 300.0, "roads": false, "ramps": false},
 	Region.BRIDGE: {"width": 3.8, "edge": Edge.FLOOR, "grip": 0.9, "rough": 0.0, "length": 280.0, "roads": false, "ramps": false},
+	Region.ROOFS: {"width": 17.5, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.0, "length": 340.0, "roads": false, "ramps": false},
 }
 
 const ZONE_LENGTH := 280.0
@@ -72,6 +73,39 @@ const BRIDGE_DEPTH := 34.0
 const BRIDGE_SAG := 2.8
 const BRIDGE_RAIL_HEIGHT := 1.25
 
+const ROOF_APPROACH := 45.0
+const ROOF_PERIOD := 42.0
+const ROOF_GAP := 4.2
+const ROOF_WIDE_GAP_MIN := 14.0
+const ROOF_WIDE_GAP_MAX := 16.0
+const ROOF_LANE := 11.5
+const ROOF_HALF_WIDTH := 5.35
+const ROOF_STREET_DEPTH := 12.0
+
+## One building's analytic footprint and snow surface. Meshes, collisions,
+## pickups and recovery all use these same immutable seeded descriptors.
+class Roof:
+	var start := 0.0
+	var finish := 0.0
+	var lane := 0
+	var index := 0
+	var half_width := ROOF_HALF_WIDTH
+	var cx := 0.0
+	var dx := 0.0
+	var y := 0.0
+	var dy := 0.0
+	var lift := 0.0
+	var district := Vector2.ZERO
+	var variant := 0
+	var gap_after := 0.0
+	var kick_height := 0.0
+	var requires_jump: bool:
+		get: return gap_after >= ROOF_WIDE_GAP_MIN - 0.01
+
+	func center(d: float) -> float: return cx + (d - start) * dx
+	func base(d: float) -> float: return y + (d - start) * dy
+
+var _rooftops: Dictionary = {}
 var world_seed: int
 var _noise := FastNoiseLite.new()
 var _phases := PackedFloat32Array()
@@ -116,11 +150,12 @@ func difficulty(d: float) -> float:
 func center_x(d: float) -> float:
 	var x := _slope_center(d)
 	var span := region_span(d)
-	if int(span.z) == Region.BRIDGE:
-		var ends := Vector2(span.x + BRIDGE_APPROACH, span.y - BRIDGE_APPROACH)
+	if int(span.z) in [Region.BRIDGE, Region.ROOFS]:
+		var approach := BRIDGE_APPROACH if int(span.z) == Region.BRIDGE else ROOF_APPROACH
+		var ends := Vector2(span.x + approach, span.y - approach)
 		var t := (d - ends.x) / (ends.y - ends.x)
 		var straight := lerpf(_slope_center(ends.x), _slope_center(ends.y), t)
-		x = lerpf(x, straight, _bridge_alignment(span, d))
+		x = lerpf(x, straight, smoothstep(span.x, ends.x, d) * (1.0 - smoothstep(ends.y, span.y, d)))
 	# Forest trails wind back and forth between the trees.
 	return x + region_weight(d, Region.WOODS) * 7.0 * sin(d * 0.03 + _phases[6])
 
@@ -304,6 +339,137 @@ func _bridge_normal(d: float) -> Vector3:
 	return Vector3(0, 1, (bridge_height(d + 0.1) - bridge_height(d - 0.1)) / 0.2).normalized()
 
 
+# --- Rooftop district ---
+
+func roof_span(d: float) -> Vector2:
+	var span := region_span(d)
+	return Vector2(span.x + ROOF_APPROACH, span.y - ROOF_APPROACH) if int(span.z) == Region.ROOFS else Vector2.ZERO
+
+
+func in_rooftops(d: float) -> bool:
+	var ends := roof_span(d)
+	return ends != Vector2.ZERO and d >= ends.x and d < ends.y
+
+
+func roof_base_height(d: float) -> float:
+	var ends := roof_span(d)
+	return lerpf(base_height(ends.x), base_height(ends.y), (d - ends.x) / (ends.y - ends.x)) if ends != Vector2.ZERO else base_height(d)
+
+
+func _roof_rows(span: Vector3) -> Array:
+	if _rooftops.has(span.x): return _rooftops[span.x]
+	var ends := Vector2(span.x + ROOF_APPROACH, span.y - ROOF_APPROACH)
+	var x0 := _slope_center(ends.x)
+	var x1 := _slope_center(ends.y)
+	var y0 := base_height(ends.x)
+	var y1 := base_height(ends.y)
+	var rows := []
+	for lane in [-1, 0, 1]:
+		var row: Array[Roof] = []
+		for i in range(-1, ceili((ends.y - ends.x) / ROOF_PERIOD) + 1):
+			var start: float = ends.x + lane * 14.0 + i * ROOF_PERIOD
+			# Stagger the large streets too, so another row remains available.
+			var gap := lerpf(ROOF_WIDE_GAP_MIN, ROOF_WIDE_GAP_MAX, hash01(i + lane * 31, 197)) if posmod(i - lane, 3) == 1 else ROOF_GAP
+			var finish := minf(start + ROOF_PERIOD - gap, ends.y)
+			start = maxf(start, ends.x)
+			if finish - start < 8.0: continue
+			var roof := Roof.new()
+			roof.start = start
+			roof.finish = finish
+			roof.lane = lane
+			roof.index = i
+			roof.district = ends
+			roof.variant = int(hash01(i + lane * 31, int(span.x)) * 5.99)
+			roof.lift = (hash01(i + lane * 31, 193) - 0.5) * 0.22
+			row.append(roof)
+		# First/last buildings meet the hill, without a gap at either entrance.
+		row[0].start = ends.x
+		row.back().finish = ends.y
+		for i in row.size() - 1:
+			row[i].gap_after = row[i + 1].start - row[i].finish
+		for i in row.size() - 1:
+			var roof := row[i]
+			if not roof.requires_jump:
+				roof.kick_height = 0.20 if lane == 0 else (0.38 if lane < 0 else 0.28)
+				# Land early on the next roof, leaving room to time its big jump.
+				if row[i + 1].requires_jump: roof.kick_height = 0.12
+		for roof in row:
+			roof.dx = (x1 - x0) / (ends.y - ends.x)
+			roof.dy = (y1 - y0) / (ends.y - ends.x)
+			roof.cx = x0 + (roof.start - ends.x) * roof.dx + lane * ROOF_LANE
+			roof.y = y0 + (roof.start - ends.x) * roof.dy
+		rows.append(row)
+	_rooftops[span.x] = rows
+	return rows
+
+
+func roofs(d: float) -> Array[Roof]:
+	var result: Array[Roof] = []
+	var span := region_span(d)
+	if int(span.z) == Region.ROOFS:
+		for row: Array in _roof_rows(span): result.append_array(row)
+	return result
+
+
+func roof_at(x: float, d: float) -> Roof:
+	var span := region_span(d)
+	if int(span.z) != Region.ROOFS or d < span.x + ROOF_APPROACH or d >= span.y - ROOF_APPROACH: return null
+	var lane := roundi((x - center_x(d)) / ROOF_LANE)
+	if lane < -1 or lane > 1: return null
+	for roof: Roof in _roof_rows(span)[lane + 1]:
+		if d >= roof.start and d < roof.finish and absf(x - roof.center(d)) <= roof.half_width:
+			return roof
+	return null
+
+
+func roof_height(roof: Roof, x: float, d: float) -> float:
+	var lateral := absf(x - roof.center(d))
+	var rise := 0.85 if roof.lane == 0 else (3.0 if roof.lane < 0 else 1.7)
+	var flat := 3.2 if roof.lane == 0 else (0.18 if roof.lane < 0 else 1.1)
+	var cross := rise * clampf((roof.half_width - lateral) / (roof.half_width - flat), 0, 1)
+	var blend := smoothstep(roof.district.x, roof.district.x + 8, d) * (1.0 - smoothstep(roof.district.y - 12, roof.district.y, d))
+	var kick := 0.0
+	if roof.kick_height > 0.0:
+		var u := clampf((d - roof.finish + 5.0) / 5.0, 0, 1)
+		kick = roof.kick_height * u * u
+	return roof.base(d) + (roof.lift + cross) * blend + kick + 0.035
+
+
+func _roof_surface(roof: Roof, x: float, d: float) -> Vector4:
+	var e := 0.08
+	var h := roof_height(roof, x, d)
+	# Stay on this building's analytic surface when differentiating near a gap.
+	var hx := (roof_height(roof, x + e, d) - roof_height(roof, x - e, d)) / (2 * e)
+	var before := clampf(d - e, roof.start, roof.finish)
+	var after := clampf(d + e, roof.start, roof.finish)
+	var hd := (roof_height(roof, x, after) - roof_height(roof, x, before)) / maxf(after - before, 0.001)
+	var n := Vector3(-hx, 1, hd).normalized()
+	return Vector4(n.x, n.y, n.z, h)
+
+
+## A falling ride must not be lifted through a bridge or a building's roof.
+func below_structure(at: Vector3) -> bool:
+	var d := -at.z
+	var kind := region(d)
+	if kind == Region.BRIDGE:
+		return on_bridge(d) and at.y < bridge_height(d) - 0.5
+	if kind == Region.ROOFS:
+		var roof := roof_at(at.x, d)
+		return roof != null and at.y < roof_height(roof, at.x, d) - 0.5
+	return false
+
+
+## Safe centre-route position after a missed jump, never in a street gap.
+func roof_recovery(d: float) -> float:
+	var span := region_span(d)
+	if int(span.z) != Region.ROOFS: return d
+	var row: Array = _roof_rows(span)[1]
+	for roof: Roof in row:
+		if roof.finish > d + 8.0:
+			return clampf(d, roof.start + 6.0, roof.finish - 8.0)
+	return span.y - ROOF_APPROACH + 2.0
+
+
 ## Grip multiplier for the surface: patchy ice is glassy, frozen rivers,
 ## bandy rinks and polished mall floors slippery all over.
 func grip_factor(x: float, d: float) -> float:
@@ -378,7 +544,7 @@ func base_height(d: float) -> float:
 	return -descent + rolls * smoothstep(0.0, 200.0, d) - cliff_drop(d)
 
 
-func height(x: float, d: float, with_ramps := true, with_bridge := true) -> float:
+func height(x: float, d: float, with_ramps := true, with_structures := true) -> float:
 	var span := region_span(d)
 	var weight := _span_weight(span, d)
 	var look := style(int(span.z))
@@ -424,34 +590,49 @@ func height(x: float, d: float, with_ramps := true, with_bridge := true) -> floa
 		h += (_bridge_profile(ends, d) - base_height(d)) * _bridge_alignment(span, d)
 		var valley := smoothstep(ends.x, ends.x + 22.0, d) * (1.0 - smoothstep(ends.y - 22.0, ends.y, d))
 		h -= BRIDGE_DEPTH * valley
-		if with_bridge and d >= ends.x and d <= ends.y and absf(x - center_x(d)) <= BRIDGE_HALF_WIDTH:
+		if with_structures and d >= ends.x and d <= ends.y and absf(x - center_x(d)) <= BRIDGE_HALF_WIDTH:
 			h = _bridge_profile(ends, d) + 0.025
+	if int(span.z) == Region.ROOFS:
+		var ends := Vector2(span.x + ROOF_APPROACH, span.y - ROOF_APPROACH)
+		var alignment := smoothstep(span.x, ends.x, d) * (1.0 - smoothstep(ends.y, span.y, d))
+		h += (roof_base_height(d) - base_height(d)) * alignment
+		h -= ROOF_STREET_DEPTH * smoothstep(ends.x, ends.x + 16, d) * (1.0 - smoothstep(ends.y - 16, ends.y, d))
+		if with_structures:
+			var roof := roof_at(x, d)
+			if roof != null: h = roof_height(roof, x, d)
 	return h
 
 
-func height_world(x: float, z: float, with_bridge := true) -> float:
-	return height(x, -z, true, with_bridge)
+func height_world(x: float, z: float, with_structures := true) -> float:
+	return height(x, -z, true, with_structures)
 
 
 ## Height and normal at a world point together: xyz is the normal and w the
 ## height. Three height lookups (one-sided differences) instead of the five
 ## that height_world and normal_world take apart; the ride's physics uses it
 ## several times a frame.
-func surface_world(x: float, z: float, with_bridge := true) -> Vector4:
+func surface_world(x: float, z: float, with_structures := true) -> Vector4:
 	# Finite differences must not sample the ravine beside a deck edge and
 	# turn a level plank into a near-vertical collision normal.
-	if with_bridge and on_bridge(-z) and absf(x - center_x(-z)) <= BRIDGE_HALF_WIDTH:
+	if with_structures and on_bridge(-z) and absf(x - center_x(-z)) <= BRIDGE_HALF_WIDTH:
 		var n := _bridge_normal(-z)
 		return Vector4(n.x, n.y, n.z, bridge_height(-z))
+	if with_structures:
+		var roof := roof_at(x, -z)
+		if roof != null: return _roof_surface(roof, x, -z)
 	var e := 0.35
-	var h := height_world(x, z, with_bridge)
-	var hx := (height_world(x + e, z, with_bridge) - h) / e
-	var hz := (height_world(x, z + e, with_bridge) - h) / e
+	var h := height_world(x, z, with_structures)
+	var hx := (height_world(x + e, z, with_structures) - h) / e
+	var hz := (height_world(x, z + e, with_structures) - h) / e
 	var n := Vector3(-hx, 1.0, -hz).normalized()
 	return Vector4(n.x, n.y, n.z, h)
 
 
 func normal_world(x: float, z: float) -> Vector3:
+	var roof := roof_at(x, -z)
+	if roof != null:
+		var surface := _roof_surface(roof, x, -z)
+		return Vector3(surface.x, surface.y, surface.z)
 	if on_bridge(-z) and absf(x - center_x(-z)) <= BRIDGE_HALF_WIDTH:
 		return _bridge_normal(-z)
 	var e := 0.35

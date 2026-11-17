@@ -5,7 +5,7 @@ extends Node3D
 ## jump over or land on. Mass decides how hard a hit is and whether the
 ## obstacle goes flying.
 
-enum Kind { TREE, ROCK, STUMP, SNOWMAN, PERSON, KID, DOG, MOOSE, DEER, HARE, CAR, PLOW, BIN, TENT, LOG, CART, PLANT, FOUNTAIN, CONE, TRAIN, PLANE, TUG, GOAL, TRUCK, BEAR }
+enum Kind { TREE, ROCK, STUMP, SNOWMAN, PERSON, KID, DOG, MOOSE, DEER, HARE, CAR, PLOW, BIN, TENT, LOG, CART, PLANT, FOUNTAIN, CONE, TRAIN, PLANE, TUG, GOAL, TRUCK, BEAR, CHIMNEY }
 
 ## Weight in kilograms; INF for things rooted to the ground.
 const MASS := {
@@ -14,7 +14,7 @@ const MASS := {
 	Kind.CAR: 1300.0, Kind.PLOW: 9000.0, Kind.BIN: 25.0, Kind.TENT: 35.0, Kind.LOG: INF,
 	Kind.CART: 30.0, Kind.PLANT: 45.0, Kind.FOUNTAIN: INF, Kind.CONE: 2.0, Kind.TRAIN: INF,
 	Kind.PLANE: INF, Kind.TUG: 2500.0, Kind.GOAL: 70.0, Kind.TRUCK: 15000.0,
-	Kind.BEAR: 250.0,
+	Kind.BEAR: 250.0, Kind.CHIMNEY: INF,
 }
 ## Heavier than this and a hit does not move it.
 const MOVABLE_MASS := 1000.0
@@ -109,6 +109,9 @@ func configure(which: Kind, rig: Props.Rig, terrain: TerrainField) -> Obstacle:
 		Kind.STUMP:
 			radius = 0.5
 			top = 0.6
+		Kind.CHIMNEY:
+			half_extents = Vector2(0.60, 0.55)
+			top = 1.75
 		Kind.SNOWMAN:
 			radius = 0.6
 			top = 2.2

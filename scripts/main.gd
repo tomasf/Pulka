@@ -24,6 +24,7 @@ const CRASH_LINES := {
 	Obstacle.Kind.TREE: ["Granen vann.", "Trädkramare!", "Barr i munnen.", "Granen stod där först."],
 	Obstacle.Kind.ROCK: ["Stenhårt!", "Stenen rörde sig inte en millimeter.", "Aj, aj, sten!"],
 	Obstacle.Kind.STUMP: ["Stubben var där först.", "Stubbad!"],
+	Obstacle.Kind.CHIMNEY: ["Skorstenen vann.", "Sotare för en dag!", "Rakt in i skorstenen!"],
 	Obstacle.Kind.PERSON: [
 		"Ursäkta! Ursäkta!", "%s såg dig inte komma.", "%s tappade termosen!", "%s spillde ut hela kaffet.",
 		"Förlåt, %s!", "%s ska ringa kommunen om det här.", "%s skakar på huvudet.", "%s hade precis borstat av sig.",
@@ -589,6 +590,8 @@ func _update_playing(delta: float) -> void:
 		if _autopilot:
 			steer = _autopilot_steer(p)
 			tuck = 1.0
+			var roof := _field.roof_at(p.sled.position.x, p.sled.distance())
+			jump = roof != null and roof.requires_jump and roof.finish - p.sled.distance() < 1.25 and p.sled.on_ground
 		p.sled.step(delta, steer, tuck, jump)
 	_update_world(delta)
 	for i in _players.size():
@@ -1482,6 +1485,7 @@ func _after_crash(p: Player) -> void:
 		d = water.y + TerrainField.WATER_BLEND + 6.0
 	if _field.near_road(d, 8.0):
 		d = _field.nearest_road(d) + TerrainField.ROAD_HALF_WIDTH + 20.0
+	if _field.in_rooftops(d): d = _field.roof_recovery(d)
 	p.sled.place_at(d, 0.0, 12.0, true)
 	p.sled.invulnerable_time = 2.5
 	p.camera.mode = ChaseCamera.Mode.CHASE
@@ -1511,6 +1515,10 @@ func _check_bounds(p: Player = null) -> void:
 	var outside := absf(p.sled.position.x - _field.center_x(d)) - _field.half_width(d)
 	var in_town := _field.region(d) == TerrainField.Region.TOWN
 	var kind := _field.region(d)
+	if _field.in_rooftops(d):
+		if _field.below_structure(p.sled.position) or p.sled.position.y < _field.roof_base_height(d) - 2.0:
+			_crash("Du missade taket!", p)
+		return
 	if _field.on_bridge(d):
 		var lateral := absf(p.sled.position.x - _field.center_x(d))
 		var above_deck := p.sled.position.y - _field.bridge_height(d)
@@ -1607,6 +1615,10 @@ func _on_landed(air_time: float, impact: float, spin: float, p: Player) -> void:
 		_add_bonus(p, degrees)
 		p.say("%d°! +%d" % [degrees, degrees], Hud.HOT, 60)
 		_sound.play("trick")
+	elif air_time > 0.35 and _field.in_rooftops(p.sled.distance()):
+		_add_bonus(p, 50)
+		p.say("Takhopp! +50", Hud.WARM)
+		_sound.play("trick", -4.0)
 	elif air_time > 0.7:
 		# Short hops still score, but only real flights get a call-out.
 		var points := int(air_time * 40.0)
@@ -1640,6 +1652,7 @@ func _find_region(name: String) -> float:
 		"woods": TerrainField.Region.WOODS, "mall": TerrainField.Region.MALL, "rail": TerrainField.Region.RAIL,
 		"airport": TerrainField.Region.AIRPORT, "highway": TerrainField.Region.HIGHWAY, "lake": TerrainField.Region.LAKE, "bandy": TerrainField.Region.BANDY, "cliff": TerrainField.Region.CLIFF,
 		"bridge": TerrainField.Region.BRIDGE,
+		"roofs": TerrainField.Region.ROOFS,
 	}.get(name, TerrainField.Region.TOWN) as TerrainField.Region
 	# A region can be skipped for a whole seeded cycle. Search slots directly
 	# and return the exact start, rather than silently falling back at 40 km.
