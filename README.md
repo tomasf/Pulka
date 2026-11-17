@@ -22,6 +22,12 @@ Menyn börjar med spelarval och sedan åkdon på den riktiga banan. Starten går
 vidare med en kamerarörelse och 3–2–1. Menylåten **Snödag** är separat från
 åkmusiken. [Menyflöde, musik och tester](tools/MENU_REVIEW.md).
 
+Bland specialregionerna finns en hängbro med 7,6 meter bred träbana över en
+ravin. Infarten smalnar av innan bron och räckena går att krascha i. Hoppar
+man över räcket kan man falla ner. Provkör nära bron med
+`godot --path . -- --start-region=bridge`, eller kör dess fysiktest med
+`godot --headless --path . --script res://tools/bridge_test.gd`.
+
 ## Apple TV
 
 Godot saknar officiellt tvOS-stöd, så Apple TV-versionen byggs med en egen

@@ -274,7 +274,8 @@ func _terrain_heights(build: ChunkBuild, deadline: float) -> bool:
 		var cx := field.center_x(d)
 		for c in cols:
 			var x := cx + _columns[c]
-			build.grid[r * cols + c] = Vector3(x, field.height(x, d, false), -d)
+			# Draw the valley floor beneath bridges; their deck is a separate mesh.
+			build.grid[r * cols + c] = Vector3(x, field.height(x, d, false, false), -d)
 		build.row += 1
 		if Time.get_ticks_usec() >= deadline:
 			break
@@ -691,6 +692,8 @@ func _place_obstacles(chunk: Chunk, rng: RandomNumberGenerator, d0: float, d1: f
 		if field.near_road(d, 22.0) or field.water_strip(d) != Vector2.ZERO:
 			continue
 		var here := field.region(d)
+		if here == TerrainField.Region.BRIDGE:
+			continue
 		var cx := field.center_x(d)
 		var hw := field.half_width(d)
 		var x := cx + rng.randf_range(-hw * 0.95, hw * 0.95)

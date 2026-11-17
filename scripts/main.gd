@@ -1511,6 +1511,12 @@ func _check_bounds(p: Player = null) -> void:
 	var outside := absf(p.sled.position.x - _field.center_x(d)) - _field.half_width(d)
 	var in_town := _field.region(d) == TerrainField.Region.TOWN
 	var kind := _field.region(d)
+	if _field.on_bridge(d):
+		var lateral := absf(p.sled.position.x - _field.center_x(d))
+		var above_deck := p.sled.position.y - _field.bridge_height(d)
+		if above_deck < -0.5 or (lateral > TerrainField.BRIDGE_HALF_WIDTH - 0.40 and above_deck < TerrainField.BRIDGE_RAIL_HEIGHT):
+			_crash("Du ramlade av bron!" if above_deck < -0.5 else "Rakt in i broräcket!", p)
+		return
 	if kind == TerrainField.Region.MALL and outside > 2.0:
 		_crash(["Rakt in i skyltfönstret!", "Du provade en tröja. Med ansiktet.", "Öppet köp gäller inte."][_rng.randi_range(0, 2)], p)
 		return
@@ -1633,12 +1639,14 @@ func _find_region(name: String) -> float:
 		"town": TerrainField.Region.TOWN, "river": TerrainField.Region.RIVER, "park": TerrainField.Region.PARK,
 		"woods": TerrainField.Region.WOODS, "mall": TerrainField.Region.MALL, "rail": TerrainField.Region.RAIL,
 		"airport": TerrainField.Region.AIRPORT, "highway": TerrainField.Region.HIGHWAY, "lake": TerrainField.Region.LAKE, "bandy": TerrainField.Region.BANDY, "cliff": TerrainField.Region.CLIFF,
+		"bridge": TerrainField.Region.BRIDGE,
 	}.get(name, TerrainField.Region.TOWN) as TerrainField.Region
-	var d := 0.0
-	while d < 40000.0:
-		if _field.region(d) == wanted:
-			return d
-		d += 25.0
+	# A region can be skipped for a whole seeded cycle. Search slots directly
+	# and return the exact start, rather than silently falling back at 40 km.
+	for cell in 256:
+		var span := _field._slot(cell)
+		if int(span.z) == wanted:
+			return span.x
 	return START_D
 
 

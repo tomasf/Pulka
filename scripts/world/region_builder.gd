@@ -49,6 +49,8 @@ func place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, 
 			_place_turn_off_arrows(decor, lo, hi, span)
 		TerrainField.Region.CLIFF:
 			_place_cliff(chunk, decor, rng, lo, hi, span)
+		TerrainField.Region.BRIDGE:
+			_place_bridge(chunk, decor, lo, hi, span)
 
 
 func _place_town(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: float) -> void:
@@ -219,6 +221,12 @@ func _rest_on_ground(vehicle: Obstacle, reach: float, track: float) -> void:
 func ground_color(kind: TerrainField.Region, x: float, lx: float, d: float, hw: float) -> Color:
 	var outside := absf(lx) - hw
 	match kind:
+		TerrainField.Region.BRIDGE:
+			var ends := field.bridge_span(d)
+			var lip := minf(d - ends.x, ends.y - d)
+			if lip > 2.0 and lip < 20.0:
+				return Color(0.49, 0.54, 0.61).lerp(Palette.SNOW_EDGE, 0.18 + 0.12 * sin(x * 0.9 + d * 0.7))
+			return Palette.SNOW_PACKED if lip < 0.0 else Color(0.77, 0.84, 0.91)
 		TerrainField.Region.TOWN:
 			if outside < -0.2:
 				return Color(0.66, 0.66, 0.7) if absf(absf(lx) - 3.2) < 0.7 else Color(0.8, 0.8, 0.83)
@@ -345,6 +353,8 @@ func obstacle_table(kind: TerrainField.Region) -> Array:
 
 func density(kind: TerrainField.Region) -> float:
 	match kind:
+		TerrainField.Region.BRIDGE:
+			return 0.0
 		TerrainField.Region.MALL:
 			return 0.8
 		TerrainField.Region.RAIL:
@@ -464,6 +474,21 @@ func _place_cliff(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, l
 				var fan := Props.posed(Props.person(rng.randi_range(0, 7)), rng.randf() * TAU, true)
 				fan.transform = world.ground_xform(field.center_x(d) + lx, d, (-PI / 2.0 if side > 0.0 else PI / 2.0) - world.street_yaw(d))
 				chunk.add_child(fan)
+
+
+func _place_bridge(chunk: Chunk, decor: Dictionary, lo: float, hi: float, span: Vector3) -> void:
+	var ends := Vector2(span.x + TerrainField.BRIDGE_APPROACH, span.y - TerrainField.BRIDGE_APPROACH)
+	var mesh := SuspensionBridge.build(field, lo, hi, ends)
+	if mesh:
+		var instance := MeshInstance3D.new()
+		instance.name = "SuspensionBridge"
+		instance.mesh = mesh
+		chunk.add_child(instance)
+	for d in [ends.x, ends.y]:
+		if d >= lo and d < hi:
+			# Deck cross sections and cables use world X too, so the portal's
+			# posts meet both cables even when the span crosses diagonally.
+			world.add_decor(decor, SuspensionBridge.tower(), Transform3D(Basis.IDENTITY, Vector3(field.center_x(d), field.bridge_height(d), -d)))
 
 
 # --- Traffic that lives as long as the region ---

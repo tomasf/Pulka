@@ -200,6 +200,8 @@ func _throw() -> void:
 	var target_d := -target.z
 	var side := -1.0 if _rng.randf() < 0.5 else 1.0
 	var launch_d := target_d + _rng.randf_range(-2.0, 8.0)
+	# The bridge sides are open air; snowball throwers need solid ground.
+	if field.on_bridge(launch_d): return
 	var x := field.center_x(launch_d) + side * (field.half_width(launch_d) + _rng.randf_range(1.0, 3.5))
 	var ground := field.height(x, launch_d)
 	var thrower := Props.posed(Props.person(_rng.randi_range(0, 7)), 1.0)

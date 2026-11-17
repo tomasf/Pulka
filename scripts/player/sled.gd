@@ -69,6 +69,7 @@ var _rumble := 0.0
 ## physics and the visuals ask for the same spot several times a frame.
 var _ground := Vector4.ZERO
 var _ground_at := Vector2.INF
+var _ground_below_bridge := false
 
 
 func _ready() -> void:
@@ -250,10 +251,16 @@ func _step_physics(dt: float, steer: float, tuck: float, jump: bool) -> void:
 ## The ground's normal and height under the ride, sampled once per spot.
 func _surface() -> Vector4:
 	var at := Vector2(position.x, position.z)
-	if at != _ground_at:
-		_ground = field.surface_world(at.x, at.y)
+	var below_bridge := _below_bridge()
+	if at != _ground_at or below_bridge != _ground_below_bridge:
+		_ground = field.surface_world(at.x, at.y, not below_bridge)
 		_ground_at = at
+		_ground_below_bridge = below_bridge
 	return _ground
+
+
+func _below_bridge() -> bool:
+	return field.on_bridge(-position.z) and position.y < field.bridge_height(-position.z) - 0.5
 
 
 func _surface_normal() -> Vector3:
@@ -366,7 +373,7 @@ func _step_crash(dt: float) -> void:
 	velocity.y -= GRAVITY * dt
 	position += velocity * dt
 	yaw += 4.0 * dt
-	var ground := field.height_world(position.x, position.z)
+	var ground := field.height_world(position.x, position.z, not _below_bridge())
 	if position.y < ground:
 		position.y = ground
 		velocity.y = maxf(velocity.y, 0.0)
@@ -445,7 +452,7 @@ func prune_trail(d: float) -> void:
 
 func _update_trail() -> void:
 	var d := distance()
-	if not on_ground or crashed or field.is_water(d) or field.region(d) == TerrainField.Region.MALL:
+	if not on_ground or crashed or field.is_water(d) or field.region(d) == TerrainField.Region.MALL or field.on_bridge(d):
 		_trail.lift()
 		return
 	# A spinning ride smears along where it is going, not where it points.

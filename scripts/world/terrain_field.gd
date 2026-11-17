@@ -13,7 +13,7 @@ extends RefCounted
 ## run still feels like a sledding hill.
 
 enum Zone { OPEN, FOREST, MOGULS, VILLAGE, WILDLIFE }
-enum Region { SLOPE, TOWN, RIVER, PARK, WOODS, MALL, RAIL, AIRPORT, LAKE, BANDY, HIGHWAY, CLIFF }
+enum Region { SLOPE, TOWN, RIVER, PARK, WOODS, MALL, RAIL, AIRPORT, LAKE, BANDY, HIGHWAY, CLIFF, BRIDGE }
 ## How the ground meets the edge of the track.
 enum Edge { BANK, KERB, GORGE, FLOOR }
 
@@ -31,6 +31,7 @@ const REGION_STYLE := {
 	Region.HIGHWAY: {"width": 22.0, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.0, "length": 300.0, "roads": false, "ramps": false},
 	Region.BANDY: {"width": 24.0, "edge": Edge.KERB, "grip": 0.35, "rough": 0.0, "length": 200.0, "roads": false, "ramps": false},
 	Region.CLIFF: {"width": 24.0, "edge": Edge.BANK, "grip": 1.0, "rough": 0.0, "length": 300.0, "roads": false, "ramps": false},
+	Region.BRIDGE: {"width": 3.8, "edge": Edge.FLOOR, "grip": 0.9, "rough": 0.0, "length": 280.0, "roads": false, "ramps": false},
 }
 
 const ZONE_LENGTH := 280.0
@@ -63,6 +64,13 @@ const CLIFF_LAND := 36.0
 const CLIFF_RUNOUT := 100.0
 ## Horizontal run of the sheer face.
 const CLIFF_LIP := 1.2
+## Snowy approaches narrow before the suspended span. The valley floor is
+## separate from the rideable deck, so going over the railing means falling.
+const BRIDGE_APPROACH := 50.0
+const BRIDGE_HALF_WIDTH := 3.8
+const BRIDGE_DEPTH := 34.0
+const BRIDGE_SAG := 2.8
+const BRIDGE_RAIL_HEIGHT := 1.25
 
 var world_seed: int
 var _noise := FastNoiseLite.new()
@@ -106,10 +114,20 @@ func difficulty(d: float) -> float:
 
 
 func center_x(d: float) -> float:
-	var amount := smoothstep(0.0, 300.0, d)
-	var x := amount * (34.0 * sin(d * 0.0042 + _phases[0]) + 14.0 * sin(d * 0.0105 + _phases[1]) - 34.0 * sin(_phases[0]) - 14.0 * sin(_phases[1]))
+	var x := _slope_center(d)
+	var span := region_span(d)
+	if int(span.z) == Region.BRIDGE:
+		var ends := Vector2(span.x + BRIDGE_APPROACH, span.y - BRIDGE_APPROACH)
+		var t := (d - ends.x) / (ends.y - ends.x)
+		var straight := lerpf(_slope_center(ends.x), _slope_center(ends.y), t)
+		x = lerpf(x, straight, _bridge_alignment(span, d))
 	# Forest trails wind back and forth between the trees.
 	return x + region_weight(d, Region.WOODS) * 7.0 * sin(d * 0.03 + _phases[6])
+
+
+func _slope_center(d: float) -> float:
+	var amount := smoothstep(0.0, 300.0, d)
+	return amount * (34.0 * sin(d * 0.0042 + _phases[0]) + 14.0 * sin(d * 0.0105 + _phases[1]) - 34.0 * sin(_phases[0]) - 14.0 * sin(_phases[1]))
 
 
 func center_slope(d: float) -> float:
@@ -255,6 +273,37 @@ func style(kind: int) -> Dictionary:
 	return REGION_STYLE.get(kind, {})
 
 
+# --- Suspension bridge ---
+
+## Deck endpoints, or ZERO off a bridge region (including its approaches).
+func bridge_span(d: float) -> Vector2:
+	var span := region_span(d)
+	return Vector2(span.x + BRIDGE_APPROACH, span.y - BRIDGE_APPROACH) if int(span.z) == Region.BRIDGE else Vector2.ZERO
+
+
+func on_bridge(d: float) -> bool:
+	var ends := bridge_span(d)
+	return ends != Vector2.ZERO and d >= ends.x and d <= ends.y
+
+
+func _bridge_alignment(span: Vector3, d: float) -> float:
+	return smoothstep(span.x, span.x + BRIDGE_APPROACH, d) * (1.0 - smoothstep(span.y - BRIDGE_APPROACH, span.y, d))
+
+
+func _bridge_profile(ends: Vector2, d: float) -> float:
+	var t := (d - ends.x) / (ends.y - ends.x)
+	return lerpf(base_height(ends.x), base_height(ends.y), t) - 4.0 * BRIDGE_SAG * t * (1.0 - t)
+
+
+func bridge_height(d: float) -> float:
+	var ends := bridge_span(d)
+	return _bridge_profile(ends, d) + 0.025 if ends != Vector2.ZERO else base_height(d)
+
+
+func _bridge_normal(d: float) -> Vector3:
+	return Vector3(0, 1, (bridge_height(d + 0.1) - bridge_height(d - 0.1)) / 0.2).normalized()
+
+
 ## Grip multiplier for the surface: patchy ice is glassy, frozen rivers,
 ## bandy rinks and polished mall floors slippery all over.
 func grip_factor(x: float, d: float) -> float:
@@ -329,7 +378,7 @@ func base_height(d: float) -> float:
 	return -descent + rolls * smoothstep(0.0, 200.0, d) - cliff_drop(d)
 
 
-func height(x: float, d: float, with_ramps := true) -> float:
+func height(x: float, d: float, with_ramps := true, with_bridge := true) -> float:
 	var span := region_span(d)
 	var weight := _span_weight(span, d)
 	var look := style(int(span.z))
@@ -370,27 +419,41 @@ func height(x: float, d: float, with_ramps := true) -> float:
 		h = lerpf(h, road_level(road), w)
 	if with_ramps:
 		h += ramp_height(x, d)
+	if int(span.z) == Region.BRIDGE:
+		var ends := Vector2(span.x + BRIDGE_APPROACH, span.y - BRIDGE_APPROACH)
+		h += (_bridge_profile(ends, d) - base_height(d)) * _bridge_alignment(span, d)
+		var valley := smoothstep(ends.x, ends.x + 22.0, d) * (1.0 - smoothstep(ends.y - 22.0, ends.y, d))
+		h -= BRIDGE_DEPTH * valley
+		if with_bridge and d >= ends.x and d <= ends.y and absf(x - center_x(d)) <= BRIDGE_HALF_WIDTH:
+			h = _bridge_profile(ends, d) + 0.025
 	return h
 
 
-func height_world(x: float, z: float) -> float:
-	return height(x, -z)
+func height_world(x: float, z: float, with_bridge := true) -> float:
+	return height(x, -z, true, with_bridge)
 
 
 ## Height and normal at a world point together: xyz is the normal and w the
 ## height. Three height lookups (one-sided differences) instead of the five
 ## that height_world and normal_world take apart; the ride's physics uses it
 ## several times a frame.
-func surface_world(x: float, z: float) -> Vector4:
+func surface_world(x: float, z: float, with_bridge := true) -> Vector4:
+	# Finite differences must not sample the ravine beside a deck edge and
+	# turn a level plank into a near-vertical collision normal.
+	if with_bridge and on_bridge(-z) and absf(x - center_x(-z)) <= BRIDGE_HALF_WIDTH:
+		var n := _bridge_normal(-z)
+		return Vector4(n.x, n.y, n.z, bridge_height(-z))
 	var e := 0.35
-	var h := height_world(x, z)
-	var hx := (height_world(x + e, z) - h) / e
-	var hz := (height_world(x, z + e) - h) / e
+	var h := height_world(x, z, with_bridge)
+	var hx := (height_world(x + e, z, with_bridge) - h) / e
+	var hz := (height_world(x, z + e, with_bridge) - h) / e
 	var n := Vector3(-hx, 1.0, -hz).normalized()
 	return Vector4(n.x, n.y, n.z, h)
 
 
 func normal_world(x: float, z: float) -> Vector3:
+	if on_bridge(-z) and absf(x - center_x(-z)) <= BRIDGE_HALF_WIDTH:
+		return _bridge_normal(-z)
 	var e := 0.35
 	var hx := (height_world(x + e, z) - height_world(x - e, z)) / (2.0 * e)
 	var hz := (height_world(x, z + e) - height_world(x, z - e)) / (2.0 * e)
