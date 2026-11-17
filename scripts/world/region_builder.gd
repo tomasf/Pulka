@@ -57,6 +57,8 @@ func place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, 
 			IceCavern.populate(world, chunk, decor, lo, hi, span)
 		TerrainField.Region.HARBOR:
 			ContainerHarbor.populate(world, chunk, decor, lo, hi, span)
+		TerrainField.Region.SEWER:
+			SewerPipe.populate(world, chunk, decor, lo, hi, span)
 
 
 func _place_town(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: float) -> void:
@@ -227,6 +229,8 @@ func _rest_on_ground(vehicle: Obstacle, reach: float, track: float) -> void:
 func ground_color(kind: TerrainField.Region, x: float, lx: float, d: float, hw: float) -> Color:
 	var outside := absf(lx) - hw
 	match kind:
+		TerrainField.Region.SEWER:
+			return Color("64745a") if field.in_sewer(d) and absf(lx) < TerrainField.SEWER_RADIUS + 1 else Palette.SNOW_PACKED
 		TerrainField.Region.ICE_CAVE:
 			return Color("83c6dd") if outside < 0 else Palette.SNOW_EDGE
 		TerrainField.Region.HARBOR:
@@ -368,7 +372,7 @@ func obstacle_table(kind: TerrainField.Region) -> Array:
 
 func density(kind: TerrainField.Region) -> float:
 	match kind:
-		TerrainField.Region.BRIDGE, TerrainField.Region.ROOFS, TerrainField.Region.ICE_CAVE, TerrainField.Region.HARBOR:
+		TerrainField.Region.BRIDGE, TerrainField.Region.ROOFS, TerrainField.Region.ICE_CAVE, TerrainField.Region.HARBOR, TerrainField.Region.SEWER:
 			return 0.0
 		TerrainField.Region.MALL:
 			return 0.8
@@ -657,7 +661,7 @@ const MALL_INSET := 6.0
 ## True while d is under the mall roof.
 func indoors(d: float) -> bool:
 	var span := field.region_span(d)
-	return field.in_cave(d) or (span.z == TerrainField.Region.MALL and d > span.x + MALL_INSET and d < span.y - MALL_INSET)
+	return field.in_cave(d) or field.in_sewer(d) or (span.z == TerrainField.Region.MALL and d > span.x + MALL_INSET and d < span.y - MALL_INSET)
 
 
 func _mall_tile(lx: float, d: float, hw: float) -> Color:

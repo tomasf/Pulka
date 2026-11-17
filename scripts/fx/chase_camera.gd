@@ -84,6 +84,14 @@ func update_camera(delta: float) -> void:
 			_update_crash(delta)
 		Mode.START:
 			_update_start(delta)
+	if field.in_sewer(-position.z):
+		var d := -position.z
+		var center := Vector2(field.center_x(d), field.sewer_height(d) + TerrainField.SEWER_RADIUS)
+		var radial := Vector2(position.x, position.y) - center
+		if radial.length() > TerrainField.SEWER_RADIUS - 0.45:
+			radial = radial.normalized() * (TerrainField.SEWER_RADIUS - 0.45)
+			position.x = center.x + radial.x
+			position.y = center.y + radial.y
 	# Keep the chase/crash camera within the same glacier vault as the rider.
 	if field.in_cave(-position.z):
 		var d := -position.z
@@ -119,6 +127,9 @@ func _speed_factor() -> float:
 
 
 func _update_chase(delta: float) -> void:
+	if target.sewer_active:
+		_update_sewer_chase(delta)
+		return
 	var velocity := target.travel_velocity()
 	var flat := Vector3(velocity.x, 0.0, velocity.z)
 	var dir := flat.normalized() if flat.length() > 2.0 else target.forward()
@@ -144,6 +155,28 @@ func _update_chase(delta: float) -> void:
 	# Rumble grows with speed, so a ride standing still (countdown) is calm.
 	var bumps := 0.04 if target.on_ground and field.bumpiness(target.distance()) > 0.5 else 0.0
 	_apply_shake(minf(sf, 1.0) * (0.012 + bumps) + sf * sf * 0.05)
+
+
+func _update_sewer_chase(delta: float) -> void:
+	var travel := target.velocity.normalized() if target.speed() > 2 else target.forward()
+	# Keep looking down the tunnel while the rider circles it. Looking
+	# straight along a fast sideways carve fills the screen with concrete.
+	var dir := (-target.sewer_frame().z).lerp(travel, 0.25).normalized()
+	_look_dir = _look_dir.lerp(dir, 1 - exp(-18 * delta)).normalized()
+	var sf := _speed_factor()
+	var distance := lerpf(4.4, 3.25, minf(sf, 1))
+	var height := lerpf(2.9, 2.35, minf(sf, 1))
+	var desired := target.position - _look_dir * distance + target.sewer_up() * height
+	position = position.lerp(desired, 1 - exp(-24 * delta))
+	# A distant tangent points through the wall during a tight loop. Keep
+	# the rider and the next few metres in view. The horizon stays level with
+	# the world, just like when riding a bank outside the tunnel.
+	var look := target.position + _look_dir * 8
+	if position.distance_squared_to(look) > 0.01 and absf((look - position).normalized().dot(Vector3.UP)) < 0.999:
+		look_at(look, Vector3.UP)
+	var boost := 8.0 if target.boost_time > 0 else 0.0
+	fov = lerpf(fov, 53 + 26.5 * pow(minf(sf, 1.2), 1.3) + boost, 1 - exp(-3 * delta))
+	_apply_shake(minf(sf, 1) * 0.012)
 
 
 func _update_orbit(delta: float) -> void:

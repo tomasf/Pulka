@@ -8,9 +8,12 @@ var movers: Array[Obstacle] = []
 var pickups: Array[Pickup] = []
 var roads: Array[RoadCrossing] = []
 var birds: Array[AmbientBird] = []
+var rats: Array[SewerRat] = []
 
 
 func tick(delta: float, observers := PackedVector3Array(), speeds := PackedFloat32Array()) -> void:
+	for rat in rats:
+		rat.tick(delta, observers)
 	for bird in birds:
 		bird.tick(delta, observers, speeds)
 	for mover in movers:

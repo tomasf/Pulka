@@ -13,7 +13,7 @@ extends RefCounted
 ## run still feels like a sledding hill.
 
 enum Zone { OPEN, FOREST, MOGULS, VILLAGE, WILDLIFE }
-enum Region { SLOPE, TOWN, RIVER, PARK, WOODS, MALL, RAIL, AIRPORT, LAKE, BANDY, HIGHWAY, CLIFF, BRIDGE, ROOFS, ICE_CAVE, HARBOR }
+enum Region { SLOPE, TOWN, RIVER, PARK, WOODS, MALL, RAIL, AIRPORT, LAKE, BANDY, HIGHWAY, CLIFF, BRIDGE, ROOFS, ICE_CAVE, HARBOR, SEWER }
 ## How the ground meets the edge of the track.
 enum Edge { BANK, KERB, GORGE, FLOOR }
 
@@ -35,6 +35,7 @@ const REGION_STYLE := {
 	Region.ROOFS: {"width": 17.5, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.0, "length": 340.0, "roads": false, "ramps": false},
 	Region.ICE_CAVE: {"width": 10.5, "edge": Edge.FLOOR, "grip": 0.28, "rough": 0.0, "length": 300.0, "roads": false, "ramps": false},
 	Region.HARBOR: {"width": 18.0, "edge": Edge.FLOOR, "grip": 1.0, "rough": 0.0, "length": 320.0, "roads": false, "ramps": false},
+	Region.SEWER: {"width": 7.0, "edge": Edge.FLOOR, "grip": 0.75, "rough": 0.0, "length": 340.0, "roads": false, "ramps": false},
 }
 
 const ZONE_LENGTH := 280.0
@@ -89,6 +90,10 @@ const HARBOR_QUAY_EDGE := 20.0
 const HARBOR_ROUTE_X := -7.0
 const HARBOR_ROUTE_HALF_WIDTH := 2.6
 const HARBOR_ROUTE_HEIGHT := 4.0
+const SEWER_INSET := 30.0
+const SEWER_RADIUS := 8.0
+## Distance, recommended passage offset; shared by barriers and breadcrumbs.
+const SEWER_PASSAGES := [Vector2(30, 0), Vector2(78, 3.6), Vector2(130, -2.8), Vector2(182, -3.6), Vector2(234, 3.6), Vector2(282, 3.6), Vector2(310, 0)]
 
 ## One building's analytic footprint and snow surface. Meshes, collisions,
 ## pickups and recovery all use these same immutable seeded descriptors.
@@ -158,14 +163,14 @@ func difficulty(d: float) -> float:
 func center_x(d: float) -> float:
 	var x := _slope_center(d)
 	var span := region_span(d)
-	if int(span.z) in [Region.BRIDGE, Region.ROOFS, Region.HARBOR]:
+	if int(span.z) in [Region.BRIDGE, Region.ROOFS, Region.HARBOR, Region.SEWER]:
 		var approach := BRIDGE_APPROACH if int(span.z) == Region.BRIDGE else (ROOF_APPROACH if int(span.z) == Region.ROOFS else HARBOR_INSET)
 		var ends := Vector2(span.x + approach, span.y - approach)
 		var t := (d - ends.x) / (ends.y - ends.x)
 		var straight := lerpf(_slope_center(ends.x), _slope_center(ends.y), t)
 		x = lerpf(x, straight, smoothstep(span.x, ends.x, d) * (1.0 - smoothstep(ends.y, span.y, d)))
 	# Forest trails wind back and forth between the trees.
-	return x + region_weight(d, Region.WOODS) * 7.0 * sin(d * 0.03 + _phases[6]) + region_weight(d, Region.ICE_CAVE) * 4.0 * sin(d * 0.025 + _phases[7])
+	return x + region_weight(d, Region.WOODS) * 7.0 * sin(d * 0.03 + _phases[6]) + region_weight(d, Region.ICE_CAVE) * 4.0 * sin(d * 0.025 + _phases[7]) + region_weight(d, Region.SEWER) * 3.5 * sin(d * 0.024 + _phases[6])
 
 
 func _slope_center(d: float) -> float:
@@ -521,6 +526,59 @@ func cave_ceiling(x: float, d: float) -> float:
 	return height(center_x(d), d, false) + lerpf(cave_arch_height(left, d), cave_arch_height(minf(left + 1, 16), d), t)
 
 
+# --- Sewer: circular floor and ceiling use the same radius as the pipe ---
+
+func sewer_span(d: float) -> Vector2:
+	var span := region_span(d)
+	return Vector2(span.x + SEWER_INSET, span.y - SEWER_INSET) if int(span.z) == Region.SEWER else Vector2.ZERO
+
+
+func in_sewer(d: float) -> bool:
+	var ends := sewer_span(d)
+	return ends != Vector2.ZERO and d >= ends.x and d <= ends.y
+
+
+func sewer_weight(d: float) -> float:
+	var ends := sewer_span(d)
+	return smoothstep(ends.x, ends.x + 10, d) * (1 - smoothstep(ends.y - 10, ends.y, d)) if ends != Vector2.ZERO else 0.0
+
+
+func sewer_height(d: float) -> float:
+	var ends := sewer_span(d)
+	return lerpf(base_height(ends.x), base_height(ends.y), (d - ends.x) / (ends.y - ends.x)) if ends != Vector2.ZERO else base_height(d)
+
+
+func sewer_floor(x: float, d: float) -> float:
+	var lx := clampf(x - center_x(d), -SEWER_RADIUS + 0.01, SEWER_RADIUS - 0.01)
+	return sewer_height(d) + SEWER_RADIUS - sqrt(SEWER_RADIUS * SEWER_RADIUS - lx * lx)
+
+
+func sewer_ceiling(x: float, d: float) -> float:
+	var lx := x - center_x(d)
+	return sewer_height(d) + SEWER_RADIUS + sqrt(maxf(0, SEWER_RADIUS * SEWER_RADIUS - lx * lx))
+
+
+func sewer_surface(x: float, d: float) -> Vector4:
+	var lx := clampf(x - center_x(d), -7.99, 7.99)
+	var across := lx / sqrt(SEWER_RADIUS * SEWER_RADIUS - lx * lx)
+	var ends := sewer_span(d)
+	var slope := (base_height(ends.y) - base_height(ends.x)) / (ends.y - ends.x)
+	var normal := Vector3(-across, 1, slope - center_slope(d) * across).normalized()
+	return Vector4(normal.x, normal.y, normal.z, sewer_floor(x, d))
+
+
+func sewer_guide(d: float) -> float:
+	var span := region_span(d)
+	if int(span.z) != Region.SEWER: return 0.0
+	var u := d - span.x
+	for i in range(1, SEWER_PASSAGES.size()):
+		var next: Vector2 = SEWER_PASSAGES[i]
+		var previous: Vector2 = SEWER_PASSAGES[i - 1]
+		if u <= next.x:
+			return lerpf(previous.y, next.y, smoothstep(previous.x + 8, next.x - 8, u))
+	return 0.0
+
+
 # --- Container harbour ---
 
 func harbor_span(d: float) -> Vector2:
@@ -595,6 +653,7 @@ func _harbor_surface(x: float, d: float, lift: float) -> Vector4:
 ## Grip multiplier for the surface: patchy ice is glassy, frozen rivers,
 ## bandy rinks and polished mall floors slippery all over.
 func grip_factor(x: float, d: float) -> float:
+	if in_sewer(d): return 0.55 if absf(x - center_x(d)) < 1.3 else 1.1
 	if is_ice(x, d):
 		return 0.12
 	var kind := region(d)
@@ -733,6 +792,14 @@ func height(x: float, d: float, with_ramps := true, with_structures := true) -> 
 		if with_structures:
 			var lift := harbor_surface_lift(x, d)
 			if lift >= 0: h = harbor_height(d) + lift + 0.035
+	if int(span.z) == Region.SEWER and absf(x - center_x(d)) < SEWER_RADIUS + 14:
+		var ends := Vector2(span.x + SEWER_INSET, span.y - SEWER_INSET)
+		var alignment := smoothstep(span.x, ends.x, d) * (1 - smoothstep(ends.y, span.y, d))
+		var lateral := absf(x - center_x(d))
+		# Snow banks outside the pipe meet its buried lower half gradually.
+		var bank_blend := smoothstep(SEWER_RADIUS - 0.05, SEWER_RADIUS + 12, lateral)
+		h = lerpf(h, lerpf(sewer_floor(x, d), h, bank_blend), alignment)
+		if not with_structures: h -= 0.25 * alignment * (1 - smoothstep(SEWER_RADIUS - 0.2, SEWER_RADIUS + 0.2, lateral))
 	return h
 
 
@@ -745,6 +812,7 @@ func height_world(x: float, z: float, with_structures := true) -> float:
 ## that height_world and normal_world take apart; the ride's physics uses it
 ## several times a frame.
 func surface_world(x: float, z: float, with_structures := true) -> Vector4:
+	if in_sewer(-z) and absf(x - center_x(-z)) < SEWER_RADIUS - 0.1: return sewer_surface(x, -z)
 	# Finite differences must not sample the ravine beside a deck edge and
 	# turn a level plank into a near-vertical collision normal.
 	if with_structures and on_bridge(-z) and absf(x - center_x(-z)) <= BRIDGE_HALF_WIDTH:
@@ -764,6 +832,9 @@ func surface_world(x: float, z: float, with_structures := true) -> Vector4:
 
 
 func normal_world(x: float, z: float) -> Vector3:
+	if in_sewer(-z) and absf(x - center_x(-z)) < SEWER_RADIUS - 0.1:
+		var surface := sewer_surface(x, -z)
+		return Vector3(surface.x, surface.y, surface.z)
 	var lift := harbor_surface_lift(x, -z)
 	if lift >= 0:
 		var surface := _harbor_surface(x, -z, lift)

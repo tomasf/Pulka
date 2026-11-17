@@ -24,6 +24,7 @@ const CRASH_LINES := {
 	Obstacle.Kind.TREE: ["Granen vann.", "Trädkramare!", "Barr i munnen.", "Granen stod där först."],
 	Obstacle.Kind.ROCK: ["Stenhårt!", "Stenen rörde sig inte en millimeter.", "Aj, aj, sten!"],
 	Obstacle.Kind.STUMP: ["Stubben var där först.", "Stubbad!"],
+	Obstacle.Kind.SEWER_DEBRIS: ["Stopp i avloppet!", "Du fastnade i gallret!"],
 	Obstacle.Kind.ICE_PILLAR: ["Ispelaren stod stadigt.", "Iskallt möte!"],
 	Obstacle.Kind.CONTAINER: ["Containern vann.", "Du blev fraktgods!"],
 	Obstacle.Kind.CHIMNEY: ["Skorstenen vann.", "Sotare för en dag!", "Rakt in i skorstenen!"],
@@ -321,19 +322,27 @@ func _process(delta: float) -> void:
 		var playing := state == State.PLAYING and not lead.sled.crashed
 		_director.sled = lead.sled
 		_director.update(delta, playing)
-		_atmosphere.indoor = _world.regions.indoors(lead.sled.distance())
-		_atmosphere.cave = _field.cave_weight(lead.sled.distance())
-		for p in _players:
-			p.camera.update_camera(delta)
-		var rush := lead.sled.speed() / 45.0 if playing and not _racing else 0.0
-		_atmosphere.update_atmosphere(delta, _players[0].camera, lead.sled.distance(), rush, lead.sled.boost_time > 0.0 and not _racing)
-		_atmosphere.follow_second_view(_players[1].camera if _players.size() > 1 else null)
+		_update_atmospheres(delta)
 		_sound.set_motion(delta, lead.sled.speed(), lead.sled.on_ground, state == State.PLAYING and not lead.sled.crashed)
 	FpsMeter.record_logic(Time.get_ticks_usec() - started)
 	_maybe_screenshot()
 
 
-## The rider out in front: the one events follow and the weather is for.
+func _update_atmospheres(delta: float) -> void:
+	for p in _players:
+		var atmosphere := p.atmosphere
+		if atmosphere != _atmosphere: atmosphere.copy_weather(_atmosphere)
+		var d := p.sled.distance()
+		atmosphere.indoor = _world.regions.indoors(d)
+		atmosphere.cave = _field.cave_weight(d)
+		atmosphere.sewer = _field.sewer_weight(d)
+		p.camera.update_camera(delta)
+		var playing := state == State.PLAYING and not p.sled.crashed
+		var rush := p.sled.speed() / 45.0 if playing and not _racing else 0.0
+		atmosphere.update_atmosphere(delta, p.camera, d, rush, p.sled.boost_time > 0.0 and not _racing)
+
+
+## The rider out in front: the one events and shared game audio follow.
 func _leader() -> Player:
 	var lead := _players[0]
 	for p in _players:
@@ -356,6 +365,11 @@ func _make_player(index: int, camera: ChaseCamera, controls: PlayerControls) -> 
 	_world_root.add_child(sled)
 	var p := Player.new(index, sled, camera, controls)
 	p.atmosphere = _atmosphere
+	if index > 0:
+		p.atmosphere = Atmosphere.new()
+		p.atmosphere.view_index = index
+		_world_root.add_child(p.atmosphere)
+	p.atmosphere.bind_camera(camera)
 	p.rumbles = not (_autopilot or _muted or DisplayServer.get_name() == "headless")
 	p.vehicle = _vehicle
 	sled.jumped.connect(_on_jumped.bind(p))
@@ -840,6 +854,7 @@ func _leave_split() -> void:
 		var other: Player = _players.pop_back()
 		other.sled.queue_free()
 		other.camera.queue_free()
+		other.atmosphere.queue_free()
 	_split.queue_free()
 	_split = null
 	_racing = false
@@ -1182,11 +1197,11 @@ func _apply_graphics() -> void:
 	viewport.scaling_3d_mode = Quality.scaling_mode()
 	viewport.scaling_3d_scale = Quality.render_scale()
 	for p in _players:
+		p.atmosphere.apply_quality()
 		var half := p.camera.get_viewport()
 		if half != viewport:
 			half.scaling_3d_mode = Quality.scaling_mode()
 			half.scaling_3d_scale = Quality.render_scale()
-	_atmosphere.apply_quality()
 
 
 func _close_settings() -> void:
@@ -1273,7 +1288,8 @@ const WIPEOUT_LINES := ["Vurpa!", "Hoppla!", "Puh, klarade mig!", "Det där gjor
 func _check_collisions(p: Player = null) -> void:
 	if p == null:
 		p = _players[0]
-	var probe := p.sled.position + Vector3.UP * 0.3
+	var up := p.sled.sewer_up() if p.sled.sewer_active else Vector3.UP
+	var probe := p.sled.position + up * 0.3
 	var d := p.sled.distance()
 	for obstacle in _world.obstacles_near(d):
 		if not obstacle.visible or obstacle.hit:
@@ -1284,7 +1300,7 @@ func _check_collisions(p: Player = null) -> void:
 		if obstacle.landable and _on_top(p, obstacle, probe):
 			_top_hop(p, obstacle)
 			continue
-		var contact := _contact(obstacle, probe)
+		var contact := _contact(obstacle, probe, up)
 		if p.sled.invulnerable_time <= 0.0 and contact != Vector3.INF:
 			_impact(p, obstacle, contact)
 			if p.sled.crashed:
@@ -1301,10 +1317,10 @@ func _check_collisions(p: Player = null) -> void:
 
 ## Where the ride touches `obstacle`, or INF. Spruces are also checked at
 ## the rider's chest, which brushes the low branches the sled slips under.
-func _contact(obstacle: Obstacle, probe: Vector3) -> Vector3:
+func _contact(obstacle: Obstacle, probe: Vector3, up := Vector3.UP) -> Vector3:
 	if obstacle.overlaps(probe, Sled.RADIUS):
 		return probe
-	var chest := probe + Vector3.UP * RIDER_CHEST
+	var chest := probe + up * RIDER_CHEST
 	if obstacle.kind in [Obstacle.Kind.TREE, Obstacle.Kind.CONTAINER] and obstacle.overlaps(chest, Sled.RADIUS * 0.6):
 		return chest
 	return Vector3.INF
@@ -1496,7 +1512,7 @@ func _after_crash(p: Player) -> void:
 		d = _field.nearest_road(d) + TerrainField.ROAD_HALF_WIDTH + 20.0
 	if _field.in_rooftops(d): d = _field.roof_recovery(d)
 	# A fixed clear line through the cave avoids respawning inside a column.
-	var lateral := -5.3 if _field.in_cave(d) else 0.0
+	var lateral := _field.sewer_guide(d) if _field.in_sewer(d) else (-5.3 if _field.in_cave(d) else 0.0)
 	p.sled.place_at(d, lateral, 12.0, true)
 	p.sled.invulnerable_time = 2.5
 	p.camera.mode = ChaseCamera.Mode.CHASE
@@ -1526,6 +1542,9 @@ func _check_bounds(p: Player = null) -> void:
 	var outside := absf(p.sled.position.x - _field.center_x(d)) - _field.half_width(d)
 	var in_town := _field.region(d) == TerrainField.Region.TOWN
 	var kind := _field.region(d)
+	if _field.in_sewer(d):
+		# The pipe is a sliding contact resolved during each physics substep.
+		return
 	if _field.in_cave(d):
 		if outside > -0.65 or p.sled.position.y + 1.25 > _field.cave_ceiling(p.sled.position.x, d):
 			_crash("Rakt in i isväggen!", p)
@@ -1566,7 +1585,7 @@ func _check_bounds(p: Player = null) -> void:
 func _check_pickups(p: Player = null) -> void:
 	if p == null:
 		p = _players[0]
-	var probe := p.sled.position + Vector3.UP * 0.6
+	var probe := p.sled.position + (p.sled.sewer_up() if p.sled.sewer_active else Vector3.UP) * 0.6
 	for pickup in _world.pickups_near(p.sled.distance()):
 		if not pickup.touches(probe):
 			continue
@@ -1657,7 +1676,9 @@ func _autopilot_steer(p: Player = null) -> float:
 		p = _players[0]
 	var d := p.sled.distance()
 	var look := d + 22.0
+	if not _reckless and (_field.in_sewer(d) or _field.in_sewer(look)): return SewerPipe.autopilot(p.sled)
 	var target_x := _field.center_x(look)
+	if _field.in_sewer(look): target_x += _field.sewer_guide(look)
 	if _reckless:
 		return clampf(wrapf(atan2(target_x - p.sled.position.x, look - d) - p.sled.yaw, -PI, PI) * 3.0, -1.0, 1.0)
 	for obstacle in _world.obstacles_near(d + 20.0):
@@ -1676,7 +1697,7 @@ func _find_region(name: String) -> float:
 		"airport": TerrainField.Region.AIRPORT, "highway": TerrainField.Region.HIGHWAY, "lake": TerrainField.Region.LAKE, "bandy": TerrainField.Region.BANDY, "cliff": TerrainField.Region.CLIFF,
 		"bridge": TerrainField.Region.BRIDGE,
 		"roofs": TerrainField.Region.ROOFS,
-		"cave": TerrainField.Region.ICE_CAVE, "harbor": TerrainField.Region.HARBOR,
+		"cave": TerrainField.Region.ICE_CAVE, "harbor": TerrainField.Region.HARBOR, "sewer": TerrainField.Region.SEWER,
 	}.get(name, TerrainField.Region.TOWN) as TerrainField.Region
 	# A region can be skipped for a whole seeded cycle. Search slots directly
 	# and return the exact start, rather than silently falling back at 40 km.

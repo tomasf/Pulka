@@ -70,6 +70,11 @@ var _rumble := 0.0
 var _ground := Vector4.ZERO
 var _ground_at := Vector2.INF
 var _ground_below_structure := false
+## Heading in the pipe's tangent plane; positive turns around its right wall.
+var sewer_active := false
+var _sewer_heading := 0.0
+var _sewer_forward := Vector3.FORWARD
+var _sewer_up := Vector3.UP
 
 
 func _ready() -> void:
@@ -113,7 +118,12 @@ func travel_velocity() -> Vector3:
 
 
 func forward() -> Vector3:
+	if sewer_active: return _sewer_forward
 	return Vector3(sin(yaw), 0.0, -cos(yaw))
+
+
+func sewer_up() -> Vector3:
+	return _sewer_up if sewer_active and on_ground else _up
 
 
 func rider_position() -> Vector3:
@@ -122,6 +132,7 @@ func rider_position() -> Vector3:
 
 ## `keep_trail` leaves the tracks so far (back on the slope after a crash).
 func place_at(d: float, lateral := 0.0, start_speed := 0.0, keep_trail := false) -> void:
+	sewer_active = false
 	var x := field.center_x(d) + lateral
 	position = Vector3(x, field.height(x, d), -d)
 	var direction := field.track_dir(d)
@@ -167,6 +178,10 @@ func step(delta: float, steer: float, tuck: float, jump: bool) -> void:
 
 
 func _step_physics(dt: float, steer: float, tuck: float, jump: bool) -> void:
+	if field.in_sewer(distance()):
+		_step_sewer(dt, steer, tuck, jump)
+		return
+	sewer_active = false
 	var gravity := GRAVITY
 	if on_ground:
 		_ground_time += dt
@@ -248,6 +263,128 @@ func _step_physics(dt: float, steer: float, tuck: float, jump: bool) -> void:
 	_resolve_ground()
 
 
+## Orthonormal frame of the circular surface: X goes around the pipe,
+## Y points inward, -Z runs downhill. It works above the centreline too.
+func sewer_frame() -> Basis:
+	var d := distance()
+	var center := Vector2(field.center_x(d), field.sewer_height(d) + TerrainField.SEWER_RADIUS)
+	var radial := (Vector2(position.x, position.y) - center).normalized()
+	if radial == Vector2.ZERO: radial = Vector2(0, -1)
+	var ends := field.sewer_span(d)
+	var grade := (field.base_height(ends.y) - field.base_height(ends.x)) / (ends.y - ends.x)
+	var inward := -Vector3(radial.x, radial.y, radial.x * field.center_slope(d) + radial.y * grade).normalized()
+	var around := Vector3(-radial.y, radial.x, 0)
+	return Basis(around, inward, around.cross(inward))
+
+
+## A pipe's normal force does no work. Transport tangent velocity between
+## frames instead of repeatedly projecting it and losing speed on the curve.
+## At the roof v_around²/r must beat gravity, otherwise contact releases.
+func _step_sewer(dt: float, steer: float, tuck: float, jump: bool) -> void:
+	var frame := sewer_frame()
+	var along := -frame.z
+	var around_speed := velocity.dot(frame.x)
+	if not sewer_active:
+		var nose := forward()
+		_sewer_heading = atan2(nose.dot(frame.x), nose.dot(along))
+		sewer_active = true
+	var supported := around_speed * around_speed / TerrainField.SEWER_RADIUS + GRAVITY * frame.y.y
+	if on_ground and supported < -0.05: _sewer_takeoff()
+	if on_ground:
+		_ground_time += dt
+		_air_since = 0
+		var current := velocity.length()
+		var grip := field.grip_factor(position.x, distance())
+		if frame.y.y < 0.8: grip = 1.1 # The wet channel is only on the bottom.
+		on_ice = grip < 0.9
+		var turn_rate := spec.steer * lerpf(1.25, 0.75, clampf(current / 45, 0, 1)) * lerpf(0.3, 1, grip)
+		if spec.spins:
+			# The tube supports a much deeper bank than an open hill, including
+			# the normally gently-steering saucer and wok.
+			_lean = lerpf(_lean, steer * spec.steer * 2.5, 1 - exp(-2.5 * dt * lerpf(0.3, 1, grip)))
+			_sewer_heading = _lean
+		else:
+			_sewer_heading = clampf(_sewer_heading + steer * turn_rate * dt, -MAX_TURN, MAX_TURN)
+			if current > 1.5:
+				var travel := atan2(around_speed, velocity.dot(along))
+				_sewer_heading += wrapf(travel - _sewer_heading, -PI, PI) * (1 - exp(-spec.self_align * dt))
+			if spec.wobble > 0:
+				_wobble_time += dt
+				_sewer_heading += sin(_wobble_time * 1.7) * sin(_wobble_time * 0.63 + 1) * spec.wobble * dt * clampf(current / 20, 0, 1)
+		_sewer_forward = along * cos(_sewer_heading) + frame.x * sin(_sewer_heading)
+		var side := _sewer_forward.cross(frame.y)
+		var planar := Vector2(velocity.dot(_sewer_forward), velocity.dot(side))
+		var planar_speed := planar.length()
+		if planar_speed > 0.5:
+			var slip := atan2(planar.y, planar.x)
+			var turned := slip * exp(-spec.grip * grip * dt)
+			# Concrete is smooth: steering still scrubs, scraping doesn't apply
+			# the old heavy per-second wall brake.
+			var drag := spec.drag * (1 - 0.4 * tuck) * current * current
+			var friction := spec.friction * GRAVITY * 0.35
+			planar_speed = maxf(0, planar_speed * (1 - absf(slip - turned) * spec.scrub) - (drag + friction + brake) * dt)
+			planar = Vector2(cos(turned), sin(turned)) * planar_speed
+		velocity = _sewer_forward * planar.x + side * planar.y
+		var gravity := Vector3.DOWN * GRAVITY
+		velocity += (gravity - frame.y * gravity.dot(frame.y)) * dt
+		if boost_time > 0: velocity += _sewer_forward * 16 * dt
+		if draft > 0: velocity += _sewer_forward * draft * dt
+		if jump and _ground_time > 0.12:
+			velocity += frame.y * spec.jump
+			_sewer_takeoff()
+			jumped.emit()
+	else:
+		_air_since += dt
+		air_time += dt
+		if _air_since > 0.25:
+			var spin := steer * spec.air_spin * dt
+			_sewer_heading += spin
+			air_spin += spin
+		velocity *= 1 - spec.drag * 0.5 * velocity.length() * dt
+		velocity.y -= GRAVITY * spec.air_gravity * dt
+	var was_grounded := on_ground
+	var tangent_speed := Vector2(velocity.dot(frame.x), velocity.dot(along))
+	position += travel_velocity() * dt
+	var d := distance()
+	if not field.in_sewer(d):
+		sewer_active = false
+		yaw = atan2(_sewer_forward.x, -_sewer_forward.z)
+		on_ground = false
+		return
+	var center := Vector2(field.center_x(d), field.sewer_height(d) + TerrainField.SEWER_RADIUS)
+	var radial := Vector2(position.x, position.y) - center
+	if was_grounded or radial.length_squared() >= TerrainField.SEWER_RADIUS * TerrainField.SEWER_RADIUS:
+		radial = radial.normalized() * TerrainField.SEWER_RADIUS
+		position.x = center.x + radial.x
+		position.y = center.y + radial.y
+		var next := sewer_frame()
+		if was_grounded:
+			velocity = next.x * tangent_speed.x - next.z * tangent_speed.y
+		else:
+			var into := velocity.dot(next.y)
+			if into < 0: velocity -= next.y * into
+			var circum := velocity.dot(next.x)
+			if circum * circum / TerrainField.SEWER_RADIUS + GRAVITY * next.y.y >= 0:
+				on_ground = true
+				_ground_time = 0
+				_squash_speed -= clampf(maxf(-into, 0) * 0.12, 0.3, 2.2)
+				if absf(air_spin) > 0.3:
+					_sewer_heading = atan2(circum, velocity.dot(-next.z))
+				landed.emit(air_time, maxf(-into, 0), air_spin)
+		frame = next
+	_sewer_up = frame.y
+	_sewer_forward = -frame.z * cos(_sewer_heading) + frame.x * sin(_sewer_heading)
+	yaw = atan2(_sewer_forward.x, -_sewer_forward.z)
+
+
+func _sewer_takeoff() -> void:
+	on_ground = false
+	_ground_time = 0
+	_air_since = 1
+	air_time = 0
+	air_spin = 0
+
+
 ## The ground's normal and height under the ride, sampled once per spot.
 func _surface() -> Vector4:
 	var at := Vector2(position.x, position.z)
@@ -264,6 +401,7 @@ func _below_structure() -> bool:
 
 
 func _surface_normal() -> Vector3:
+	if sewer_active and field.in_sewer(distance()): return sewer_frame().y
 	var ground := _surface()
 	return Vector3(ground.x, ground.y, ground.z)
 
@@ -389,9 +527,14 @@ func _reset_rider() -> void:
 
 func _update_visual(delta: float) -> void:
 	var target_up := _surface_normal() if on_ground or crashed else Vector3.UP
-	_up = _up.lerp(target_up, 1.0 - exp(-14.0 * delta)).normalized()
+	var blend := 1.0 - exp(-14.0 * delta)
+	if _up.dot(target_up) < -0.999:
+		_up = _up.rotated(forward().normalized(), PI * blend).normalized()
+	else:
+		_up = _up.slerp(target_up, blend).normalized()
 	var ahead := forward()
 	ahead = (ahead - _up * ahead.dot(_up)).normalized()
+	if ahead.length_squared() < 0.01: ahead = _up.cross(Vector3.RIGHT).normalized()
 	var right := ahead.cross(_up)
 	basis = Basis(right, _up, -ahead)
 	_body.rotation.z = -steer_visual * 0.22
@@ -438,7 +581,9 @@ func _update_particles() -> void:
 	_spray.emitting = on_ground and not crashed and current > 6.0
 	_spray.amount_ratio = clampf(current / 40.0 + absf(steer_visual) * 0.4, 0.15, 1.0)
 	var process := _spray.process_material as ParticleProcessMaterial
-	process.direction = (-velocity.normalized() + Vector3.UP * 0.8).normalized() * global_basis
+	var up := sewer_up() if sewer_active else Vector3.UP
+	process.direction = (-velocity.normalized() + up * 0.8).normalized() * global_basis
+	process.color = Color(0.50, 0.60, 0.35, 0.7) if field.in_sewer(distance()) else Color.WHITE
 	process.initial_velocity_min = current * 0.05
 	process.initial_velocity_max = current * 0.15
 
@@ -452,7 +597,7 @@ func prune_trail(d: float) -> void:
 
 func _update_trail() -> void:
 	var d := distance()
-	if not on_ground or crashed or field.is_water(d) or field.region(d) in [TerrainField.Region.MALL, TerrainField.Region.ICE_CAVE] or field.on_bridge(d) or field.harbor_surface_lift(position.x, d) >= 0:
+	if not on_ground or crashed or field.is_water(d) or field.region(d) in [TerrainField.Region.MALL, TerrainField.Region.ICE_CAVE, TerrainField.Region.SEWER] or field.on_bridge(d) or field.harbor_surface_lift(position.x, d) >= 0:
 		_trail.lift()
 		return
 	# A spinning ride smears along where it is going, not where it points.

@@ -17,6 +17,10 @@ const CYCLE_LENGTH := 6000.0
 ## map, which costs a phone or Apple TV GPU dearly when done each frame.
 const SKY_STEP := 15.0
 const SKY_EVENT_STEP := 0.03
+## Ordinary world geometry stays on layer 1. These two reserved layers
+## isolate each view's sun, flakes and aurora, even in a shared World3D.
+const VIEW_LAYERS := (1 << 18) | (1 << 19)
+var view_index := 0
 
 var overlay: ShaderMaterial
 ## 0–1, driven by events: blizzard thickness and how dark the sky is pulled
@@ -30,7 +34,9 @@ var wind := 1.0
 var indoor := false
 ## Fade the ambient light and fog through the glacier portals.
 var cave := 0.0
+var sewer := 0.0
 var _day_ambient := 0.5
+var _day_sun_energy := 1.0
 var _day_fog := Color.WHITE
 var _environment: Environment
 var _sky: ProceduralSkyMaterial
@@ -38,9 +44,6 @@ var _sun: DirectionalLight3D
 var _snow: GPUParticles3D
 var _flash := 0.0
 var _snow_process: ParticleProcessMaterial
-## Snow round the second player's camera in a split-screen race; it shares
-## the first snowfall's settings.
-var _second_snow: GPUParticles3D
 var _aurora: Array[MeshInstance3D] = []
 var _intensity := 0.0
 ## Distance, storm and night the sky was last painted for.
@@ -69,20 +72,24 @@ func _ready() -> void:
 	_environment.glow_enabled = Quality.glow()
 	_environment.glow_intensity = 0.6
 	_environment.glow_bloom = 0.05
-	var world_env := WorldEnvironment.new()
-	world_env.environment = _environment
-	add_child(world_env)
+	if view_index == 0:
+		var world_env := WorldEnvironment.new()
+		world_env.environment = _environment
+		add_child(world_env)
 
 	_sun = DirectionalLight3D.new()
+	_sun.layers = view_layer()
 	_sun.shadow_enabled = true
 	_sun.rotation_degrees = Vector3(-40.0, 35.0, 0.0)
 	add_child(_sun)
 
 	_snow = _make_snowfall()
+	_snow.layers = view_layer()
 	add_child(_snow)
 	_snow_process = _snow.process_material as ParticleProcessMaterial
 	for i in 2:
 		var curtain := MeshInstance3D.new()
+		curtain.layers = view_layer()
 		var plane := PlaneMesh.new()
 		plane.size = Vector2(700.0, 160.0)
 		plane.orientation = PlaneMesh.FACE_Z
@@ -97,18 +104,37 @@ func _ready() -> void:
 		add_child(curtain)
 		_aurora.append(curtain)
 
-	var layer := CanvasLayer.new()
-	layer.layer = 1
-	add_child(layer)
-	var rect := ColorRect.new()
-	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay = ShaderMaterial.new()
 	overlay.shader = load("res://shaders/speed_overlay.gdshader")
-	rect.material = overlay
-	layer.add_child(rect)
+	if view_index == 0:
+		var layer := CanvasLayer.new()
+		layer.layer = 1
+		add_child(layer)
+		var rect := ColorRect.new()
+		rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rect.material = overlay
+		layer.add_child(rect)
 	apply_quality()
 	set_time_of_day(0.0)
+
+
+func view_layer() -> int:
+	return 1 << (18 + view_index)
+
+
+func bind_camera(camera: Camera3D) -> void:
+	if camera.environment != _environment: camera.environment = _environment
+	var mask := (camera.cull_mask & ~VIEW_LAYERS) | view_layer()
+	if camera.cull_mask != mask: camera.cull_mask = mask
+
+
+## Events are shared; region lighting and indoor snowfall remain local.
+func copy_weather(source: Atmosphere) -> void:
+	storm = source.storm
+	night_override = source.night_override
+	aurora = source.aurora
+	wind = source.wind
 
 
 ## Picks up the graphics level (Quality.level), also when it changes.
@@ -124,6 +150,7 @@ func flash(color: Color, amount := 0.6) -> void:
 
 
 func update_atmosphere(delta: float, camera: Camera3D, distance: float, speed_factor: float, boosting: bool) -> void:
+	bind_camera(camera)
 	_snow.global_position = camera.global_position - camera.global_basis.z * 16.0 + Vector3.UP * 5.0
 	if _sky_needs_repaint(Vector3(distance, storm, night_override)):
 		set_time_of_day(distance)
@@ -131,10 +158,14 @@ func update_atmosphere(delta: float, camera: Camera3D, distance: float, speed_fa
 	_snow.amount_ratio = 0.0 if indoor else 0.25 + 0.75 * storm
 	_snow_process.gravity = Vector3(wind * storm * 14.0, -1.5 - storm * 4.0, 0.0)
 	_environment.fog_density = lerpf(Quality.base_fog() + storm * 0.032, 0.012, cave)
-	_environment.fog_light_color = _day_fog.lerp(Color("24546f"), cave)
-	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR if cave > 0.01 else Environment.AMBIENT_SOURCE_SKY
-	_environment.ambient_light_color = Color("6ca8d6")
-	_environment.ambient_light_energy = lerpf(_day_ambient, 0.65, cave)
+	_environment.fog_density = lerpf(_environment.fog_density, 0.014, sewer)
+	_environment.fog_light_color = _day_fog.lerp(Color("24546f"), cave).lerp(Color("1c241b"), sewer)
+	_environment.fog_aerial_perspective = lerpf(0.6, 0.0, sewer)
+	_environment.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED if sewer > 0.5 else Environment.REFLECTION_SOURCE_SKY
+	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR if maxf(cave, sewer) > 0.01 else Environment.AMBIENT_SOURCE_SKY
+	_environment.ambient_light_color = Color("6ca8d6").lerp(Color("7c886a"), sewer)
+	_environment.ambient_light_energy = lerpf(lerpf(_day_ambient, 0.65, cave), 0.28, sewer)
+	_sun.light_energy = _day_sun_energy * lerpf(1.0, 0.08, sewer)
 	_update_aurora(camera)
 	var target := clampf((speed_factor - 0.35) * 1.4, 0.0, 1.3) + (0.35 if boosting else 0.0)
 	_intensity = lerpf(_intensity, target, 1.0 - exp(-4.0 * delta))
@@ -175,6 +206,7 @@ func set_time_of_day(distance: float) -> void:
 		_sky.ground_horizon_color = horizon
 		_sun.light_energy *= 1.0 - 0.55 * storm
 	_day_ambient = _environment.ambient_light_energy
+	_day_sun_energy = _sun.light_energy
 	_day_fog = horizon
 	_environment.fog_light_color = horizon
 
@@ -206,29 +238,6 @@ func _update_aurora(camera: Camera3D) -> void:
 		curtain.global_position = at
 		curtain.look_at(at - ahead, Vector3.UP)
 		(curtain.material_override as ShaderMaterial).set_shader_parameter("strength", aurora)
-
-
-## A split-screen race: snow also falls round the second camera, which can
-## be far from the first. Null takes it away again.
-func follow_second_view(camera: Camera3D) -> void:
-	if camera == null:
-		if _second_snow != null:
-			_second_snow.queue_free()
-			_second_snow = null
-		return
-	if _second_snow == null:
-		_second_snow = GPUParticles3D.new()
-		_second_snow.amount = _snow.amount
-		_second_snow.lifetime = _snow.lifetime
-		_second_snow.preprocess = _snow.preprocess
-		_second_snow.local_coords = false
-		_second_snow.visibility_aabb = _snow.visibility_aabb
-		_second_snow.process_material = _snow_process
-		_second_snow.draw_pass_1 = _snow.draw_pass_1
-		add_child(_second_snow)
-	_second_snow.visible = _snow.visible
-	_second_snow.amount_ratio = _snow.amount_ratio
-	_second_snow.global_position = camera.global_position - camera.global_basis.z * 16.0 + Vector3.UP * 5.0
 
 
 func _make_snowfall() -> GPUParticles3D:

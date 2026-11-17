@@ -22,6 +22,11 @@ Menyn börjar med spelarval och sedan åkdon på den riktiga banan. Starten går
 vidare med en kamerarörelse och 3–2–1. Menylåten **Snödag** är separat från
 åkmusiken. [Menyflöde, musik och tester](tools/MENU_REVIEW.md).
 
+I delad skärm följer ljus, dimma och snö varje spelares egen region. Testa med
+`godot --headless --path . --script res://tools/split_atmosphere_test.gd -- --autopilot`.
+Kör utan `--headless` och lägg till `--capture` för spelbilder och en jämförelse
+som kontrollerar att utomhusbildens ljus inte ändras när den andra går in.
+
 Bland specialregionerna finns en hängbro med 7,6 meter bred träbana över en
 ravin. Infarten smalnar av innan bron och räckena går att krascha i. Hoppar
 man över räcket kan man falla ner. Provkör nära bron med
@@ -54,6 +59,17 @@ Utelämna `--headless` och lägg till `--capture` efter `--` för spelbilder i `
 Streaming kan profileras separat med
 `godot --headless --path . --script res://tools/region_stream_profile.gd -- cave`
 (eller `harbor`).
+
+Kloaken går in i en brant snötäckt slänt. Det begravda betongröret har mörk, matt
+och smutsig insida, välvd botten, smutsvatten, rostiga galler,
+skräphögar och springande råttor. Med tillräcklig fart kan man styra hela varvet
+runt röret, även i taket, medan kamerans horisont hålls vågrät. För låg fart gör att man
+tappar kontakten med taket och faller ned. Man kan välja
+öppningar i gallren och hoppa över eller köra runt låga rör. Råttorna flyr
+undan båda spelarna. Provkör med `godot --path . -- --start-region=sewer`.
+Testa med `godot --headless --path . --script res://tools/sewer_test.gd -- --autopilot`.
+Loopen och fartberoende väggkontakten testas med `tools/sewer_loop_test.gd`.
+Lägg till `--capture` utan `--headless` för bilder i `/tmp`.
 
 Kråkor, skator och domherrar ger liv åt backen. De går och pickar i snön
 eller sitter på riktiga grenar, stenar och stubbar. När någon av spelarna

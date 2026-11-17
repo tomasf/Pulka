@@ -152,7 +152,12 @@ func _cross(field: TerrainField, span: Vector3, spec: VehicleSpec, raised: bool)
 		var drift := sled.velocity.x + sled.velocity.z * slope
 		var desired := atan2(slope, 1) - clampf(offset * 0.25 + drift * 0.4, -0.7, 0.7)
 		var steer := clampf(wrapf(desired - sled.yaw, -PI, PI) * 3, -1, 1)
-		sled.step(1.0 / 60, steer, 1, false)
+		# Jump from the ramp lip: on steep quays its natural launch can land
+		# inside the gap, so waiting until the gap itself is too late.
+		var ramp_lip := span.x + 92
+		var gap_start := span.x + 108
+		var jump := raised and sled.on_ground and ((d < ramp_lip and ramp_lip - d < 1.25) or (d < gap_start and gap_start - d < 1.25))
+		sled.step(1.0 / 60, steer, 1, jump)
 		highest = maxf(highest, sled.position.y - field.harbor_height(sled.distance()))
 		if field.below_structure(sled.position) or (field.in_cave(sled.distance()) and absf(offset) > 7):
 			safe = false
