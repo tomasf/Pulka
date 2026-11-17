@@ -44,6 +44,18 @@ func snap() -> void:
 	update_camera(1.0)
 
 
+## A rebuilt run has no preview pose to preserve. Place the camera beside
+## the new start before begin_run records its short intro arc.
+func reset_preview(is_centered := false) -> void:
+	mode = Mode.ORBIT
+	centered = is_centered
+	_shake = 0
+	_start_elapsed = 0
+	_orbit_angle = 2.4
+	_look_dir = target.forward()
+	update_camera(0)
+
+
 ## Keep the live preview's exact pose, then ease into the riding camera.
 func begin_run(seconds := START_SECONDS) -> void:
 	_start_fov = fov

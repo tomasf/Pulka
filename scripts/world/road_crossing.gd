@@ -10,6 +10,9 @@ var road_d := 0.0
 var cars: Array[Obstacle] = []
 var _center := 0.0
 var _level := 0.0
+var _flows: Array[TrafficLane] = []
+var _lanes := PackedInt32Array()
+var _flow_indices := PackedInt32Array()
 
 
 func setup(field: TerrainField, at_d: float, rng: RandomNumberGenerator, engine_sound: AudioStream) -> RoadCrossing:
@@ -20,6 +23,8 @@ func setup(field: TerrainField, at_d: float, rng: RandomNumberGenerator, engine_
 	var difficulty := field.difficulty(at_d)
 	for lane in 2:
 		var direction := 1.0 if lane == 0 else -1.0
+		var flow := TrafficLane.new(REACH * 2)
+		_flows.append(flow)
 		var z := -(at_d + (LANE_OFFSET if lane == 0 else -LANE_OFFSET))
 		var count := 2 + int(round(difficulty * 2.0)) + rng.randi_range(0, 1)
 		var speed := rng.randf_range(11.0, 16.0) + difficulty * 7.0
@@ -43,16 +48,20 @@ func setup(field: TerrainField, at_d: float, rng: RandomNumberGenerator, engine_
 			car.add_child(hum)
 			add_child(car)
 			cars.append(car)
+			_lanes.append(lane)
+			var progress := car.position.x - (_center - REACH) if direction > 0 else (_center + REACH) - car.position.x
+			_flow_indices.append(flow.add(progress, absf(car.velocity.x), TrafficLane.vehicle_half_length(car)))
 	return self
 
 
 func tick(delta: float) -> void:
-	for car in cars:
-		car.position += car.velocity * delta
-		if car.velocity.x > 0.0 and car.position.x > _center + REACH:
-			car.position.x -= REACH * 2.0
-		elif car.velocity.x < 0.0 and car.position.x < _center - REACH:
-			car.position.x += REACH * 2.0
+	for flow in _flows: flow.step(delta)
+	for i in cars.size():
+		var direction := 1.0 if _lanes[i] == 0 else -1.0
+		var flow := _flows[_lanes[i]]
+		var index := _flow_indices[i]
+		cars[i].position.x = _center + direction * (flow.positions[index] - REACH)
+		cars[i].velocity.x = direction * flow.speeds[index]
 
 
 func _build_surface() -> void:

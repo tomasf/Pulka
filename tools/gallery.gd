@@ -131,6 +131,17 @@ static func _entries(group: String) -> Array:
 		["new tefat", func() -> Node3D: return _ride3d(VehicleSpec.Model.TEFAT)],
 	]
 	groups["creatures"] = []
+	groups["people_motion"] = []
+	for pose in [["idle", 0.0], ["walk", 0.0], ["walk", 0.25], ["walk", 0.75], ["flail", 0.2], ["flail", 0.6]]:
+		groups["people_motion"].append(["person %s" % pose[0], func() -> Node3D: return _creature("person", pose[0], pose[1])])
+	groups["people_wave"] = []
+	for view in [Vector3(0, 0.05, -1), Vector3(-1, 0.2, -1.4)]:
+		for step in 6:
+			var fraction := step / 6.0
+			groups["people_wave"].append(["wave %.2f" % fraction, func() -> Node3D:
+				var person := _creature("person", "wave", fraction)
+				person.set_meta("frame", AABB(Vector3(-0.7, -0.05, -0.4), Vector3(1.4, 2.35, 0.8)))
+				return _viewed(person, view)])
 	for kind in ["person", "moose", "deer", "reindeer", "dog", "hare", "bear"]:
 		for anim in [["walk", 0.0], ["walk", 0.5], ["idle", 0.3], ["wave", 0.2], ["gallop", 0.3], ["hop", 0.5], ["flail", 0.3]]:
 			groups["creatures"].append(["%s %s" % [kind, anim[0]], func() -> Node3D: return _creature(kind, anim[0], anim[1])])

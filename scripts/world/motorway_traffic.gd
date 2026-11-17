@@ -10,8 +10,9 @@ var _world: SlopeWorld
 var _span := Vector3.ZERO
 ## Parallel to `obstacles`: lane index and current distance of each vehicle.
 var _lanes := PackedInt32Array()
-var _ds := PackedFloat32Array()
-var _speeds := PackedFloat32Array()
+var _ds := PackedFloat64Array()
+var _flows: Array[TrafficLane] = []
+var _flow_indices := PackedInt32Array()
 var _honked: Array[bool] = []
 
 
@@ -23,8 +24,17 @@ func setup(world: SlopeWorld, span: Vector3) -> MotorwayTraffic:
 	var length := span.y - span.x
 	for lane in RegionBuilder.MOTORWAY_LANES.size():
 		var info: Array = RegionBuilder.MOTORWAY_LANES[lane]
-		var d := span.x + rng.randf_range(0.0, 30.0)
-		while d < span.y:
+		var direction: float = info[1]
+		var flow := TrafficLane.new(length)
+		_flows.append(flow)
+		# Uniform spacing with small jitter also leaves room across the seam
+		# where the last vehicle rejoins ahead of the first one.
+		var count := rng.randi_range(2, 4)
+		var spacing := length / count
+		var offset := rng.randf_range(0, spacing)
+		for i in count:
+			var progress := fposmod(offset + i * spacing + rng.randf_range(-8, 8), length)
+			var d := span.x + progress if direction > 0 else span.y - progress
 			var lorry := rng.randf() < 0.25
 			var mesh := RegionProps.truck(rng.randi_range(0, 2)) if lorry else Props.car(rng.randi_range(0, Palette.CARS.size() - 1))
 			var vehicle := Obstacle.new().configure(Obstacle.Kind.TRUCK if lorry else Obstacle.Kind.CAR, Props.Rig.of(mesh), world.field)
@@ -42,25 +52,21 @@ func setup(world: SlopeWorld, span: Vector3) -> MotorwayTraffic:
 			obstacles.append(vehicle)
 			_lanes.append(lane)
 			_ds.append(d)
-			_speeds.append(rng.randf_range(float(info[2]), float(info[3])))
+			_flow_indices.append(flow.add(progress, rng.randf_range(float(info[2]), float(info[3])), TrafficLane.vehicle_half_length(vehicle)))
 			_honked.append(false)
-			d += rng.randf_range(70.0, 150.0) + (15.0 if lorry else 0.0)
 	_place_all()
 	return self
 
 
 func tick(delta: float, player_d: float) -> void:
+	for flow in _flows: flow.step(delta)
 	for i in obstacles.size():
 		var info: Array = RegionBuilder.MOTORWAY_LANES[_lanes[i]]
 		var direction: float = info[1]
-		_ds[i] += direction * _speeds[i] * delta
-		# Off the end of the motorway: rejoin at the other end.
-		if direction > 0.0 and _ds[i] > _span.y:
-			_ds[i] -= _span.y - _span.x
-			_honked[i] = false
-		elif direction < 0.0 and _ds[i] < _span.x:
-			_ds[i] += _span.y - _span.x
-			_honked[i] = false
+		var old := _ds[i]
+		var progress := _flows[_lanes[i]].positions[_flow_indices[i]]
+		_ds[i] = _span.x + progress if direction > 0 else _span.y - progress
+		if (direction > 0 and _ds[i] < old) or (direction < 0 and _ds[i] > old): _honked[i] = false
 		var gap := _ds[i] - player_d
 		if direction < 0.0 and not _honked[i] and gap > 0.0 and gap < 45.0:
 			var car := obstacles[i]
@@ -82,4 +88,6 @@ func _place_all() -> void:
 		var d := _ds[i]
 		var vehicle := obstacles[i]
 		vehicle.visible = d > _span.x + 2.0 and d < _span.y - 2.0
-		vehicle.transform = Transform3D(regions.lane_basis(float(info[0]), d, float(info[1])), regions.lane_point(float(info[0]), d, 0.02))
+		var tangent := regions.lane_point(float(info[0]), d + float(info[1]) * 1.5) - regions.lane_point(float(info[0]), d - float(info[1]) * 1.5)
+		vehicle.transform = Transform3D(Basis.looking_at(tangent, Vector3.UP), regions.lane_point(float(info[0]), d, 0.02))
+		vehicle.velocity = tangent / 3 * _flows[_lanes[i]].speeds[_flow_indices[i]]

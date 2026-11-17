@@ -484,6 +484,7 @@ func _start_run() -> void:
 		_prepare_preview_world()
 		p.sled.set_vehicle(spec, _rng, Player.COLORS[0])
 		p.sled.place_at(_start_d)
+		p.camera.reset_preview()
 	p.sled.frozen = true
 	p.sled.invulnerable_time = 0.0
 	_reset_player(p)
@@ -856,6 +857,7 @@ func _start_race() -> void:
 		if not reuse_preview:
 			p.sled.set_vehicle(_specs[p.vehicle], _rng, Player.COLORS[p.index])
 			p.sled.place_at(_start_d, _lane(p))
+			p.camera.reset_preview(true)
 		p.sled.frozen = true
 		p.sled.invulnerable_time = 0.0
 		_reset_player(p)

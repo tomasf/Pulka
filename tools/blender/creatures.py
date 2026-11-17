@@ -14,6 +14,8 @@ import math
 import os
 import sys
 
+import bpy
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from mathutils import Vector  # noqa: E402
@@ -69,8 +71,8 @@ class PersonModel:
             ]
         rig = K.armature("person", bones)
 
-        # Jacket: a quilted column for the torso, a little flared at the hem,
-        # with the arms branching off its top.
+        # Overlapping shoulder caps keep the coat continuous in silhouette,
+        # while separate sleeves can lift without dragging the coat's hem.
         joints, radii, edges = [], [], []
         for k in range(9):
             t = k / 8.0
@@ -85,19 +87,17 @@ class PersonModel:
         joints.append((0, 1.57, 0.0))
         radii.append((0.085, 0.085))
         edges.append((top, top + 1))
-        for s in (-1, 1):
+        jacket = K.skin("jacket_body", joints, edges, radii, "jacket")
+        sleeves = []
+        for tag, s in (("L", -1), ("R", 1)):
             chain = [side(PersonModel.SHOULDER, s), side(PersonModel.ELBOW, s), side((0.265, 0.97, 0.005), s)]
             chain.insert(1, tuple((Vector(chain[0]) + Vector(chain[1])) * 0.5))
             chain.insert(3, tuple((Vector(chain[2]) + Vector(chain[3])) * 0.5))
             sizes = [0.08, 0.077, 0.068, 0.066, 0.058]
-            previous = top - 1
-            for i, point in enumerate(chain):
-                joints.append(point)
-                r = sizes[i] + (0.006 if i % 2 == 1 else 0.0)
-                radii.append((r, r))
-                edges.append((previous, len(joints) - 1))
-                previous = len(joints) - 1
-        jacket = K.skin("jacket", joints, edges, radii, "jacket")
+            sleeve = K.skin("sleeve." + tag, chain,
+                            [(i, i + 1) for i in range(len(chain) - 1)],
+                            [(r, r) for r in sizes], "jacket")
+            sleeves.append((sleeve, tag))
 
         leg_joints, leg_radii, leg_edges = [(0, 0.95, 0)], [(0.17, 0.13)], []
         for s in (-1, 1):
@@ -109,10 +109,11 @@ class PersonModel:
         trunks = K.ellipsoid("trunks", (0, 0.9, 0.0), (0.185, 0.1, 0.145), "trunks", segments=20, rings=10)
 
         trim = []
-        for s in (-1, 1):
-            trim.append(K.ellipsoid("cuff", side((0.266, 0.985, 0.005), s), (0.064, 0.05, 0.064), "jacket_trim", segments=12, rings=6))
-        trim.append(K.ellipsoid("hood", (0, 1.52, 0.13), (0.15, 0.09, 0.07), "jacket", rotation=(math.radians(-20), 0, 0), segments=16, rings=8))
-        trim = K.join(trim, "jacket_trim")
+        for tag, s in (("L", -1), ("R", 1)):
+            cuff = K.ellipsoid("cuff." + tag, side((0.266, 0.985, 0.005), s), (0.064, 0.05, 0.064), "jacket_trim", segments=12, rings=6)
+            trim.append((cuff, "forearm." + tag))
+        hood = K.ellipsoid("hood", (0, 1.52, 0.13), (0.15, 0.09, 0.07), "jacket", rotation=(math.radians(-20), 0, 0), segments=16, rings=8)
+        trim.append((hood, "spine"))
 
         # A flat knitted band round the neck, a stripe along its top and a
         # flat end hanging down the front.
@@ -133,13 +134,65 @@ class PersonModel:
             boot.append(K.tube("shaft", ankle + Vector((0, -0.02, 0)), ankle + Vector((0, 0.12, 0)), 0.076, "boots", vertices=16))
             boot.append(K.ellipsoid("sole", ankle + Vector((0, -0.075, -0.05)), (0.078, 0.02, 0.135), "sole", segments=16, rings=6))
             rigid.append((K.join(boot, "boot." + tag), "shin." + tag))
-        K.weigh(rig, [jacket, pants, trunks, trim, scarf], rigid)
+        # Heat weights confuse the hanging hands with the nearby waist and
+        # thighs. Bind each garment only to its anatomical joints instead.
+        PersonModel.bind(jacket, rig, PersonModel.coat_weights)
+        PersonModel.bind(pants, rig, PersonModel.pants_weights)
+        for sleeve, tag in sleeves:
+            PersonModel.bind(sleeve, rig, lambda p, tag=tag: {
+                "upper_arm." + tag: PersonModel.smooth(1.10, 1.26, p.y),
+                "forearm." + tag: 1 - PersonModel.smooth(1.10, 1.26, p.y),
+            })
+        K.weigh(rig, [], rigid + trim + [(trunks, "hips"), (scarf, "spine")])
 
         K.animate(rig, "walk", 24, PersonModel.walk)
         K.animate(rig, "idle", 60, PersonModel.idle)
         K.animate(rig, "wave", 24, PersonModel.wave)
         K.animate(rig, "flail", 16, PersonModel.flail)
         return rig
+
+    @staticmethod
+    def smooth(low, high, value):
+        t = min(1.0, max(0.0, (value - low) / (high - low)))
+        return t * t * (3 - 2 * t)
+
+    @staticmethod
+    def bind(obj, rig, weights_at):
+        """Normalized garment weights in Godot coordinates, at most four
+        joints per vertex so the exported and live skins stay identical."""
+        groups = {}
+        for vertex in obj.data.vertices:
+            p = obj.matrix_world @ vertex.co
+            weights = weights_at(Vector((p.x, p.z, -p.y)))
+            active = {name: weight for name, weight in weights.items() if weight > 1e-6}
+            total = sum(active.values())
+            assert total > 0 and len(active) <= 4
+            for name, weight in active.items():
+                if name not in groups:
+                    groups[name] = obj.vertex_groups.new(name=name)
+                groups[name].add([vertex.index], weight / total, "REPLACE")
+        modifier = obj.modifiers.new("rig", "ARMATURE")
+        modifier.object = rig
+        obj.parent = rig
+
+    @staticmethod
+    def coat_weights(p):
+        hips = 1 - PersonModel.smooth(0.87, 1.14, p.y)
+        neck = PersonModel.smooth(1.48, 1.58, p.y)
+        return {"hips": hips, "spine": (1 - hips) * (1 - neck), "neck": neck}
+
+    @staticmethod
+    def pants_weights(p):
+        hips = PersonModel.smooth(0.75, 0.94, p.y)
+        right = PersonModel.smooth(-0.045, 0.045, p.x)
+        shin = 1 - PersonModel.smooth(0.43, 0.57, p.y)
+        return {
+            "hips": hips,
+            "thigh.L": (1 - hips) * (1 - right) * (1 - shin),
+            "thigh.R": (1 - hips) * right * (1 - shin),
+            "shin.L": (1 - hips) * (1 - right) * shin,
+            "shin.R": (1 - hips) * right * shin,
+        }
 
     @staticmethod
     def walk(rig, t):
@@ -170,8 +223,9 @@ class PersonModel:
     @staticmethod
     def wave(rig, t):
         phase = t * math.tau
-        K.turn(rig, "upper_arm.R", "z", 2.5)
-        K.turn(rig, "forearm.R", "z", 0.35 + math.sin(phase) * 0.45)
+        K.turn(rig, "upper_arm.R", "z", 1.85 + math.sin(phase) * 0.04)
+        K.turn(rig, "upper_arm.R", "x", -0.12)
+        K.turn(rig, "forearm.R", "z", 1.1 + math.sin(phase) * 0.35)
         K.turn(rig, "upper_arm.L", "z", -0.1)
         K.turn(rig, "forearm.L", "x", 0.25)
         K.turn(rig, "head", "z", math.sin(phase) * 0.05)
