@@ -82,6 +82,17 @@ Testa med `godot --headless --path . --script res://tools/sewer_test.gd -- --aut
 Loopen och fartberoende väggkontakten testas med `tools/sewer_loop_test.gd`.
 Lägg till `--capture` utan `--headless` för bilder i `/tmp`.
 
+Sjön är en sammanhängande, cirka 200 meter bred vak med oregelbunden strand,
+snövall, brutna iskanter, isflak och en brygga vid bastun. Vattenytan har
+rörliga krusningar, ljusare vatten vid stranden och skum intill isen. Sjöbottnen ligger
+under vattnet; terräng och fysik använder samma strandlinje. Med tillräcklig
+fart studsar man över sjön och lämnar stänk och utdragna ringar. Sjön ligger
+på en plan avsats med en mjuk utfart; höjden fortsätter nedströms utan att
+terrängen faller tillbaka till den gamla backens nivå. Låg fart ger
+ett plums. Provkör med `godot --path . -- --start-region=lake` och testa med
+`godot --headless --path . --script res://tools/lake_test.gd -- --autopilot --mute`.
+Utelämna `--headless` och lägg till `--capture` för en översiktsbild i `/tmp`.
+
 Kråkor, skator och domherrar ger liv åt backen. De går och pickar i snön
 eller sitter på riktiga grenar, stenar och stubbar. När någon av spelarna
 kommer nära lyfter de och flyger bort med animerade vingslag. Fåglarna är

@@ -6,7 +6,7 @@ extends RefCounted
 static func ground_allowed(field: TerrainField, x: float, d: float) -> bool:
 	if field.region(d) not in [TerrainField.Region.SLOPE, TerrainField.Region.WOODS, TerrainField.Region.PARK, TerrainField.Region.TOWN, TerrainField.Region.HARBOR]: return false
 	if field.near_road(d, 14) or field.in_corridor(x, d, 3) or field.near_ramp(x, d, 3): return false
-	if field.in_cliff_fall(d) or field.is_water(d) or field.harbor_water(x, d): return false
+	if field.in_cliff_fall(d) or field.is_water(d, x) or field.harbor_water(x, d): return false
 	return absf(x - field.center_x(d)) < field.half_width(d) * 0.85 and field.harbor_surface_lift(x, d) < 0
 
 

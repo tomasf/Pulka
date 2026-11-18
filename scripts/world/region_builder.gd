@@ -275,9 +275,8 @@ func ground_color(kind: TerrainField.Region, x: float, lx: float, d: float, hw: 
 		TerrainField.Region.LAKE:
 			var strip := field.water_strip(d)
 			if strip != Vector2.ZERO:
-				if d >= strip.x and d <= strip.y:
-					return Color(0.25, 0.35, 0.45)
-				return Palette.ICE
+				if field.is_water(d, x): return Color("263f48")
+				if field.lake_shore_distance(x, d) > -8: return Color("bfd7e2")
 		TerrainField.Region.BANDY:
 			if outside < 0.0:
 				var span := field.region_span(d)
@@ -936,66 +935,8 @@ func _runway_paint(lx: float, d: float, hw: float) -> Color:
 
 # --- Lake ---
 
-func _place_lake(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: float, span: Vector3) -> void:
-	for water: Vector2 in TerrainField.LAKE_WATER:
-		var start := span.x + water.x
-		if start < lo or start >= hi:
-			continue
-		var strip := Vector2(start, start + water.y)
-		chunk.add_child(_water_mesh(strip))
-		var cx := field.center_x(strip.x)
-		var hw := field.half_width(strip.x)
-		var level := field.water_level(strip)
-		for i in 6:
-			var fx := cx + rng.randf_range(-hw - 30.0, hw + 30.0)
-			var fd := rng.randf_range(strip.x + 2.0, strip.y - 2.0)
-			if absf(fx - field.center_x(fd)) < hw + 2.0:
-				continue
-			world.add_decor(decor, RegionProps.ice_floe(rng.randi_range(0, 2)), Transform3D(Basis(Vector3.UP, rng.randf() * TAU), Vector3(fx, level, -fd)))
-		# Ragged shelves of ice where the open water meets the snow.
-		for edge in [strip.x, strip.y]:
-			var e: float = edge
-			var x := field.center_x(e) - hw - 40.0
-			while x < field.center_x(e) + hw + 40.0:
-				var width := rng.randf_range(2.0, 5.0)
-				var reach := rng.randf_range(0.8, 2.6) * (1.0 if e == strip.x else -1.0)
-				var shelf := Basis(Vector3.UP, rng.randf_range(-0.2, 0.2)).scaled(Vector3(width, 1.0, absf(reach) * 2.0))
-				world.add_decor(decor, RegionProps.ice_shelf(), Transform3D(shelf, Vector3(x, level + 0.05, -(e + reach * 0.5))))
-				x += width * 0.9
-		var jetty_x := cx - hw - 4.0
-		world.add_decor(decor, RegionProps.jetty(), Transform3D(Basis(Vector3.UP, -world.street_yaw(strip.x)), Vector3(jetty_x, level, -(strip.x - 1.0))))
-		world.add_decor(decor, Props.house(0), world.ground_xform(jetty_x - 9.0, strip.x - 10.0, PI / 2.0, 0.55, 0.3))
-		for k in 2:
-			var bather := Props.posed(Props.dressed("bather%d" % k, Palette.JACKETS[k + 2], Palette.JACKETS[k + 5], Color.WHITE, Color.WHITE, true), k * 1.5, true)
-			bather.position = Vector3(jetty_x + (k - 0.5) * 0.8, level + 0.72, -(strip.x + 5.0 + k * 1.2))
-			bather.rotation.y = PI * 0.5 * (k * 2 - 1)
-			chunk.add_child(bather)
-	var reed := ceilf(lo / 6.0) * 6.0
-	while reed < hi:
-		var strip := field.water_strip(reed)
-		if strip != Vector2.ZERO and (reed < strip.x or reed > strip.y):
-			for side in [-1.0, 1.0]:
-				var x: float = field.center_x(reed) + side * (field.half_width(reed) + rng.randf_range(0.5, 4.0))
-				world.add_decor(decor, Props.reeds(), world.ground_xform(x, reed, rng.randf() * TAU, rng.randf_range(0.8, 1.3)))
-		reed += 6.0
-
-
-func _water_mesh(strip: Vector2) -> MeshInstance3D:
-	var mesh := PlaneMesh.new()
-	var length := strip.y - strip.x + 6.0
-	mesh.size = Vector2(240.0, length)
-	mesh.subdivide_width = 24
-	mesh.subdivide_depth = 6
-	var material := ShaderMaterial.new()
-	material.shader = load("res://shaders/water.gdshader")
-	mesh.material = material
-	var instance := MeshInstance3D.new()
-	instance.mesh = mesh
-	var middle := (strip.x + strip.y) * 0.5
-	instance.position = Vector3(field.center_x(middle), field.water_level(strip) + 0.04, -middle)
-	instance.rotation.y = -world.street_yaw(middle)
-	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	return instance
+func _place_lake(chunk: Chunk, decor: Dictionary, _rng: RandomNumberGenerator, lo: float, hi: float, span: Vector3) -> void:
+	LakeWater.populate(world, chunk, decor, lo, hi, span)
 
 
 # --- Bandy rink ---

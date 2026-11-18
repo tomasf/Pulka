@@ -475,12 +475,6 @@ static func ice_floe(variant: int) -> ArrayMesh:
 		return kit.build())
 
 
-## A unit slab of shore ice; scale it in X and Z where it is placed.
-static func ice_shelf() -> ArrayMesh:
-	return Props.cached_mesh("shelf", func() -> ArrayMesh:
-		return MeshKit.new().box(Vector3(1.0, 0.18, 1.0), Vector3.ZERO, Color(0.86, 0.93, 1.0)).build())
-
-
 # --- Bandy rink ---
 
 ## A bandy goal: red posts and crossbar, a net stretched back to a frame

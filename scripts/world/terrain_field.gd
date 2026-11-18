@@ -56,8 +56,12 @@ const REGION_SPACING := 1400.0
 const REGION_CHANCE := 0.8
 const REGION_BLEND := 40.0
 ## Open water in lake regions: (offset from region start, length).
-const LAKE_WATER := [Vector2(70.0, 26.0), Vector2(150.0, 32.0)]
-const WATER_BLEND := 14.0
+const LAKE_WATER := [Vector2(80.0, 80.0)]
+const WATER_BLEND := 36.0
+const LAKE_HALF_WIDTH := 105.0
+const LAKE_DEPTH := 2.2
+const LAKE_APPROACH := 40.0
+const LAKE_EXIT := 80.0
 ## The cliff: a calm snowfield, then at CLIFF_EDGE metres into the region a
 ## sheer face of CLIFF_FACE metres onto a steep landing hill that drops
 ## CLIFF_LAND more and levels out over CLIFF_RUNOUT, like a ski jump's.
@@ -119,7 +123,34 @@ class Roof:
 	func center(d: float) -> float: return cx + (d - start) * dx
 	func base(d: float) -> float: return y + (d - start) * dy
 
+## Flattening a lake removes some of the hill's descent. Keep that height
+## downstream instead of dropping back to the old hillside after the shore.
+class LakeProfile:
+	var approach := 0.0
+	var start := 0.0
+	var finish := 0.0
+	var exit := 0.0
+	var level := 0.0
+	var incoming := 0.0
+	var outgoing := 0.0
+	var rise := 0.0
+
+	func lift(d: float, natural: float) -> float:
+		if d <= approach: return 0.0
+		if d >= exit: return rise
+		if d < start:
+			var left := start - d
+			return level - incoming * left * left / (2 * LAKE_APPROACH) - natural
+		if d <= finish: return level - natural
+		var past := d - finish
+		return level + outgoing * past * past / (2 * LAKE_EXIT) - natural
+
 var _rooftops: Dictionary = {}
+var _lake_profiles: Dictionary = {}
+var _lake_rises: Dictionary = {0: 0.0}
+var _lake_cell := -1
+var _lake_before := 0.0
+var _lake_current: LakeProfile
 var world_seed: int
 var _noise := FastNoiseLite.new()
 var _phases := PackedFloat32Array()
@@ -722,14 +753,49 @@ func water_strip(d: float) -> Vector2:
 	return Vector2.ZERO
 
 
-func is_water(d: float) -> bool:
+func is_water(d: float, x := INF) -> bool:
 	var strip := water_strip(d)
-	return strip != Vector2.ZERO and d >= strip.x and d <= strip.y
+	if strip == Vector2.ZERO or d <= strip.x or d >= strip.y: return false
+	return is_inf(x) or absf(x - center_x(d)) < lake_half_width(d)
 
 
-## Water lies level, at the height of the slope where the strip ends.
+## A broad, gently irregular basin, rather than rectangular trenches.
+func lake_half_width(d: float) -> float:
+	var strip := water_strip(d)
+	if strip == Vector2.ZERO or d <= strip.x or d >= strip.y: return 0.0
+	var t := (d - strip.x) / (strip.y - strip.x)
+	var u := 2.0 * t - 1.0
+	return _lake_radius(strip, d) * sqrt(maxf(0, 1 - u * u))
+
+
+func _lake_radius(strip: Vector2, d: float) -> float:
+	var t := clampf((d - strip.x) / (strip.y - strip.x), 0, 1)
+	return LAKE_HALF_WIDTH * (1 + 0.055 * sin(t * TAU * 2 + _phases[2]))
+
+
+## The shoreline and water mesh use exactly the same seeded outline.
+func lake_edge(strip: Vector2, angle: float) -> Vector3:
+	var d := lerpf(strip.x, strip.y, (1 - cos(angle)) * 0.5)
+	var x := center_x(d) + signf(sin(angle)) * lake_half_width(d)
+	return Vector3(x, water_level(strip), -d)
+
+
+func lake_shore_distance(x: float, d: float) -> float:
+	var strip := water_strip(d)
+	if strip == Vector2.ZERO: return -INF
+	var radii := Vector2(_lake_radius(strip, d), (strip.y - strip.x) * 0.5)
+	var q := Vector2((x - center_x(d)) / radii.x, (d - (strip.x + strip.y) * 0.5) / radii.y)
+	var length := q.length()
+	if length < 0.001: return minf(radii.x, radii.y)
+	# Approximate signed distance to the same ellipse, including beyond
+	# either end. That keeps a continuous snowy bank around the far shore.
+	return (1 - length) / (q / radii / length).length()
+
+
+## The base profile holds this level throughout the lake and resumes the
+## downhill grade gradually beyond the far shore.
 func water_level(strip: Vector2) -> float:
-	return base_height(strip.y)
+	return base_height((strip.x + strip.y) * 0.5)
 
 
 func track_dir(d: float) -> Vector3:
@@ -765,10 +831,48 @@ func bumpiness(d: float) -> float:
 	return wave * wave * wave * wave
 
 
-func base_height(d: float) -> float:
+func _natural_height(d: float) -> float:
 	var descent := 0.30 * d - 400.0 * (1.0 - exp(-d / 4000.0))
 	var rolls := 7.0 * sin(d * 0.0095 + _phases[4]) + 3.0 * sin(d * 0.023 + _phases[5])
 	return -descent + rolls * smoothstep(0.0, 200.0, d) - cliff_drop(d)
+
+
+func _lake_profile(cell: int) -> LakeProfile:
+	if _lake_profiles.has(cell): return _lake_profiles[cell]
+	var span := _slot(cell)
+	if int(span.z) != Region.LAKE: return null
+	var profile := LakeProfile.new()
+	profile.start = span.x + LAKE_WATER[0].x
+	profile.finish = profile.start + LAKE_WATER[0].y
+	profile.approach = profile.start - LAKE_APPROACH
+	profile.exit = profile.finish + LAKE_EXIT
+	profile.incoming = (_natural_height(profile.approach + 0.5) - _natural_height(profile.approach - 0.5))
+	profile.outgoing = (_natural_height(profile.exit + 0.5) - _natural_height(profile.exit - 0.5))
+	profile.level = _natural_height(profile.approach) + profile.incoming * LAKE_APPROACH * 0.5
+	profile.rise = profile.level + profile.outgoing * LAKE_EXIT * 0.5 - _natural_height(profile.exit)
+	_lake_profiles[cell] = profile
+	return profile
+
+
+func _lake_rise_before(cell: int) -> float:
+	if not _lake_rises.has(cell):
+		var last := cell - 1
+		while not _lake_rises.has(last): last -= 1
+		for c in range(last + 1, cell + 1):
+			var previous := _lake_profile(c - 1)
+			_lake_rises[c] = float(_lake_rises[c - 1]) + (previous.rise if previous else 0.0)
+	return _lake_rises[cell]
+
+
+func base_height(d: float) -> float:
+	var natural := _natural_height(d)
+	var cell := _region_cell(d)
+	if cell < 0: return natural
+	if cell != _lake_cell:
+		_lake_cell = cell
+		_lake_before = _lake_rise_before(cell)
+		_lake_current = _lake_profile(cell)
+	return natural + _lake_before + (_lake_current.lift(d, natural) if _lake_current else 0.0)
 
 
 func height(x: float, d: float, with_ramps := true, with_structures := true) -> float:
@@ -779,6 +883,9 @@ func height(x: float, d: float, with_ramps := true, with_structures := true) -> 
 	var calm := 1.0 - weight * (1.0 - rough)
 	var base := base_height(d)
 	var h := base
+	if _lake_current != null:
+		var quiet := smoothstep(_lake_current.approach - 20, _lake_current.approach, d) * (1.0 - smoothstep(_lake_current.exit, _lake_current.exit + 40, d))
+		calm *= 1.0 - quiet
 	# Rails and roads run on smooth ground; the banks beside them stay.
 	if weight > 0.0 and in_corridor(x, d, 8.0):
 		calm = 0.0
@@ -805,7 +912,19 @@ func height(x: float, d: float, with_ramps := true, with_structures := true) -> 
 	var water := water_strip(d)
 	if water != Vector2.ZERO:
 		var gap := maxf(maxf(water.x - d, d - water.y), 0.0)
-		h = lerpf(h, water_level(water), 1.0 - smoothstep(0.0, WATER_BLEND, gap))
+		var distance := lake_shore_distance(x, d)
+		var outside_lake := maxf(-distance, 0)
+		var shore := 1.0 - smoothstep(8, 30, outside_lake)
+		var basin := (1.0 - smoothstep(0.0, WATER_BLEND, gap)) * shore
+		var rim := 0.8 * smoothstep(0, 2, outside_lake) * (1 - smoothstep(5, 16, outside_lake))
+		# Snow banks frame the lake, but the rideable exit follows the smooth
+		# base profile instead of turning the far shore into a ski jump.
+		rim *= smoothstep(half_width(d) - 2, half_width(d) + 6, absf(x - center_x(d)))
+		h = lerpf(h, base + rim, basin)
+		# The render mesh is the lake bed, while the sled samples the mean
+		# water surface. Waves must never expose a flat snow sheet underneath.
+		if not with_structures and d >= water.x and d <= water.y:
+			h -= LAKE_DEPTH * smoothstep(0, 5, distance)
 	var road := nearest_road(d)
 	var road_gap := absf(d - road)
 	if road_gap < ROAD_HALF_WIDTH + ROAD_BLEND:

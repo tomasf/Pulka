@@ -410,7 +410,7 @@ func _resolve_ground() -> void:
 	var h := _surface().w
 	var gap := position.y - h
 	if gap <= 0.0 or (on_ground and gap < 0.002):
-		if field.is_water(-position.z):
+		if field.is_water(-position.z, position.x):
 			position.y = h
 			_touch_water()
 			return
@@ -441,7 +441,9 @@ func _touch_water() -> void:
 		on_ground = true
 		sank.emit()
 		return
-	velocity *= 0.93
+	# Preserve momentum across the broad lake; repeated skips should not
+	# swallow a clean, fast crossing before the far shore is reachable.
+	velocity *= 0.97
 	velocity.y = 2.4 + current * 0.035
 	on_ground = false
 	_air_since = 1.0
@@ -530,6 +532,10 @@ func _update_visual(delta: float) -> void:
 	var blend := 1.0 - exp(-14.0 * delta)
 	if _up.dot(target_up) < -0.999:
 		_up = _up.rotated(forward().normalized(), PI * blend).normalized()
+	elif _up.dot(target_up) > 0.999:
+		# A nearly parallel cross product is too small for slerp's axis on
+		# a flat lake. Interpolation also avoids sudden numerical rotations.
+		_up = _up.lerp(target_up, blend).normalized()
 	else:
 		_up = _up.slerp(target_up, blend).normalized()
 	var ahead := forward()
@@ -597,7 +603,7 @@ func prune_trail(d: float) -> void:
 
 func _update_trail() -> void:
 	var d := distance()
-	if not on_ground or crashed or field.is_water(d) or field.region(d) in [TerrainField.Region.MALL, TerrainField.Region.ICE_CAVE, TerrainField.Region.SEWER] or field.on_bridge(d) or field.harbor_surface_lift(position.x, d) >= 0:
+	if not on_ground or crashed or field.is_water(d, position.x) or field.region(d) in [TerrainField.Region.MALL, TerrainField.Region.ICE_CAVE, TerrainField.Region.SEWER] or field.on_bridge(d) or field.harbor_surface_lift(position.x, d) >= 0:
 		_trail.lift()
 		return
 	# A spinning ride smears along where it is going, not where it points.

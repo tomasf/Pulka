@@ -43,7 +43,7 @@ func _run() -> void:
 	# Deserializing ArrayMeshes requests their render pipelines in Godot.
 	# Include the terrain-specific materials too, ahead of first visibility.
 	var pipeline_meshes: Array[ArrayMesh] = []
-	for material in [IceCavern.material(), ContainerHarbor.water_material(), SewerPipe.concrete(), SewerPipe.sewage(), SewerPipe.earth()]:
+	for material in [IceCavern.material(), ContainerHarbor.water_material(), LakeWater.material(), SewerPipe.concrete(), SewerPipe.sewage(), SewerPipe.earth()]:
 		var m := MeshKit.new()
 		m.box(Vector3.ONE, Vector3.ZERO, Color.WHITE)
 		var mesh := m.build()

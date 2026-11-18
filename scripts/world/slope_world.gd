@@ -469,6 +469,8 @@ func _place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator,
 		var lx := side * (hw + rng.randf_range(nearest, 90.0 if not forest else 60.0))
 		if field.in_corridor(field.center_x(d) + lx, d, 5.0):
 			continue
+		if field.region(d) == TerrainField.Region.LAKE and field.lake_shore_distance(field.center_x(d) + lx, d) > -6:
+			continue
 		var mesh: Mesh = Props.birch() if rng.randf() < 0.12 else Props.spruce(rng.randi_range(0, 2))
 		add_tree(chunk, decor, mesh, ground_xform(field.center_x(d) + lx, d, rng.randf() * TAU, rng.randf_range(0.8, 1.7), 0.2))
 	var houses := 3 if village else (1 if rng.randf() < 0.7 else 0)

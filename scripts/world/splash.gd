@@ -21,15 +21,17 @@ var _ring: MeshInstance3D
 var _ring_material: StandardMaterial3D
 var _age := 0.0
 var _size := 1.0
+var _stretch := 1.0
 
 
 func _build(carry: Vector3, size: float) -> void:
 	_size = size
+	_stretch = 1.0 + minf(Vector2(carry.x, carry.z).length() / 35, 1.0)
 	if _droplet_material == null:
-		_droplet_material = Sled.soft_flake_material()
-		_droplet_material.albedo_color = Color(0.85, 0.93, 1.0)
+		_droplet_material = Sled.soft_flake_material().duplicate()
+		_droplet_material.albedo_color = Color(0.62, 0.85, 1.0)
 		_ring_mesh = TorusMesh.new()
-		_ring_mesh.inner_radius = 0.85
+		_ring_mesh.inner_radius = 0.97
 		_ring_mesh.outer_radius = 1.0
 		_ring_mesh.rings = 24
 		_ring_mesh.ring_segments = 4
@@ -69,9 +71,11 @@ func _build(carry: Vector3, size: float) -> void:
 	_ring_material = StandardMaterial3D.new()
 	_ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_ring_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_ring_material.albedo_color = Color(0.9, 0.96, 1.0, 0.8)
+	_ring_material.albedo_color = Color(0.82, 0.94, 1.0, 0.55)
 	_ring.material_override = _ring_material
-	_ring.scale = Vector3(1.0, 0.05, 1.0) * size
+	_ring.scale = Vector3(1.0, 0.05, _stretch) * size
+	if Vector2(carry.x, carry.z).length() > 0.01:
+		_ring.rotation.y = atan2(-carry.x, -carry.z)
 	_ring.position.y = 0.06
 	_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_ring)
@@ -80,8 +84,8 @@ func _build(carry: Vector3, size: float) -> void:
 func _process(delta: float) -> void:
 	_age += delta
 	var t := _age / LIFETIME
-	var reach := (1.0 + t * 4.0) * _size
-	_ring.scale = Vector3(reach, 0.05, reach)
-	_ring_material.albedo_color.a = 0.8 * (1.0 - t)
+	var reach := (1.0 + t * 3.0) * _size
+	_ring.scale = Vector3(reach, 0.05, reach * _stretch)
+	_ring_material.albedo_color.a = 0.55 * pow(maxf(1.0 - t, 0), 2)
 	if _age > LIFETIME:
 		queue_free()
