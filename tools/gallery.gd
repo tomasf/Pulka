@@ -139,7 +139,7 @@ static func _entries(group: String) -> Array:
 				var person := _creature("person", "wave", fraction)
 				person.set_meta("frame", AABB(Vector3(-0.7, -0.05, -0.4), Vector3(1.4, 2.35, 0.8)))
 				return _viewed(person, view)])
-	for kind in ["person", "moose", "deer", "reindeer", "dog", "hare", "bear"]:
+	for kind in ["person", "moose", "deer", "reindeer", "dog", "hare", "bear", "fox", "cat"]:
 		for anim in [["walk", 0.0], ["walk", 0.5], ["idle", 0.3], ["wave", 0.2], ["gallop", 0.3], ["hop", 0.5], ["flail", 0.3]]:
 			groups["creatures"].append(["%s %s" % [kind, anim[0]], func() -> Node3D: return _creature(kind, anim[0], anim[1])])
 	groups["moose"] = []
@@ -154,7 +154,7 @@ static func _entries(group: String) -> Array:
 			var animal := _creature("moose", "idle", 0.0)
 			animal.set_meta("frame", AABB(Vector3(-0.65, 1.50, -2.65), Vector3(1.3, 1.65, 1.5)))
 			return _viewed(animal, view)])
-	for kind in ["deer", "reindeer", "dog", "hare"]:
+	for kind in ["deer", "reindeer", "dog", "hare", "fox"]:
 		groups[kind + "_review"] = []
 		var box: AABB
 		match kind:
@@ -162,14 +162,36 @@ static func _entries(group: String) -> Array:
 			"reindeer": box = AABB(Vector3(-0.65, 0, -1.25), Vector3(1.3, 2.9, 2.1))
 			"dog": box = AABB(Vector3(-0.3, 0, -0.95), Vector3(0.6, 1.05, 1.8))
 			"hare": box = AABB(Vector3(-0.28, 0, -0.5), Vector3(0.56, 0.95, 0.95))
+			"fox": box = AABB(Vector3(-0.28, 0, -0.85), Vector3(0.56, 1.0, 1.94))
 		for view in [Vector3(-1, 0.35, -1.1), Vector3(-1, 0.03, 0), Vector3(0, 0.1, -1)]:
 			groups[kind + "_review"].append([kind, func() -> Node3D:
 				var animal := _creature(kind, "idle", 0.0)
 				animal.set_meta("frame", box)
 				return _viewed(animal, view)])
 	groups["animal_motion"] = []
-	for kind in ["deer", "reindeer", "dog", "hare"]:
-		var gait := "hop" if kind == "hare" else ("walk" if kind == "dog" else "gallop")
+	groups["cat_review"] = []
+	for variant in 3:
+		for direction in [Vector3(-1, 0.3, -1.1), Vector3(-1, 0.03, 0), Vector3(0, 0.1, -1)]:
+			groups["cat_review"].append(["cat %d" % variant, func() -> Node3D:
+				var animal := Props.cat(variant).make()
+				animal.freeze(&"idle", 0)
+				animal.set_meta("frame", AABB(Vector3(-0.16, 0, -0.48), Vector3(0.32, 0.8, 1.0)))
+				return _viewed(animal, direction)])
+	groups["cat_motion"] = []
+	groups["cat_colors"] = [groups["cat_review"][0], groups["cat_review"][3], groups["cat_review"][6]]
+	for fraction in [0.0, 0.125, 0.25, 0.375, 0.5, 0.75]:
+		groups["cat_motion"].append(["cat walk %.3f" % fraction, func() -> Node3D:
+			var animal := _creature("cat", "walk", fraction)
+			animal.set_meta("frame", AABB(Vector3(-0.16, 0, -0.48), Vector3(0.32, 0.8, 1.0)))
+			return _viewed(animal, Vector3(-1, 0.06, -0.3))])
+	groups["fox_motion"] = []
+	for fraction in [0.0, 0.125, 0.25, 0.375, 0.5, 0.75]:
+		groups["fox_motion"].append(["fox trot %.3f" % fraction, func() -> Node3D:
+			var animal := _creature("fox", "walk", fraction)
+			animal.set_meta("frame", AABB(Vector3(-0.28, 0, -0.85), Vector3(0.56, 1.0, 1.94)))
+			return _viewed(animal, Vector3(-1, 0.05, -0.2))])
+	for kind in ["deer", "reindeer", "dog", "hare", "fox"]:
+		var gait := "hop" if kind == "hare" else ("walk" if kind in ["dog", "fox"] else "gallop")
 		for pose in [["idle", 0.0], ["walk", 0.25], ["walk", 0.75], [gait, 0.3], [gait, 0.7], ["flail", 0.3]]:
 			groups["animal_motion"].append([kind + " " + pose[0], func() -> Node3D:
 				return _viewed(_creature(kind, pose[0], pose[1]), Vector3(-1, 0.1, -0.4))])

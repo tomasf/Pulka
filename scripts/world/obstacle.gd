@@ -5,7 +5,7 @@ extends Node3D
 ## jump over or land on. Mass decides how hard a hit is and whether the
 ## obstacle goes flying.
 
-enum Kind { TREE, ROCK, STUMP, SNOWMAN, PERSON, KID, DOG, MOOSE, DEER, HARE, CAR, PLOW, BIN, TENT, LOG, CART, PLANT, FOUNTAIN, CONE, TRAIN, PLANE, TUG, GOAL, TRUCK, BEAR, CHIMNEY, ICE_PILLAR, CONTAINER, SEWER_DEBRIS }
+enum Kind { TREE, ROCK, STUMP, SNOWMAN, PERSON, KID, DOG, MOOSE, DEER, HARE, CAR, PLOW, BIN, TENT, LOG, CART, PLANT, FOUNTAIN, CONE, TRAIN, PLANE, TUG, GOAL, TRUCK, BEAR, CHIMNEY, ICE_PILLAR, CONTAINER, SEWER_DEBRIS, FOX, CAT }
 
 ## Weight in kilograms; INF for things rooted to the ground.
 const MASS := {
@@ -15,6 +15,8 @@ const MASS := {
 	Kind.CART: 30.0, Kind.PLANT: 45.0, Kind.FOUNTAIN: INF, Kind.CONE: 2.0, Kind.TRAIN: INF,
 	Kind.PLANE: INF, Kind.TUG: 2500.0, Kind.GOAL: 70.0, Kind.TRUCK: 15000.0,
 	Kind.BEAR: 250.0, Kind.CHIMNEY: INF, Kind.ICE_PILLAR: INF, Kind.CONTAINER: INF, Kind.SEWER_DEBRIS: INF,
+	Kind.FOX: 6.0,
+	Kind.CAT: 4.5,
 }
 ## Heavier than this and a hit does not move it.
 const MOVABLE_MASS := 1000.0
@@ -143,6 +145,12 @@ func configure(which: Kind, rig: Props.Rig, terrain: TerrainField) -> Obstacle:
 		Kind.DOG:
 			radius = 0.5
 			top = 0.9
+		Kind.FOX:
+			radius = 0.40
+			top = 0.9
+		Kind.CAT:
+			radius = 0.27
+			top = 0.53
 		Kind.MOOSE:
 			radius = 1.3
 			top = 2.9
@@ -340,7 +348,7 @@ func _ground_penetration() -> float:
 
 ## People and animals: landing on top of them is survivable.
 func is_creature() -> bool:
-	return kind in [Kind.PERSON, Kind.KID, Kind.DOG, Kind.MOOSE, Kind.DEER, Kind.HARE, Kind.BEAR]
+	return kind in [Kind.PERSON, Kind.KID, Kind.DOG, Kind.MOOSE, Kind.DEER, Kind.HARE, Kind.BEAR, Kind.FOX, Kind.CAT]
 
 
 func is_vehicle() -> bool:
@@ -439,7 +447,7 @@ func react_to_hit(impact_velocity: Vector3) -> void:
 			_hop_height = 1.6
 			_hop_rate = 6.0
 			_face_velocity()
-		Kind.PERSON, Kind.KID, Kind.DEER, Kind.DOG:
+		Kind.PERSON, Kind.KID, Kind.DEER, Kind.DOG, Kind.FOX, Kind.CAT:
 			visual.rotation.x = -PI / 2.0 * 0.9
 			visual.position.y = 0.25
 			rotation.y = atan2(-impact_velocity.x, -impact_velocity.z) + PI

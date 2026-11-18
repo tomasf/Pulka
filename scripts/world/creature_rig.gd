@@ -18,6 +18,8 @@ static var _scenes := {
 	"reindeer": preload("res://models/reindeer.glb"),
 	"dog": preload("res://models/dog.glb"),
 	"hare": preload("res://models/hare.glb"),
+	"fox": preload("res://models/fox.glb"),
+	"cat": preload("res://models/cat.glb"),
 }
 ## Reuse clothing materials across moving and baked figures.
 static var _dressed_materials := {}

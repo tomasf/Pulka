@@ -245,6 +245,7 @@ func _build(index: int, deadline: float) -> void:
 				build.stage += 1
 			4:
 				_place_obstacles(chunk, build.rng, d0, d1)
+				CatPopulation.populate(self, chunk)
 				_place_pickups(chunk, build.rng, d0, d1)
 				BirdPopulation.populate(self, chunk, build.decor, d0, d1)
 				_flush_decor(chunk, build.decor)
@@ -485,7 +486,9 @@ func _place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator,
 		if field.in_corridor(x, d, 14.0):
 			continue
 		var yaw := (PI / 2.0 if side > 0.0 else -PI / 2.0) + rng.randf_range(-0.3, 0.3)
-		add_decor(decor, Props.house(rng.randi_range(0, 9)), ground_xform(x, d, yaw, 1.0, 0.4))
+		var home := ground_xform(x, d, yaw, 1.0, 0.4)
+		add_decor(decor, Props.house(rng.randi_range(0, 9)), home)
+		chunk.homes.append(home)
 		if rng.randf() < 0.5:
 			for f in 3:
 				var fd := d - 6.0 + f * 4.2
@@ -606,6 +609,10 @@ func obstacle_rig(kind: Obstacle.Kind, rng: RandomNumberGenerator) -> Props.Rig:
 			return Props.person(rng.randi_range(0, 7))
 		Obstacle.Kind.DOG:
 			return Props.dog()
+		Obstacle.Kind.FOX:
+			return Props.fox()
+		Obstacle.Kind.CAT:
+			return Props.cat(rng.randi_range(0, 2))
 		Obstacle.Kind.MOOSE:
 			return Props.moose()
 		Obstacle.Kind.DEER:
@@ -635,20 +642,21 @@ func obstacle_rig(kind: Obstacle.Kind, rng: RandomNumberGenerator) -> Props.Rig:
 
 
 func _pick_kind(zone: TerrainField.Zone, kind: TerrainField.Region, rng: RandomNumberGenerator) -> Obstacle.Kind:
-	if forced_kind >= 0 and rng.randf() < 0.5:
+	# Cats are placed by real homes, including when requested for testing.
+	if forced_kind >= 0 and forced_kind != Obstacle.Kind.CAT and rng.randf() < 0.5:
 		return forced_kind as Obstacle.Kind
 	var table := regions.obstacle_table(kind)
 	if table.is_empty():
 		match zone:
 			TerrainField.Zone.FOREST:
-				table = [[Obstacle.Kind.TREE, 8], [Obstacle.Kind.STUMP, 2], [Obstacle.Kind.ROCK, 1], [Obstacle.Kind.DEER, 1]]
+				table = [[Obstacle.Kind.TREE, 8], [Obstacle.Kind.STUMP, 2], [Obstacle.Kind.ROCK, 1], [Obstacle.Kind.DEER, 1], [Obstacle.Kind.FOX, 2]]
 			TerrainField.Zone.MOGULS:
 				table = [[Obstacle.Kind.ROCK, 2], [Obstacle.Kind.SNOWMAN, 1], [Obstacle.Kind.PERSON, 1]]
 			TerrainField.Zone.VILLAGE:
 				table = [[Obstacle.Kind.PERSON, 4], [Obstacle.Kind.KID, 3], [Obstacle.Kind.SNOWMAN, 3], [Obstacle.Kind.DOG, 2]]
 			TerrainField.Zone.WILDLIFE:
 				# A bear only now and then.
-				table = [[Obstacle.Kind.MOOSE, 10], [Obstacle.Kind.DEER, 15], [Obstacle.Kind.HARE, 20], [Obstacle.Kind.TREE, 10], [Obstacle.Kind.BEAR, 2]]
+				table = [[Obstacle.Kind.MOOSE, 10], [Obstacle.Kind.DEER, 15], [Obstacle.Kind.HARE, 20], [Obstacle.Kind.TREE, 10], [Obstacle.Kind.BEAR, 2], [Obstacle.Kind.FOX, 8]]
 			_:
 				table = [[Obstacle.Kind.ROCK, 3], [Obstacle.Kind.SNOWMAN, 3], [Obstacle.Kind.TREE, 2], [Obstacle.Kind.PERSON, 1], [Obstacle.Kind.STUMP, 1]]
 	var total := 0
@@ -716,6 +724,8 @@ func _setup_obstacle(obstacle: Obstacle, rng: RandomNumberGenerator, cx: float, 
 				obstacle.rotation.y = rng.randf_range(-0.6, 0.6)
 		Obstacle.Kind.DOG:
 			obstacle.patrol(rng.randf_range(4.0, 7.0) * random_sign(rng), cx - hw, cx + hw)
+		Obstacle.Kind.FOX:
+			obstacle.patrol(rng.randf_range(1.8, 3.0) * random_sign(rng), cx - hw - 4, cx + hw + 4)
 		Obstacle.Kind.MOOSE:
 			obstacle.patrol(rng.randf_range(1.5, 2.6) * random_sign(rng), cx - hw - 10.0, cx + hw + 10.0)
 		Obstacle.Kind.DEER:

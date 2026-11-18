@@ -121,11 +121,14 @@ func _registry() -> void:
 			return _figure(Props.dressed("atlas_bandy%d" % i, Color("e9c824") if i == 0 else Color("315bba"), Color("203c83"), Color.WHITE, Color("203c83"), false, true), "walk"))
 		_add("bather_%d" % i, "Vinterbadare %d" % (i + 1), "Människor", func() -> Node3D:
 			return _figure(Props.dressed("atlas_bath%d" % i, Color("315bba") if i == 0 else Color("d94050"), Color("d94050"), Color.WHITE, Color.BLACK, true), "idle"))
-	var animals := {"dog": ["Hund", Props.dog()], "moose": ["Älg", Props.moose()], "bear": ["Björn", Props.bear()], "deer": ["Rådjur", Props.deer()], "hare": ["Hare", Props.hare()], "reindeer": ["Ren", Props.reindeer()]}
+	var animals := {"dog": ["Hund", Props.dog()], "moose": ["Älg", Props.moose()], "bear": ["Björn", Props.bear()], "deer": ["Rådjur", Props.deer()], "hare": ["Hare", Props.hare()], "reindeer": ["Ren", Props.reindeer()], "fox": ["Räv", Props.fox()]}
 	for kind: String in animals:
 		var rig: Props.Rig = animals[kind][1]
 		for clip in ["idle", String(rig.gait), "flail"]:
 			_add(kind + "_" + clip, animals[kind][0] + " · " + clip, "Djur", func() -> Node3D: return _figure(rig, clip))
+	for variant in 3:
+		for clip in ["idle", "walk", "flail"]:
+			_add("cat_%d_%s" % [variant, clip], ["Grå katt", "Röd katt", "Svartvit katt"][variant] + " · " + clip, "Djur", func() -> Node3D: return _figure(Props.cat(variant), clip))
 	for species in 3:
 		for flying in [false, true]:
 			_add("bird_%d_%s" % [species, flying], ["Kråka", "Skata", "Domherre"][species] + (" · flyger" if flying else " · sitter"), "Djur", func() -> Node3D: return _bird(species, flying))

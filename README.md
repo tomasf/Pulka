@@ -103,6 +103,21 @@ dekoration och orsakar inga krascher. Beteende och placering testas med
 `godot --headless --path . --script res://tools/birds_test.gd -- --autopilot`.
 Kör utan `--headless` och lägg till `--capture` efter `--` för granskningsbilder.
 
+Rödrävar travar över backen i skogs- och vildmarksavsnitt. De har vinterpäls,
+vit bringa, mörka tassar och en buskig svans med ljus spets. Provkör med
+`godot --path . -- --spawn=fox --no-crash`. Kontrollera rörelse, kollisioner
+och naturlig placering med `godot --headless --path . --script res://tools/fox_test.gd`.
+Modellvyer: `godot --path . --rendering-method mobile --script res://tools/gallery.gd -- fox_review /tmp/pulka-fox.png 700`.
+
+Grå, röda och svartvita katter håller till vid riktiga bostadshus: vid de
+utspridda trähusen och längs stadens husfasader. De står och spanar eller går
+korta sträckor kring sitt hus. Placeringen lottas separat och påverkar inte
+andra hinder. Katter placeras aldrig fritt i djur- eller skogstabellerna.
+Provkör med `godot --path . -- --start-region=town --spawn=cat --no-crash`;
+`--spawn=cat` ökar antalet vid hus och behåller samma placeringsregler.
+Testa med `godot --headless --path . --script res://tools/cat_test.gd`.
+Kör utan `--headless` och lägg till `-- --capture` för bilder vid husen.
+
 Trafiken har sju karossformer med olika proportioner: klassisk och modern
 kombi, halvkombi, sedan, SUV, skåpbil och pickup. De har formade hjulhus,
 fälgar, backspeglar, olika lyktor och grillar, vinterdetaljer och ibland skidor.

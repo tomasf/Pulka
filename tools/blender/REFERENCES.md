@@ -44,6 +44,34 @@ not cylinders; their roots must meet the skull. The body reference has a
 transitional grey coat; the game keeps the white winter coat shown in the
 head reference.
 
+## Red fox (`fox`)
+
+- [Rödräv, Svenska Jägareförbundet](https://jagareforbundet.se/viltarter/daggdjur-hela-listan/rodrav/)
+- [Winter full-body photograph](https://jagareforbundet.se/contentassets/aa5718c3f2fb40c396d4d846b60a85e4/10419275-fox-in-the-winter.jpg)
+- [Winter head and chest photograph](https://jagareforbundet.se/contentassets/38c75ec244244c00befa41b9cb7a0f57/red-fox-in-white-snow-cold-winter-with-orange-fur-fox-hunting-anima.jpg)
+
+Compare the elongated, level back, narrow pointed muzzle, upright triangular
+ears, white cheeks and throat, black lower legs and full low brush with a
+pale tip. The coat, legs, ears and tail form one welded surface. Small pads
+sit within the paws and the eyes are embedded in the skull. A diagonal trot,
+small head movements and a restrained tail sway distinguish it from the dog.
+Review `fox_review` and all six phases in `fox_motion` using the native renderer.
+
+## Domestic cat (`cat`)
+
+- [Full-body walking cat, Hoo House Nursery](https://hoohouse.co.uk/about/)
+  ([photograph](https://hoohouse.co.uk/img/nursery-21.jpg))
+- [Round skull, cheeks and eyes, Battersea](https://www.battersea.org.uk/pet-advice/cat-advice/my-cat-happy)
+  ([photograph](https://www.battersea.org.uk/sites/default/files/inline-images/Happy%20and%20relaxed%20grey%20cat.jpg))
+- [Relaxed walking posture, Cats Protection](https://www.cats.org.uk/help-and-advice/cat-behaviour/cat-body-language)
+
+Compare the low, level body, short blunt muzzle, full cheeks, almond-shaped
+eyes, triangular ears and thin upright tail with a softly hooked tip. The
+cat has a four-beat walk rather than the fox's diagonal trot. Coat, paws,
+ears and tail are welded; whiskers begin inside the muzzle and the eyes
+sit within the skull. Grey, ginger and dark coats share geometry; the white
+bib and socks keep their own colour. Review `cat_review` and `cat_motion`.
+
 ## Verification
 
 `tools/gallery.gd` groups `deer_review`, `reindeer_review`, `dog_review` and

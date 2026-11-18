@@ -422,6 +422,17 @@ static func dog() -> Rig:
 	return cached_rig("dog", func() -> Rig: return Rig.creature("dog", {}, 0.9))
 
 
+## Winter red fox with a continuous coat and a white-tipped brush.
+static func fox() -> Rig:
+	return cached_rig("fox", func() -> Rig: return Rig.creature("fox", {}, 0.9))
+
+
+## Grey tabby, ginger tabby or dark tuxedo; bib and socks stay pale.
+static func cat(variant := 0) -> Rig:
+	var coat: Color = [Color.WHITE, Color(1.0, 0.69, 0.37), Color(0.27, 0.29, 0.33)][posmod(variant, 3)]
+	return cached_rig("cat%d" % posmod(variant, 3), func() -> Rig: return Rig.creature("cat", {"cat coat": coat}, 0.65))
+
+
 static func moose() -> Rig:
 	return cached_rig("moose", func() -> Rig: return Rig.creature("moose", {}, 2.6))
 

@@ -24,6 +24,8 @@ from model_kit import ModelKit as K  # noqa: E402
 from bear import Bear  # noqa: E402
 from moose import Moose  # noqa: E402
 from animals import AnimalAnatomy  # noqa: E402
+from fox import Fox  # noqa: E402
+from cat import Cat  # noqa: E402
 
 
 class PersonModel:
@@ -308,8 +310,8 @@ class QuadrupedModel:
         if spec.get("bind"):
             spec["bind"](rig, coat)
 
-        K.animate(rig, "walk", 24, lambda r, t: QuadrupedModel.trot(r, t, spec))
-        K.animate(rig, "idle", 60, QuadrupedModel.idle)
+        K.animate(rig, "walk", 24, spec.get("walk_animation", lambda r, t: QuadrupedModel.trot(r, t, spec)))
+        K.animate(rig, "idle", 60, spec.get("idle_animation", QuadrupedModel.idle))
         if spec.get("gallop"):
             K.animate(rig, "gallop", 16, QuadrupedModel.gallop)
         if spec.get("hop"):
@@ -418,6 +420,14 @@ class Animals:
     """Descriptions of the animals for QuadrupedModel."""
 
     @staticmethod
+    def cat():
+        return Cat.spec()
+
+    @staticmethod
+    def fox():
+        return Fox.spec()
+
+    @staticmethod
     def moose():
         colors = {"fur": (0.3, 0.2, 0.13), "dark": (0.2, 0.13, 0.08), "shin": (0.62, 0.55, 0.46), "hoof": (0.12, 0.1, 0.08), "antler": (0.65, 0.53, 0.38), "ink": (0.02, 0.02, 0.02), "nose": (0.18, 0.12, 0.08)}
 
@@ -505,7 +515,7 @@ class Creatures:
     def export_all(folder):
         PersonModel.build()
         K.export(os.path.join(folder, "person.glb"))
-        for name in ("moose", "deer", "reindeer", "dog", "hare", "bear"):
+        for name in ("moose", "deer", "reindeer", "dog", "hare", "bear", "fox", "cat"):
             if name == "bear":
                 Bear.build()
             else:

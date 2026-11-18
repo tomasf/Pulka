@@ -36,6 +36,8 @@ const CRASH_LINES := {
 		"Barnet skrattade. Du grät.", "%s vann den duellen.", "%s ska skvallra för fröken.", "%s vill åka en gång till!",
 		"%s tappade vanten.", "%s står kvar. Du ligger ner."],
 	Obstacle.Kind.DOG: ["Voff!", "Hunden trodde du var en pinne.", "Taxen tog ingen skada. Du däremot..."],
+	Obstacle.Kind.FOX: ["Räven vann den här gången.", "Listig, men inte osynlig.", "Du tog fel väg till grytet."],
+	Obstacle.Kind.CAT: ["Mjau!", "Katten hade företräde.", "Nio liv. Inget tålamod."],
 	Obstacle.Kind.MOOSE: ["Älgen är okej. Det är inte du.", "Skogens konung vinner alltid.", "Du blev älgad."],
 	Obstacle.Kind.DEER: ["Rådjuret blev mest förvånat.", "Bambi: 1, Du: 0"],
 	Obstacle.Kind.BEAR: [

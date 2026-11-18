@@ -3,7 +3,7 @@ extends SceneTree
 ## Godot --headless --path . --script res://tools/tumble_test.gd
 
 class FlatField extends TerrainField:
-	func height_world(_x: float, _z: float) -> float:
+	func height_world(_x: float, _z: float, _include_ramps := true) -> float:
 		return 0.0
 
 var _failures := 0

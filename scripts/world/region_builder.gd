@@ -75,6 +75,7 @@ func _place_town(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo
 			var facing: float = (PI / 2.0 if side > 0.0 else -PI / 2.0) - yaw
 			var xform := Transform3D(Basis(Vector3.UP, facing), Vector3(x, field.height(x, d, false) - 0.1, -d))
 			world.add_decor(decor, Props.town_house(variant), xform)
+			chunk.homes.append(xform)
 			var sign := Shops.town_sign(variant)
 			sign.transform = xform * Transform3D(Basis(Vector3.UP, PI), Vector3(-0.9, 3.4, -4.62))
 			chunk.add_child(sign)
@@ -336,7 +337,7 @@ func obstacle_table(kind: TerrainField.Region) -> Array:
 		TerrainField.Region.PARK:
 			return [[Obstacle.Kind.PERSON, 2], [Obstacle.Kind.SNOWMAN, 2], [Obstacle.Kind.KID, 1]]
 		TerrainField.Region.WOODS:
-			return [[Obstacle.Kind.LOG, 9], [Obstacle.Kind.TREE, 3], [Obstacle.Kind.STUMP, 3], [Obstacle.Kind.DEER, 3], [Obstacle.Kind.MOOSE, 3], [Obstacle.Kind.HARE, 6], [Obstacle.Kind.BEAR, 1]]
+			return [[Obstacle.Kind.LOG, 9], [Obstacle.Kind.TREE, 3], [Obstacle.Kind.STUMP, 3], [Obstacle.Kind.DEER, 3], [Obstacle.Kind.MOOSE, 3], [Obstacle.Kind.HARE, 6], [Obstacle.Kind.BEAR, 1], [Obstacle.Kind.FOX, 3]]
 		TerrainField.Region.MALL:
 			return [[Obstacle.Kind.PERSON, 5], [Obstacle.Kind.KID, 2], [Obstacle.Kind.CART, 1], [Obstacle.Kind.PLANT, 2]]
 		TerrainField.Region.RAIL:

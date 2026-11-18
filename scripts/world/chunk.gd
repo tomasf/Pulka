@@ -9,6 +9,8 @@ var pickups: Array[Pickup] = []
 var roads: Array[RoadCrossing] = []
 var birds: Array[AmbientBird] = []
 var rats: Array[SewerRat] = []
+## Actual residential buildings, registered when their scenery is placed.
+var homes: Array[Transform3D] = []
 
 
 func tick(delta: float, observers := PackedVector3Array(), speeds := PackedFloat32Array()) -> void:
