@@ -30,6 +30,21 @@ func _run() -> void:
 			world.regions.prepare_floors(Time.get_ticks_usec() + 800)
 			passes += 1
 		_check("pipe and stream build in small slices", world.regions._region_jobs.is_empty() and passes > 1)
+		var wall_surfaces: Array[Array] = []
+		var lamps: Array[Transform3D] = []
+		for chunk: Chunk in world._chunks.values():
+			for child in chunk.get_children():
+				if child is MeshInstance3D and child.name == "SewerPipe":
+					wall_surfaces.append(child.mesh.surface_get_arrays(0))
+				elif child is MultiMeshInstance3D and child.multimesh.mesh == SewerPipe.lamp():
+					for i in child.multimesh.instance_count:
+						lamps.append(child.global_transform * child.multimesh.get_instance_transform(i))
+		var mounted := lamps.size() >= 10
+		for fixture: Transform3D in lamps:
+			for x in [-0.27, 0.27]:
+				for y in [-0.47, 0.47]:
+					mounted = mounted and _on_inner_wall(fixture * Vector3(x, y, 0), fixture.basis.z, wall_surfaces)
+		_check("both sides' lamp plates touch rendered concrete and face inward", mounted)
 		var obstacles: Array[Obstacle] = []
 		var rats: Array[SewerRat] = []
 		for chunk: Chunk in world._chunks.values():
@@ -109,6 +124,30 @@ func _run() -> void:
 	await process_frame
 	print("sewer test: %s" % ("all passed" if failures == 0 else "%d failed" % failures))
 	quit(failures)
+
+## Compare all four mounting corners against the rendered pipe quads,
+## independently of the fixture placement formula. The quad edges can be
+## skewed by the pipe's bends, so solve its two surface coordinates.
+func _on_inner_wall(point: Vector3, outward: Vector3, surfaces: Array[Array]) -> bool:
+	for arrays: Array in surfaces:
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		for q in range(0, vertices.size(), 4):
+			if normals[q].dot(outward) > -0.995: continue
+			var a := vertices[q]
+			if point.z < minf(a.z, vertices[q + 2].z) - 0.02 or point.z > maxf(a.z, vertices[q + 2].z) + 0.02: continue
+			var offset := point - a
+			if absf(offset.dot(normals[q])) > 0.015: continue
+			var u := vertices[q + 1] - a
+			var v := vertices[q + 3] - a
+			var uu := u.dot(u)
+			var uv := u.dot(v)
+			var vv := v.dot(v)
+			var determinant := uu * vv - uv * uv
+			var s := (offset.dot(u) * vv - offset.dot(v) * uv) / determinant
+			var t := (offset.dot(v) * uu - offset.dot(u) * uv) / determinant
+			if s >= -0.01 and s <= 1.01 and t >= -0.01 and t <= 1.01: return true
+	return false
 
 func _cross(field: TerrainField, span: Vector3, spec: VehicleSpec, obstacles: Array[Obstacle]) -> bool:
 	var sled := Sled.new()
@@ -233,6 +272,16 @@ func _capture(main: Node, span: Vector3) -> void:
 	atmo.indoor = true
 	atmo.update_atmosphere(0, camera, 0, 0, false)
 	await _shot("rat")
+	# View each alternating wall fixture against its concrete mounting face.
+	for i in 2:
+		d = ceilf((span.x + 90) / 22) * 22 + i * 22
+		var side := 1.0 if int(d / 22) % 2 == 0 else -1.0
+		target = Vector3(field.center_x(d) + side * 7.2, field.sewer_height(d) + 5.15, -d)
+		camera.position = target + Vector3(-side * 2.8, 0.8, 3.2)
+		camera.look_at(target)
+		camera.fov = 48
+		atmo.update_atmosphere(0, camera, 0, 0, false)
+		await _shot("lamp-%d" % i)
 
 func _shot(name: String) -> void:
 	for i in 12: await process_frame

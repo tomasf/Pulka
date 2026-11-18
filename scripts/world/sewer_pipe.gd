@@ -7,6 +7,7 @@ static var _water: ShaderMaterial
 static var _earth: StandardMaterial3D
 const R := TerrainField.SEWER_RADIUS
 const SEGMENTS := 40
+const SLICE_LENGTH := 2.5
 ## Centre X, half width, half depth, top above the sewer datum.
 const BARRIERS := [Vector4(-3.1, 3.7, 0.26, 9), Vector4(3.4, 1.65, 0.8, 1.95), Vector4(3.1, 3.7, 0.26, 9), Vector4(-0.8, 1.65, 0.8, 1.95), Vector4(-2.8, 3.4, 0.43, 1.43)]
 
@@ -90,7 +91,7 @@ class BuildJob:
 
 	func step() -> bool:
 		if at < finish - 0.001:
-			var next := minf(finish, (floorf(at / 2.5) + 1) * 2.5)
+			var next := minf(finish, (floorf(at / SewerPipe.SLICE_LENGTH) + 1) * SewerPipe.SLICE_LENGTH)
 			SewerPipe._slice(skin, water, field, at, next)
 			SewerPipe._earth_slice(embankment, field, at, next)
 			at = next
@@ -251,10 +252,37 @@ static func low_pipe() -> ArrayMesh:
 static func lamp() -> ArrayMesh:
 	return Props.cached_mesh("sewer_lamp", func() -> ArrayMesh:
 		var m := MeshKit.new()
-		m.box(Vector3(0.36, 0.72, 0.30), Vector3.ZERO, Color("454c46"))
-		m.ellipsoid(Vector3(0.20, 0.26, 0.20), Vector3(0, 0, -0.15), Color(1, 0.68, 0.20, 0.35))
-		for x in [-0.16, 0, 0.16]: m.box(Vector3(0.025, 0.55, 0.03), Vector3(x, 0, -0.32), Color("4e5143"))
+		# Origin is on the concrete. The rear of the bolted mounting plate
+		# sinks slightly into it; brackets carry the lamp on the inward side.
+		m.box(Vector3(0.54, 0.94, 0.07), Vector3(0, 0, 0.005), Color("51574d"))
+		for y in [-0.25, 0.25]:
+			m.box(Vector3(0.10, 0.13, 0.15), Vector3(0, y, -0.09), Color("5f6252"))
+		for x in [-0.22, 0.22]:
+			for y in [-0.40, 0.40]:
+				m.cylinder(0.033, 0.035, Vector3(x, y, -0.045), Color("969680"), 6, Vector3(PI / 2, 0, 0))
+		m.box(Vector3(0.38, 0.76, 0.20), Vector3(0, 0, -0.23), Color("454c46"))
+		m.ellipsoid(Vector3(0.17, 0.26, 0.14), Vector3(0, 0, -0.33), Color(1, 0.68, 0.20, 0.35))
+		for x in [-0.16, 0, 0.16]: m.box(Vector3(0.025, 0.55, 0.03), Vector3(x, 0, -0.47), Color("4e5143"))
 		return m.build())
+
+
+## Mount on the actual faceted inner skin, including its grade and bends.
+## Local +Z goes into the wall; the lamp and its light face inward along -Z.
+static func lamp_transform(field: TerrainField, d: float, side: float) -> Transform3D:
+	var ends := field.sewer_span(d)
+	var lo := maxf(ends.x, floorf(d / SLICE_LENGTH) * SLICE_LENGTH)
+	var hi := minf(ends.y, (floorf(d / SLICE_LENGTH) + 1) * SLICE_LENGTH)
+	var front := Vector3(field.center_x(lo), field.sewer_height(lo) + R + 0.025, -lo)
+	var back := Vector3(field.center_x(hi), field.sewer_height(hi) + R + 0.025, -hi)
+	# Centre of the 63–72 degree facet, comfortably below the ceiling.
+	var a := Vector3(side * sin(7 * TAU / SEGMENTS), -cos(7 * TAU / SEGMENTS), 0) * R
+	var b := Vector3(side * sin(8 * TAU / SEGMENTS), -cos(8 * TAU / SEGMENTS), 0) * R
+	var up := (b - a).normalized()
+	var outward := up.cross(back - front).normalized() * -side
+	var right := up.cross(outward).normalized()
+	up = outward.cross(right).normalized()
+	var at := front.lerp(back, inverse_lerp(lo, hi, d)) + (a + b) * 0.5
+	return Transform3D(Basis(right, up, outward), at)
 
 
 static func inlet() -> ArrayMesh:
@@ -318,10 +346,10 @@ static func populate(world: SlopeWorld, chunk: Chunk, decor: Dictionary, lo: flo
 	d = ceilf(lo / 22) * 22
 	while d < hi:
 		var side := 1.0 if int(d / 22) % 2 == 0 else -1.0
-		var at := Vector3(field.center_x(d) + side * 6.5, field.sewer_height(d) + 5.1, -d)
-		world.add_decor(decor, lamp(), Transform3D(Basis(Vector3.UP, -side * PI / 2), at))
+		var mounting := lamp_transform(field, d, side)
+		world.add_decor(decor, lamp(), mounting)
 		var light := OmniLight3D.new()
-		light.position = at + Vector3(-side, 0, 0)
+		light.position = mounting * Vector3(0, 0, -0.68)
 		light.light_color = Color("ffd58a")
 		light.light_energy = 2.0
 		light.omni_range = 18
