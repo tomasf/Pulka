@@ -38,17 +38,28 @@ func _run() -> void:
 		world.add_child(road)
 		var road_clear := true
 		var velocities := true
+		var rolling := true
 		for frame in 7200:
 			var before := PackedFloat64Array()
+			var angles := PackedFloat64Array()
 			for car in road.cars: before.append(car.position.x)
+			for car in road.cars: angles.append(car._wheel_angle)
 			road.tick(1.0 / 30)
 			for lane in road._flows: road_clear = road_clear and _clear(lane)
 			for i in road.cars.size():
+				var car := road.cars[i]
+				if car.kind == Obstacle.Kind.CAR:
+					var expected := angles[i] - car.velocity.length() / (30 * car._wheel_radius)
+					rolling = rolling and absf(angle_difference(car._wheel_angle, expected)) < 0.00001
 				var dx := road.cars[i].position.x - before[i]
 				if absf(dx) < 100:
 					velocities = velocities and absf(dx * 30 - road.cars[i].velocity.x) < 0.04
 		_check("crossing seed %d keeps both lanes separated through wraps" % seed_value, road_clear)
 		_check("crossing collision velocities match movement", velocities)
+		_check("crossing wheels follow both traffic directions, queues and lane wraps", rolling)
+		var stopped_angle := road.cars[0]._wheel_angle
+		road.tick(0)
+		_check("paused crossing traffic leaves wheel rotation unchanged", road.cars[0]._wheel_angle == stopped_angle)
 		road.free()
 		world.field = TerrainField.new(seed_value)
 		var span := Vector3.ZERO
@@ -61,14 +72,23 @@ func _run() -> void:
 		world.add_child(motorway)
 		var motorway_clear := true
 		var directions := true
+		rolling = true
 		for frame in 1800:
-			motorway.tick(0.1 if frame % 120 else 0.8, -1000)
+			var angles := PackedFloat64Array()
+			for car in motorway.obstacles: angles.append(car._wheel_angle)
+			var delta := 0.1 if frame % 120 else 0.8
+			motorway.tick(delta, -1000)
 			for lane in motorway._flows: motorway_clear = motorway_clear and _clear(lane)
 			for i in motorway.obstacles.size():
+				var car := motorway.obstacles[i]
+				if car.kind == Obstacle.Kind.CAR:
+					var expected := angles[i] - car.velocity.length() * delta / car._wheel_radius
+					rolling = rolling and absf(angle_difference(car._wheel_angle, expected)) < 0.00001
 				var direction: float = RegionBuilder.MOTORWAY_LANES[motorway._lanes[i]][1]
 				directions = directions and motorway.obstacles[i].velocity.z * direction < 0
 		_check("motorway seed %d keeps cars and trucks separated" % seed_value, motorway_clear)
 		_check("motorway collision velocities follow the correct direction", directions)
+		_check("motorway wheels follow curved/sloping lanes and wraps", rolling)
 		motorway.free()
 	world.queue_free()
 	await process_frame

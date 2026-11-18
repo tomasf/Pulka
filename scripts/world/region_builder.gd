@@ -195,7 +195,7 @@ func _park_cars(chunk: Chunk, rng: RandomNumberGenerator, d0: float, d1: float) 
 		var car := Obstacle.new().configure(Obstacle.Kind.CAR, world.obstacle_rig(Obstacle.Kind.CAR, rng), field)
 		car.position = Vector3(x, field.height(x, d), -d)
 		car.rotation.y = -world.street_yaw(d) + (PI if rng.randf() < 0.5 else 0.0)
-		_rest_on_ground(car, 1.4, 0.8)
+		_rest_on_ground(car, float(car.visual.mesh.get_meta("axle_reach", 1.4)), float(car.visual.mesh.get_meta("track_half_width", 0.8)))
 		chunk.add_child(car)
 		chunk.obstacles.append(car)
 

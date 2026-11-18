@@ -43,8 +43,11 @@ func _run() -> void:
 	_check("landing on a head is survived", await _try(main, sled, Obstacle.Kind.PERSON, Props.person(0), 1.75, false) == false)
 	_check("landing on a head still bounces", not sled.on_ground and sled.velocity.y > 0.0)
 	_check("landing on a moose is survived", await _try(main, sled, Obstacle.Kind.MOOSE, Props.moose(), 2.6, false) == false)
-	_check("landing on a car roof is survived", await _try(main, sled, Obstacle.Kind.CAR, Props.Rig.of(Props.car(0)), 1.5, false) == false)
-	_check("landing on a car roof still bounces", not sled.on_ground and sled.velocity.y > 0.0)
+	for body in CarModels.BODY_NAMES.size():
+		var car := Props.car(body)
+		var roof := float(car.get_meta("roof_height"))
+		_check("landing on %s roof is survived" % CarModels.BODY_NAMES[body], not await _try(main, sled, Obstacle.Kind.CAR, Props.Rig.of(car), roof - 0.07, false))
+		_check("landing on the car roof still bounces", not sled.on_ground and sled.velocity.y > 0.0)
 	_check("ground collisions respect --no-crash", await _try(main, sled, Obstacle.Kind.PERSON, Props.person(1), 0.0, true, no_crash, 25.0) == not no_crash)
 	if not no_crash:
 		_check("hitting a person at speed crashes", await _try(main, sled, Obstacle.Kind.PERSON, Props.person(2), 0.0, true, false, 25.0))

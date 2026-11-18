@@ -1,7 +1,8 @@
 extends SceneTree
 ## Renders one model from three angles side by side.
 ## Run: Godot --path . --script res://tools/mesh_preview.gd -- <name> <out.png>
-## Names: plane, truck, loco, mitten, face, pulka, stjartlapp, snowracer, tefat, wok, rider.
+## Names: car0..48, plane, truck, loco, mitten, face, pulka, stjartlapp, snowracer, tefat, wok, rider.
+## Cars accept --wheel-angle=<degrees> to inspect their animated wheels.
 
 
 func _initialize() -> void:
@@ -10,6 +11,9 @@ func _initialize() -> void:
 
 func _model(name: String) -> Node3D:
 	var node := MeshInstance3D.new()
+	if name.begins_with("car"):
+		node.mesh = Props.car(int(name.trim_prefix("car")))
+		return node
 	match name:
 		"plane":
 			node.mesh = RegionProps.plane(0)
@@ -64,8 +68,17 @@ func _run() -> void:
 		angles = [Vector3(0.0, 0.05, -1.0), Vector3(0.8, 0.1, -1.0), Vector3(0.3, 0.3, 1.0)]
 	var model := _model(name)
 	world.add_child(model)
+	if name.begins_with("car"):
+		for arg in args:
+			if arg.begins_with("--wheel-angle="):
+				model.set_instance_shader_parameter(&"wheel_angle", deg_to_rad(float(arg.get_slice("=", 1))))
 	var camera := Camera3D.new()
 	camera.fov = 40.0
+	if name.begins_with("car"):
+		size = 5.5
+		angles = [Vector3(-1.0, 0.5, -1.0), Vector3(1.0, 0.4, 1.0), Vector3(1.0, 0.15, 0.0)]
+		camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+		camera.size = 5.5
 	world.add_child(camera)
 	camera.current = true
 	root.size = Vector2i(600, 600)

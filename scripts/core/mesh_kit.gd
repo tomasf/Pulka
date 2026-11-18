@@ -300,14 +300,20 @@ func prism(size: Vector3, pos: Vector3, color: Color, rot := Vector3.ZERO) -> Me
 	return add(mesh, Transform3D(Basis.from_euler(rot), pos), color)
 
 
-func build() -> ArrayMesh:
+## Optional float4 vertex data for props animated inside their shared shader.
+func build(custom0 := PackedFloat32Array()) -> ArrayMesh:
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = _vertices
 	arrays[Mesh.ARRAY_NORMAL] = _normals
 	arrays[Mesh.ARRAY_COLOR] = _colors
 	arrays[Mesh.ARRAY_INDEX] = _indices
+	var flags := 0
+	if not custom0.is_empty():
+		assert(custom0.size() == _vertices.size() * 4)
+		arrays[Mesh.ARRAY_CUSTOM0] = custom0
+		flags = Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT
 	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, flags)
 	mesh.surface_set_material(0, Palette.surface())
 	return mesh

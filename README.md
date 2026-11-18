@@ -89,6 +89,22 @@ dekoration och orsakar inga krascher. Beteende och placering testas med
 `godot --headless --path . --script res://tools/birds_test.gd -- --autopilot`.
 Kör utan `--headless` och lägg till `--capture` efter `--` för granskningsbilder.
 
+Trafiken har sju karossformer med olika proportioner: klassisk och modern
+kombi, halvkombi, sedan, SUV, skåpbil och pickup. De har formade hjulhus,
+fälgar, backspeglar, olika lyktor och grillar, vinterdetaljer och ibland skidor.
+Kaross och lack lottas oberoende. Den ungefärliga svenska trafikblandningen
+är viktad till 33 % kombi, 24 % halvkombi, 25 % SUV, 12 % sedan, 5 % skåpbil
+och 1 % pickup; detta är spelvikter, inte officiell fordonsstatistik.
+Vitt, svart och silver är vanligast. Alla 49 kombinationer förbereds i
+modellcachen och varje bil använder en enda ogenomskinlig materialyta.
+Hjulen roterar kring sina egna axlar efter körsträckan och hjulradien,
+även när trafiken bromsar in. Parkerade bilar och pausad trafik står still.
+Kontrollera geometri och fördelning med
+`godot --headless --path . --script res://tools/car_test.gd` och köbildning med
+`godot --headless --path . --script res://tools/traffic_test.gd -- --autopilot`.
+En modellöversikt kan renderas med
+`godot --path . --script res://tools/car_preview.gd -- /tmp/pulka-cars.png`.
+
 ## Apple TV
 
 Godot saknar officiellt tvOS-stöd, så Apple TV-versionen byggs med en egen

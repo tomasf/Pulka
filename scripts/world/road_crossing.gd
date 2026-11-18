@@ -32,7 +32,7 @@ func setup(field: TerrainField, at_d: float, rng: RandomNumberGenerator, engine_
 		var offset := rng.randf_range(0.0, spacing)
 		for i in count:
 			var is_plow := rng.randf() < 0.12
-			var mesh := Props.plow() if is_plow else Props.car(rng.randi_range(0, Palette.CARS.size() - 1))
+			var mesh := Props.plow() if is_plow else Props.car(CarModels.pick(rng))
 			var car := Obstacle.new().configure(Obstacle.Kind.PLOW if is_plow else Obstacle.Kind.CAR, Props.Rig.of(mesh), field)
 			car.position = Vector3(_center - REACH + offset + i * spacing + rng.randf_range(-8.0, 8.0), _level, z)
 			car.velocity = Vector3(direction * speed * (0.6 if is_plow else 1.0), 0.0, 0.0)
@@ -62,6 +62,7 @@ func tick(delta: float) -> void:
 		var index := _flow_indices[i]
 		cars[i].position.x = _center + direction * (flow.positions[index] - REACH)
 		cars[i].velocity.x = direction * flow.speeds[index]
+		cars[i].roll_wheels(flow.speeds[index] * delta)
 
 
 func _build_surface() -> void:

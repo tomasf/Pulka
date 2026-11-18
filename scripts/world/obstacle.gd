@@ -52,6 +52,8 @@ var hit := false
 var close_call := false
 var near_miss_done := false
 var visual: MeshInstance3D
+var _wheel_radius := 0.0
+var _wheel_angle := 0.0
 
 var _limbs: Array[Node3D] = []
 ## A Blender-made person or animal, animated instead of swinging limbs.
@@ -199,8 +201,9 @@ func configure(which: Kind, rig: Props.Rig, terrain: TerrainField) -> Obstacle:
 			half_extents = Vector2(1.9, 0.7)
 			top = 2.1
 		Kind.CAR:
-			half_extents = Vector2(0.95, 2.25)
-			top = 1.7
+			half_extents = rig.body.get_meta("collision_extents", Vector2(0.95, 2.25)) if rig.body else Vector2(0.95, 2.25)
+			top = float(rig.body.get_meta("roof_height", 1.7)) if rig.body else 1.7
+			_wheel_radius = float(rig.body.get_meta("wheel_radius", 0.0)) if rig.body else 0.0
 			follow_terrain = false
 		Kind.PLOW:
 			half_extents = Vector2(1.8, 3.6)
@@ -217,6 +220,14 @@ func configure(which: Kind, rig: Props.Rig, terrain: TerrainField) -> Obstacle:
 
 func movable() -> bool:
 	return mass < MOVABLE_MASS
+
+
+## Signed distance along the vehicle's forward direction, independent of
+## world position: wrapping a traffic lane must not spin the wheels wildly.
+func roll_wheels(distance: float) -> void:
+	if _wheel_radius <= 0.0 or is_zero_approx(distance): return
+	_wheel_angle = fposmod(_wheel_angle - distance / _wheel_radius, TAU)
+	visual.set_instance_shader_parameter(&"wheel_angle", _wheel_angle)
 
 
 ## Height of the obstacle's top above its base, allowing for scaling (trees).
@@ -348,6 +359,7 @@ func tick(delta: float) -> void:
 	if flying or (hit and not soft):
 		return
 	if velocity != Vector3.ZERO:
+		if _wheel_radius > 0.0: roll_wheels(-basis.z.dot(velocity) * delta)
 		position += velocity * delta
 		if (position.x < min_x and velocity.x < 0.0) or (position.x > max_x and velocity.x > 0.0):
 			velocity.x = -velocity.x

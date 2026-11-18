@@ -36,7 +36,7 @@ func setup(world: SlopeWorld, span: Vector3) -> MotorwayTraffic:
 			var progress := fposmod(offset + i * spacing + rng.randf_range(-8, 8), length)
 			var d := span.x + progress if direction > 0 else span.y - progress
 			var lorry := rng.randf() < 0.25
-			var mesh := RegionProps.truck(rng.randi_range(0, 2)) if lorry else Props.car(rng.randi_range(0, Palette.CARS.size() - 1))
+			var mesh := RegionProps.truck(rng.randi_range(0, 2)) if lorry else Props.car(CarModels.pick(rng))
 			var vehicle := Obstacle.new().configure(Obstacle.Kind.TRUCK if lorry else Obstacle.Kind.CAR, Props.Rig.of(mesh), world.field)
 			vehicle.follow_terrain = false
 			if rng.randf() < 0.4:
@@ -75,6 +75,8 @@ func tick(delta: float, player_d: float) -> void:
 				_honked[i] = true
 				_world.honk(car.global_position)
 	_place_all()
+	for vehicle in obstacles:
+		vehicle.roll_wheels(vehicle.velocity.length() * delta)
 
 
 func finished(player_d: float) -> bool:

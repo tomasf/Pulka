@@ -447,58 +447,10 @@ static func hare() -> Rig:
 
 # --- Vehicles on the roads ---
 
-## A family car, nose towards -Z: an estate or (odd variants) a saloon,
-## with a glasshouse of tinted windows between painted pillars, black
-## bumpers, wheel arches, mirrors and snow on the roof and bonnet.
+## Detailed cars, nose towards -Z, cached by independent body/paint variant.
 static func car(variant: int) -> ArrayMesh:
-	return cached_mesh("car%d" % variant, func() -> ArrayMesh:
-		var kit := MeshKit.new()
-		var paint: Color = Palette.CARS[variant % Palette.CARS.size()]
-		var glass := Color(0.16, 0.22, 0.3)
-		var black := Color(0.08, 0.08, 0.09)
-		var estate := variant % 2 == 0
-		var lengthwise := Basis(Vector3.UP, -PI / 2.0)
-		# Lower body, side view in Z/Y, slightly rounded at the nose.
-		kit.slab(PackedVector2Array([Vector2(2.2, 0.3), Vector2(2.25, 0.95), Vector2(-2.12, 0.92), Vector2(-2.3, 0.62), Vector2(-2.22, 0.3)]), 1.8, Transform3D(lengthwise, Vector3.ZERO), paint)
-		# Glasshouse: tinted glass all round, pillars and roof painted over.
-		var rear := 2.1 if estate else 1.15
-		var cabin := PackedVector2Array([Vector2(rear + 0.05, 0.92), Vector2(rear, 1.45), Vector2(rear - 0.4, 1.52), Vector2(-0.4, 1.5), Vector2(-1.2, 0.92)])
-		kit.slab(cabin, 1.64, Transform3D(lengthwise, Vector3.ZERO), glass)
-		kit.slab(PackedVector2Array([Vector2(rear - 0.02, 1.47), Vector2(rear - 0.4, 1.55), Vector2(-0.4, 1.53), Vector2(-0.5, 1.47)]), 1.6, Transform3D(lengthwise, Vector3.ZERO), paint)
-		for side in [-1.0, 1.0]:
-			var x: float = 0.81 * side
-			kit.box(Vector3(0.04, 0.6, 0.12), Vector3(x, 1.21, 0.35), paint)
-			kit.box(Vector3(0.04, 0.6, 0.16), Vector3(x, 1.21, rear - 0.08), paint, Vector3(-0.08, 0, 0))
-			kit.box(Vector3(0.04, 0.97, 0.1), Vector3(x, 1.21, -0.8), paint, Vector3(0.94, 0, 0))
-			if estate:
-				kit.box(Vector3(0.04, 0.6, 0.1), Vector3(x, 1.21, 1.35), paint)
-			# Door seams, handles and a mirror.
-			for z in [-0.6, 0.38, 1.3]:
-				kit.box(Vector3(0.02, 0.6, 0.02), Vector3(0.905 * side, 0.62, z), paint.darkened(0.3))
-			kit.box(Vector3(0.03, 0.04, 0.16), Vector3(0.91 * side, 0.85, 0.2), black)
-			kit.box(Vector3(0.03, 0.04, 0.16), Vector3(0.91 * side, 0.85, 1.15), black)
-			kit.ellipsoid(Vector3(0.1, 0.07, 0.05), Vector3(0.95 * side, 1.02, -0.95), paint)
-			# Wheels under black arches.
-			for axle in [-1.35, 1.4]:
-				kit.cylinder(0.4, 0.06, Vector3(0.88 * side, 0.36, axle), black, 14, Vector3(0, 0, PI / 2))
-				wheel(kit, Vector3(0.8 * side, 0.34, axle), 0.34, 0.24, Color(0.72, 0.74, 0.77))
-		# Bumpers, grille, lights and number plates.
-		kit.box(Vector3(1.86, 0.22, 0.18), Vector3(0, 0.42, -2.25), black)
-		kit.box(Vector3(1.86, 0.22, 0.18), Vector3(0, 0.42, 2.25), black)
-		kit.box(Vector3(0.9, 0.2, 0.05), Vector3(0, 0.72, -2.29), Color(0.15, 0.15, 0.17))
-		for k in 3:
-			kit.box(Vector3(0.86, 0.02, 0.06), Vector3(0, 0.66 + k * 0.06, -2.3), Color(0.55, 0.57, 0.6))
-		for plate_z in [-2.35, 2.35]:
-			kit.box(Vector3(0.52, 0.12, 0.02), Vector3(0, 0.42, plate_z), Color(0.95, 0.95, 0.92))
-			kit.box(Vector3(0.06, 0.12, 0.025), Vector3(-0.23, 0.42, plate_z), Color(0.1, 0.25, 0.7))
-		for side in [-1.0, 1.0]:
-			kit.box(Vector3(0.36, 0.18, 0.05), Vector3(0.66 * side, 0.74, -2.27), Palette.HEADLIGHT)
-			kit.box(Vector3(0.12, 0.1, 0.05), Vector3(0.88 * side, 0.64, -2.24), Color(1.0, 0.6, 0.1))
-			kit.box(Vector3(0.22, 0.3, 0.05), Vector3(0.74 * side, 0.75, 2.26), Palette.TAILLIGHT)
-		# Snow on the roof and a thin layer on the bonnet.
-		kit.slab(PackedVector2Array([Vector2(rear - 0.1, 1.53), Vector2(rear - 0.25, 1.68), Vector2(-0.2, 1.66), Vector2(-0.35, 1.53)]), 1.5, Transform3D(lengthwise, Vector3.ZERO), Palette.SNOW)
-		kit.box(Vector3(1.6, 0.05, 0.8), Vector3(0, 0.96, -1.65), Palette.SNOW, Vector3(-0.06, 0, 0))
-		return kit.build())
+	variant = posmod(variant, CarModels.variant_count())
+	return cached_mesh("car_v3_%d" % variant, func() -> ArrayMesh: return CarModels.build(variant))
 
 
 ## A road wheel turned to roll along Z: a tyre, a rim and a hub cap.

@@ -637,7 +637,7 @@ func obstacle_rig(kind: Obstacle.Kind, rng: RandomNumberGenerator) -> Props.Rig:
 		Obstacle.Kind.TENT:
 			return Props.Rig.of(Props.tent())
 		Obstacle.Kind.CAR:
-			return Props.Rig.of(Props.car(rng.randi_range(0, Palette.CARS.size() - 1)))
+			return Props.Rig.of(Props.car(CarModels.pick(rng)))
 		Obstacle.Kind.LOG:
 			return Props.Rig.of(Props.fallen_log())
 		Obstacle.Kind.CART:
