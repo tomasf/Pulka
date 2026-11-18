@@ -124,7 +124,7 @@ func _build_scene() -> void:
 	_ride = ride
 	_foreground.append(ride)
 	_world.add_child(ride)
-	for i in 60: rider.animate(1.0 / 60, 0.35, 0.15, false)
+	for i in 60: rider.animate(1.0 / 60, 0.35, false)
 	# Snow kicked up behind and beside the ride.
 	for i in 60:
 		var puff := MeshInstance3D.new()

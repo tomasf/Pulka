@@ -20,3 +20,13 @@ Compare the flared bow, aft accommodation and wide wheelhouse, individual
 bridge windows, deck railings and ladders, rescue-boat davits, mast/radar,
 funnel, mooring equipment and corrugated stacked containers. Keep the
 existing compact footprint so the ship fits the harbour scenery.
+
+## Water warning sign
+
+[Transportstyrelsen, A7 Varning för kaj](https://www.transportstyrelsen.se/sv/vagtrafik/trafikregler-och-vagmarken/vagmarken/varningsmarken/varning-for-kaj/)
+([reference image](https://www.transportstyrelsen.se/globalassets/global/vag/vagmarken2/a.-varningsmarken/a07.-varning-for-kaj/a7-1.png)).
+
+Keep the Swedish rounded red triangle, yellow field, black quay edge and
+two bold water ripples. Replace the car with an original flat snowracer
+pictogram: saddle, open triangular frame, steering wheel and three skis,
+tipping nose-first beyond the edge. Shares the bridge warning's plate.

@@ -42,11 +42,6 @@ func consume_jump() -> bool:
 	return jumped
 
 
-## While touching, the ride tucks automatically whenever you are not steering.
-func tuck() -> float:
-	return 1.0 if touch_mode and steer == 0.0 else 0.0
-
-
 func reset() -> void:
 	_fingers.clear()
 	_jump_pending = false

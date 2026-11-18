@@ -32,7 +32,7 @@ func _run() -> void:
 	var spikes := 0
 	var worst := 0
 	for frame in FRAMES:
-		sled.step(DT, main.call("_autopilot_steer"), 1.0, false)
+		sled.step(DT, main.call("_autopilot_steer"), false)
 		var start := Time.get_ticks_usec()
 		world.update_world(sled.distance(), DT)
 		var spent := Time.get_ticks_usec() - start

@@ -2,7 +2,7 @@ extends SceneTree
 ## Runs a two-player race from the menu to the results with synthetic
 ## keyboard input (no pads: the keyboard is split between the players),
 ## then checks the game goes back to one player cleanly.
-## Run: Godot --headless --path . --script res://tools/race_test.gd
+## Run: Godot --headless --fixed-fps 60 --path . --script res://tools/race_test.gd
 
 var _failures := 0
 
@@ -17,6 +17,10 @@ func _run() -> void:
 	await _frames(5)
 	main.set("_muted", true)
 	main.set("_no_crash", true)
+	# Return to player choice even when --autopilot started a run in _ready.
+	# Keep test results out of the player's saved records in either case.
+	main.set("_autopilot", true)
+	main.call("_enter_menu")
 	main.call("_on_hud_pressed", &"duo")
 	await _frames(3)
 	var players: Array = main.get("_players")
@@ -29,6 +33,10 @@ func _run() -> void:
 	_check("choosing two players splits the menu", int(main.get("state")) == 5 and main.get("_two_players"))
 	_check("two players in the lobby", players.size() == 2)
 	_check("the screen is split", main.get("_split") != null)
+	if players.size() != 2:
+		main.queue_free()
+		quit(1)
+		return
 	_check("the players start on different rides", players[0].vehicle != players[1].vehicle)
 	await create_timer(0.5).timeout
 	var before: int = players[0].vehicle

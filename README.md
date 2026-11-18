@@ -2,6 +2,9 @@ Pulka! Ett fartfyllt pulkaspel i en oändlig, procedurellt genererad backe.
 
 [Spela i webbläsaren](https://tomasf.github.io/Pulka/)
 
+Styr med A/D eller vänster/höger och hoppa med Space. På handkontroll använder
+du spaken och A. Farten kommer automatiskt från backen.
+
 För testkörning utan krascher, starta med `godot --path . -- --no-crash`.
 Hopp, studsar mot biltak och stockar samt vanliga markfysiken fungerar som vanligt,
 men hinder som annars orsakar en krasch passeras utan påverkan. Flaggan förhindrar

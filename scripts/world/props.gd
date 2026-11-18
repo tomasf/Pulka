@@ -669,31 +669,7 @@ static func yield_sign() -> ArrayMesh:
 static func road_narrows_sign() -> ArrayMesh:
 	return cached_mesh("road_narrows_sign", func() -> ArrayMesh:
 		var kit := MeshKit.new()
-		var steel := Color("929b9f")
-		kit.cylinder(0.035, 2.85, Vector3(0, 1.425, -0.055), steel, 10)
-		for y in [2.40, 2.85]:
-			kit.box(Vector3(0.22, 0.055, 0.025), Vector3(0, y, -0.017), steel)
-		# Six cubic arcs round the three corners without stretching the face.
-		var arcs := [
-			[Vector2(4.93711, 55.2762), Vector2(-1.6457, 43.8738), Vector2(-1.6457, 29.8262), Vector2(4.93711, 18.425)],
-			[Vector2(4.93711, 18.425), Vector2(11.5195, 7.02422), Vector2(23.6852, 0), Vector2(36.8508, 0)],
-			[Vector2(419.433, 0), Vector2(432.598, 0), Vector2(444.764, 7.02422), Vector2(451.346, 18.425)],
-			[Vector2(451.346, 18.425), Vector2(457.929, 29.8262), Vector2(457.929, 43.8738), Vector2(451.346, 55.2762)],
-			[Vector2(260.055, 386.602), Vector2(253.473, 398.004), Vector2(241.307, 405.027), Vector2(228.142, 405.027)],
-			[Vector2(228.142, 405.027), Vector2(214.977, 405.027), Vector2(202.811, 398.004), Vector2(196.229, 386.602)],
-		]
-		var outline := PackedVector2Array()
-		for arc: Array in arcs:
-			for i in 9:
-				var point: Vector2 = (arc[0] as Vector2).bezier_interpolate(arc[1], arc[2], arc[3], i / 8.0)
-				point = (point - Vector2(228.142, 0)) * 0.004
-				if outline.is_empty() or outline[-1].distance_squared_to(point) > 0.00000001:
-					outline.append(point)
-		kit.slab(outline, 0.012, Transform3D(Basis.IDENTITY, Vector3(0, 2.05, 0)), steel)
-		kit.slab(outline, 0.002, Transform3D(Basis.IDENTITY, Vector3(0, 2.05, 0.010)), Color("e4002b"))
-		var yellow := PackedVector2Array([Vector2(-181.4721, 42.5199), Vector2(181.472, 42.5199), Vector2(0, 356.838)])
-		for i in yellow.size(): yellow[i] *= 0.004
-		kit.slab(yellow, 0.002, Transform3D(Basis.IDENTITY, Vector3(0, 2.05, 0.015)), Color("ffcd00"))
+		_warning_sign_plate(kit)
 		# Convex pieces meet on the reference outline. Reflect their points,
 		# rather than the mesh basis, to keep both strokes' winding consistent.
 		var stroke := [
@@ -709,6 +685,102 @@ static func road_narrows_sign() -> ArrayMesh:
 				if side < 0: polygon.reverse()
 				kit.slab(polygon, 0.002, Transform3D(Basis.IDENTITY, Vector3(0, 2.05, 0.020)), Color("111111"))
 		return kit.build())
+
+
+## Common Swedish warning plate: same contours, colours, pole and brackets
+## for the A5-inspired bridge warning and the playful A7 lake warning.
+static func _warning_sign_plate(kit: MeshKit) -> void:
+	var steel := Color("929b9f")
+	kit.cylinder(0.035, 2.85, Vector3(0, 1.425, -0.055), steel, 10)
+	for y in [2.40, 2.85]:
+		kit.box(Vector3(0.22, 0.055, 0.025), Vector3(0, y, -0.017), steel)
+	# Six cubic arcs round the three corners without stretching the face.
+	var arcs := [
+		[Vector2(4.93711, 55.2762), Vector2(-1.6457, 43.8738), Vector2(-1.6457, 29.8262), Vector2(4.93711, 18.425)],
+		[Vector2(4.93711, 18.425), Vector2(11.5195, 7.02422), Vector2(23.6852, 0), Vector2(36.8508, 0)],
+		[Vector2(419.433, 0), Vector2(432.598, 0), Vector2(444.764, 7.02422), Vector2(451.346, 18.425)],
+		[Vector2(451.346, 18.425), Vector2(457.929, 29.8262), Vector2(457.929, 43.8738), Vector2(451.346, 55.2762)],
+		[Vector2(260.055, 386.602), Vector2(253.473, 398.004), Vector2(241.307, 405.027), Vector2(228.142, 405.027)],
+		[Vector2(228.142, 405.027), Vector2(214.977, 405.027), Vector2(202.811, 398.004), Vector2(196.229, 386.602)],
+	]
+	var outline := PackedVector2Array()
+	for arc: Array in arcs:
+		for i in 9:
+			var point: Vector2 = (arc[0] as Vector2).bezier_interpolate(arc[1], arc[2], arc[3], i / 8.0)
+			point = (point - Vector2(228.142, 0)) * 0.004
+			if outline.is_empty() or outline[-1].distance_squared_to(point) > 0.00000001:
+				outline.append(point)
+	kit.slab(outline, 0.012, Transform3D(Basis.IDENTITY, Vector3(0, 2.05, 0)), steel)
+	kit.slab(outline, 0.002, Transform3D(Basis.IDENTITY, Vector3(0, 2.05, 0.010)), Color("e4002b"))
+	var yellow := PackedVector2Array([Vector2(-181.4721, 42.5199), Vector2(181.472, 42.5199), Vector2(0, 356.838)])
+	for i in yellow.size(): yellow[i] *= 0.004
+	kit.slab(yellow, 0.002, Transform3D(Basis.IDENTITY, Vector3(0, 2.05, 0.015)), Color("ffcd00"))
+
+
+## A7-inspired quay warning, with a three-ski snowracer instead of a car.
+## Front faces +Z. The symbol is printed flat, not a miniature 3D vehicle.
+## https://www.transportstyrelsen.se/sv/vagtrafik/trafikregler-och-vagmarken/vagmarken/varningsmarken/varning-for-kaj/
+static func water_warning_sign() -> ArrayMesh:
+	return cached_mesh("water_warning_sign", func() -> ArrayMesh:
+		var kit := MeshKit.new()
+		_warning_sign_plate(kit)
+		# Keep the quay edge and two bold ripples from the reference's layout.
+		_warning_ink(kit, PackedVector2Array([Vector2(136, 210), Vector2(196, 210), Vector2(196, 362.5), Vector2(46.7, 362.5)]))
+		var inside := PackedVector2Array([Vector2(228.142, 48.189), Vector2(409.614, 362.507), Vector2(46.670, 362.507)])
+		for y in [292.0, 328.0]:
+			var wave := PackedVector2Array()
+			for i in 81:
+				var x := 195.0 + i * 3
+				wave.append(Vector2(x, y + sin((x - 196) / 52 * TAU) * 4.5 - 7))
+			for i in range(80, -1, -1):
+				var x := 195.0 + i * 3
+				wave.append(Vector2(x, y + sin((x - 196) / 52 * TAU) * 4.5 + 7))
+			for clipped: PackedVector2Array in Geometry2D.intersect_polygons(wave, inside): _warning_ink(kit, clipped)
+		# Tilt nose-first beyond the quay. The long saddle, open triangular
+		# frame, steering wheel and three separate skis identify a snowracer.
+		var tilt := Transform2D(deg_to_rad(29), Vector2(240, 207)).scaled_local(Vector2.ONE * 0.92)
+		_warning_ink(kit, tilt * PackedVector2Array([Vector2(-55, -24), Vector2(1, -24), Vector2(5, -20), Vector2(3, -12), Vector2(-55, -12), Vector2(-58, -16)]))
+		_warning_line(kit, PackedVector2Array([Vector2(-37, 23), Vector2(-29, -12), Vector2(42.5, -11), Vector2(7, 23), Vector2(-37, 23)]), 5.5, tilt)
+		_warning_line(kit, PackedVector2Array([Vector2(-29, -12), Vector2(7, 23)]), 5.5, tilt)
+		_warning_line(kit, PackedVector2Array([Vector2(51, 23), Vector2(35, -41)]), 6, tilt)
+		_warning_line(kit, PackedVector2Array([Vector2(-65, 24), Vector2(-58, 26), Vector2(2, 26), Vector2(15, 20)]), 7, tilt)
+		_warning_line(kit, PackedVector2Array([Vector2(-63, 33), Vector2(-55, 35), Vector2(2, 35), Vector2(14, 29)]), 5, tilt)
+		for x in [-43.0, -3.0]:
+			_warning_line(kit, PackedVector2Array([Vector2(x, 26), Vector2(x + 2, 35)]), 4, tilt)
+		_warning_line(kit, PackedVector2Array([Vector2(37, 26), Vector2(72, 26), Vector2(82, 19), Vector2(83, 13)]), 7, tilt)
+		# A real hole in the wheel lets the yellow face show through.
+		for i in 24:
+			var a := Vector2.from_angle(TAU * i / 24)
+			var b := Vector2.from_angle(TAU * (i + 1) / 24)
+			var center := Vector2(35, -41)
+			_warning_ink(kit, tilt * PackedVector2Array([center + a * Vector2(15, 7), center + b * Vector2(15, 7), center + b * Vector2(11, 3), center + a * Vector2(11, 3)]))
+		_warning_line(kit, PackedVector2Array([Vector2(24, -41), Vector2(46, -41)]), 3, tilt)
+		return kit.build())
+
+
+## Reference-image coordinates (456 x 405, Y down) to the plate's face.
+## Triangulate the concave waves; a convex fan would fill their troughs.
+static func _warning_ink(kit: MeshKit, polygon: PackedVector2Array) -> void:
+	var indices := Geometry2D.triangulate_polygon(polygon)
+	assert(not indices.is_empty(), "Invalid warning pictogram contour")
+	var start := kit._vertices.size()
+	for point in polygon:
+		kit._vertices.append(Vector3((point.x - 228.142) * 0.004, 2.05 + (405.027 - point.y) * 0.004, 0.020))
+		kit._normals.append(Vector3.BACK)
+		kit._colors.append(Color("111111").srgb_to_linear())
+	for i in range(0, indices.size(), 3): kit._triangle_facing(start + indices[i], start + indices[i + 1], start + indices[i + 2])
+
+
+static func _warning_line(kit: MeshKit, path: PackedVector2Array, width: float, xform: Transform2D) -> void:
+	for i in path.size() - 1:
+		var a := path[i]
+		var b := path[i + 1]
+		var offset := (b - a).orthogonal().normalized() * width * 0.5
+		_warning_ink(kit, xform * PackedVector2Array([a - offset, a + offset, b + offset, b - offset]))
+	for point in path:
+		var cap := PackedVector2Array()
+		for k in 12: cap.append(xform * (point + Vector2.from_angle(TAU * k / 12) * width * 0.5))
+		_warning_ink(kit, cap)
 
 
 static func ramp_flag() -> ArrayMesh:

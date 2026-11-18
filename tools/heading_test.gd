@@ -35,10 +35,10 @@ func _switch_rides() -> void:
 		sled.place_at(8.0, 0.0, 9.0)
 		sled.frozen = false
 		for frame in 47:
-			sled.step(1.0 / 60.0, 0.0, 0.0, false)
+			sled.step(1.0 / 60.0, 0.0, false)
 		sled.set_vehicle(spec, RandomNumberGenerator.new())
 		sled.place_at(8.0, 0.0, 9.0)
-		sled.step(1.0 / 60.0, 0.0, 0.0, false)
+		sled.step(1.0 / 60.0, 0.0, false)
 		var ride: Node3D = sled.get("_vehicle_mesh")
 		var nose := -ride.global_basis.z
 		var off := rad_to_deg(nose.signed_angle_to(sled.forward(), Vector3.UP))
@@ -61,7 +61,7 @@ func _hold_turn() -> void:
 		sled.frozen = false
 		var worst := 0.0
 		for frame in 60 * 6:
-			sled.step(1.0 / 60.0, 1.0, 0.0, false)
+			sled.step(1.0 / 60.0, 1.0, false)
 			var fall := field.track_dir(sled.distance())
 			var off := absf(wrapf(sled.yaw - atan2(fall.x, -fall.z), -PI, PI))
 			worst = maxf(worst, off)
@@ -92,7 +92,7 @@ func _simulate(digital: bool) -> void:
 			var steer := clampf(wrapf(desired - sled.yaw, -PI, PI) * 3.0, -1.0, 1.0)
 			if digital:
 				steer = signf(steer) if absf(steer) > 0.15 else 0.0
-			sled.step(dt, steer, 1.0, false)
+			sled.step(dt, steer, false)
 			if sled.crashed:
 				break
 			var v := sled.velocity

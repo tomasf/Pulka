@@ -2,7 +2,7 @@ class_name PlayerControls
 extends RefCounted
 ## What one player steers with. Alone, a player has every key and pad (the
 ## input actions). Two players each get their own pad, or one half of the
-## keyboard: WASD and Space, or the arrows and Enter.
+## keyboard: A/D and Space, or Left/Right and Enter.
 
 ## ALL is every key and pad through the input actions (one player);
 ## KEYBOARD is both halves of the keyboard but no pad.
@@ -45,9 +45,9 @@ func describe() -> String:
 		parts.append("handkontroll %d" % (pad + 1))
 	match keys:
 		Keys.LEFT:
-			parts.append("A/D, W, Space")
+			parts.append("A/D, Space")
 		Keys.RIGHT:
-			parts.append("pilar, Enter")
+			parts.append("←/→, Enter")
 		Keys.KEYBOARD, Keys.ALL:
 			parts.append("tangentbordet")
 	return " eller ".join(parts)
@@ -79,19 +79,6 @@ func steer() -> float:
 		if Input.is_joy_button_pressed(pad, JOY_BUTTON_DPAD_RIGHT):
 			value += 1.0
 	return clampf(value, -1.0, 1.0)
-
-
-func tuck() -> float:
-	if keys == Keys.ALL:
-		return Input.get_action_strength(&"tuck")
-	var value := 0.0
-	if (keys == Keys.KEYBOARD or keys == Keys.LEFT) and Input.is_physical_key_pressed(KEY_W):
-		value = 1.0
-	if (keys == Keys.KEYBOARD or keys == Keys.RIGHT) and Input.is_physical_key_pressed(KEY_UP):
-		value = 1.0
-	if pad >= 0:
-		value = maxf(value, Input.get_joy_axis(pad, JOY_AXIS_TRIGGER_RIGHT))
-	return value
 
 
 func jump() -> bool:

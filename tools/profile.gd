@@ -36,7 +36,7 @@ func _run() -> void:
 	var sound: SoundBank = main.get("_sound")
 	for frame in FRAMES:
 		var steps := {
-			"sled": func() -> void: sled.step(DT, main.call("_autopilot_steer"), 1.0, false),
+			"sled": func() -> void: sled.step(DT, main.call("_autopilot_steer"), false),
 			"world": func() -> void: world.update_world(sled.distance(), DT),
 			"collisions": func() -> void: main.call("_check_collisions"),
 			"pickups+bounds": func() -> void:

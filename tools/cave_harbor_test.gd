@@ -157,7 +157,7 @@ func _cross(field: TerrainField, span: Vector3, spec: VehicleSpec, raised: bool)
 		var ramp_lip := span.x + 92
 		var gap_start := span.x + 108
 		var jump := raised and sled.on_ground and ((d < ramp_lip and ramp_lip - d < 1.25) or (d < gap_start and gap_start - d < 1.25))
-		sled.step(1.0 / 60, steer, 1, jump)
+		sled.step(1.0 / 60, steer, jump)
 		highest = maxf(highest, sled.position.y - field.harbor_height(sled.distance()))
 		if field.below_structure(sled.position) or (field.in_cave(sled.distance()) and absf(offset) > 7):
 			safe = false
@@ -186,7 +186,7 @@ func _gangway(field: TerrainField, span: Vector3, spec: VehicleSpec) -> bool:
 		var steer := clampf(wrapf(desired - sled.yaw, -PI, PI) * 4, -1, 1)
 		if spec.spins:
 			steer = clampf(wrapf(desired - atan2(field.center_slope(d), 1), -PI, PI) / spec.steer + wrapf(desired - sled.yaw, -PI, PI) * 3, -1, 1)
-		sled.step(1.0 / 60, steer, 0, false)
+		sled.step(1.0 / 60, steer, false)
 		var lateral := absf(sled.position.x - field.center_x(d) - field.harbor_gangway_x(d))
 		error = maxf(error, lateral)
 		if field.harbor_water(sled.position.x, sled.distance()) and sled.position.y < field.harbor_height(sled.distance()) - 0.6:

@@ -474,7 +474,7 @@ func update_vehicle(spec: VehicleSpec, unlocked: bool, best_distance: float, bes
 func set_touch_mode(touch: bool) -> void:
 	_picker_hint.text = "Tryck på ett åkdon" if touch else "←  →  Välj åkdon"
 	_start_hint.text = "Tryck för att åka" if touch else "Enter / A  Åk"
-	_controls_hint.text = "← →  Styr     Space / A  Hoppa     W / RT  Luta"
+	_controls_hint.text = "← →  Styr     Space / A  Hoppa"
 	if touch:
 		_controls_hint.text = "Tryck på sidorna  Styr     ↑ Svep  Hoppa"
 	elif Quality.is_tv():

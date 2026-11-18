@@ -461,7 +461,7 @@ func _is_unlocked(spec: VehicleSpec) -> bool:
 
 func _update_menu(delta: float) -> void:
 	_update_world(delta)
-	_players[0].sled.step(delta, 0.0, 0.0, false)
+	_players[0].sled.step(delta, 0.0, false)
 	if _input_cooldown > 0.0 or _hud.settings_open:
 		return
 	if _confirm_pressed():
@@ -470,7 +470,7 @@ func _update_menu(delta: float) -> void:
 
 func _update_selection(delta: float) -> void:
 	_update_world(delta)
-	_players[0].sled.step(delta, 0.0, 0.0, false)
+	_players[0].sled.step(delta, 0.0, false)
 	if _input_cooldown > 0.0 or _hud.settings_open:
 		return
 	if Input.is_action_just_pressed(&"back") or Input.is_action_just_pressed(&"pause"):
@@ -561,7 +561,7 @@ func _force_event() -> void:
 func _update_countdown(delta: float) -> void:
 	_update_world(delta)
 	for p in _players:
-		p.sled.step(delta, 0.0, 0.0, false)
+		p.sled.step(delta, 0.0, false)
 	var remaining := delta
 	if _intro_remaining > 0.0:
 		var used := minf(remaining, _intro_remaining)
@@ -611,21 +611,18 @@ func _update_playing(delta: float) -> void:
 	for p in _players:
 		before.append(p.sled.distance())
 		var steer := p.controls.steer()
-		var tuck := p.controls.tuck()
 		var jump := p.controls.jump()
 		if p.finished():
 			_coast_home(p, delta)
 			continue
 		if not _racing:
 			steer = clampf(steer + _touch.steer, -1.0, 1.0)
-			tuck = maxf(tuck, _touch.tuck())
 			jump = jump or _touch.consume_jump()
 		if _autopilot:
 			steer = _autopilot_steer(p)
-			tuck = 1.0
 			var roof := _field.roof_at(p.sled.position.x, p.sled.distance())
 			jump = roof != null and roof.requires_jump and roof.finish - p.sled.distance() < 1.25 and p.sled.on_ground
-		p.sled.step(delta, steer, tuck, jump)
+		p.sled.step(delta, steer, jump)
 	_update_world(delta)
 	for i in _players.size():
 		_update_player(_players[i], before[i], delta)
@@ -732,7 +729,7 @@ func _enter_lobby() -> void:
 func _update_lobby(delta: float) -> void:
 	_update_world(delta)
 	for p in _players:
-		p.sled.step(delta, 0.0, 0.0, false)
+		p.sled.step(delta, 0.0, false)
 	if _input_cooldown > 0.0 or _hud.settings_open:
 		return
 	if Input.is_action_just_pressed(&"back") or Input.is_action_just_pressed(&"pause"):
@@ -977,7 +974,7 @@ func _coast_home(p: Player, delta: float) -> void:
 	var look := d + 12.0
 	var side := _field.center_x(look) + _lane(p) * 1.5
 	var steer := clampf(wrapf(atan2(side - p.sled.position.x, look - d) - p.sled.yaw, -PI, PI) * 2.5, -1.0, 1.0)
-	p.sled.step(delta, steer, 0.0, false)
+	p.sled.step(delta, steer, false)
 	if p.sled.speed() < 3.0 and p.camera.mode != ChaseCamera.Mode.ORBIT:
 		p.camera.centered = true
 		p.camera.mode = ChaseCamera.Mode.ORBIT
@@ -1127,7 +1124,7 @@ func _update_game_over(delta: float) -> void:
 		if _racing:
 			_coast_home(p, delta)
 		else:
-			p.sled.step(delta, 0.0, 0.0, false)
+			p.sled.step(delta, 0.0, false)
 	if _racing:
 		_update_race_hud()
 	if _input_cooldown > 0.0:

@@ -95,7 +95,7 @@ func _run() -> void:
 	sled.place_at(span.x + 100, 7.6, 25)
 	sled.velocity = Vector3(18, 0, -20)
 	sled.frozen = false
-	sled.step(0.1, 1, 0, false)
+	sled.step(0.1, 1, false)
 	main.call("_check_bounds")
 	_check("scraping the pipe costs no life", not sled.crashed and main.get("_players")[0].lives == 10)
 	var barrier: Obstacle
@@ -163,7 +163,7 @@ func _cross(field: TerrainField, span: Vector3, spec: VehicleSpec, obstacles: Ar
 		var d := sled.distance()
 		if d >= span.y - 2: break
 		var steer := SewerPipe.autopilot(sled)
-		sled.step(1.0 / 60, steer, 1.0, false)
+		sled.step(1.0 / 60, steer, false)
 		for obstacle in obstacles:
 			if obstacle.overlaps(sled.position + Vector3.UP * 0.3, Sled.RADIUS): safe = false
 		if field.in_sewer(sled.distance()):
@@ -190,7 +190,7 @@ func _scrape(field: TerrainField, span: Vector3, spec: VehicleSpec) -> bool:
 		sled.frozen = false
 		for frame in 240:
 			var steer: float = -side * 0.7 if frame >= 30 and nearest_center > 4 else 0.0
-			sled.step(1.0 / 60, steer, 0, false)
+			sled.step(1.0 / 60, steer, false)
 			var d := sled.distance()
 			var radial := Vector2(sled.position.x - field.center_x(d), sled.position.y - field.sewer_height(d) - TerrainField.SEWER_RADIUS)
 			max_radius = maxf(max_radius, radial.length())
@@ -203,7 +203,7 @@ func _scrape(field: TerrainField, span: Vector3, spec: VehicleSpec) -> bool:
 	sled.position.y = field.sewer_ceiling(sled.position.x, sled.distance()) - 0.8
 	sled.velocity = Vector3(0, 12, -20)
 	sled.on_ground = false
-	sled.step(0.1, 0, 0, false)
+	sled.step(0.1, 0, false)
 	safe = safe and not sled.crashed and not sled.on_ground and sled.velocity.dot(sled.sewer_frame().y) >= 0 and sled.position.y <= field.sewer_ceiling(sled.position.x, sled.distance()) + 0.01
 	sled.free()
 	return safe
@@ -242,7 +242,7 @@ func _capture(main: Node, span: Vector3) -> void:
 	sled.velocity = -sled.sewer_frame().z * 48
 	camera.snap()
 	for i in 360:
-		sled.step(1.0 / 60, 1, 1, false)
+		sled.step(1.0 / 60, 1, false)
 		camera.update_camera(1.0 / 60)
 		if sled.on_ground and sled.basis.y.y < -0.8:
 			_check("ceiling rider stays visible to the chase camera", camera.is_position_in_frustum(sled.position + sled.basis.y * 0.8))

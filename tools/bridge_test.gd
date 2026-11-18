@@ -36,7 +36,7 @@ func _run() -> void:
 				var drift := sled.velocity.x + sled.velocity.z * slope
 				var desired := atan2(slope, 1) - clampf(offset * 0.25 + drift * 0.40, -0.7, 0.7)
 				var steer := clampf(wrapf(desired - sled.yaw, -PI, PI) * 3, -1, 1)
-				sled.step(1.0 / 60, steer, 1, false)
+				sled.step(1.0 / 60, steer, false)
 				if field.on_bridge(sled.distance()):
 					lateral = maxf(lateral, absf(sled.position.x - field.center_x(sled.distance())))
 			_check("%s enters, crosses and exits (%.2f m)" % [spec.title, lateral], sled.distance() >= span.y - 1 and lateral < 3.3)
@@ -87,7 +87,7 @@ func _run() -> void:
 	main.call("_check_bounds")
 	_check("a jump may clear the railing", not sled.crashed)
 	var airborne_y := sled.position.y
-	for i in 90: sled.step(1.0 / 60, 0, 0, false)
+	for i in 90: sled.step(1.0 / 60, 0, false)
 	_check("leaving the deck falls toward the ravine", not sled.on_ground and sled.position.y < airborne_y - 1)
 	main.call("_check_bounds")
 	_check("falling beyond the railing costs a life", sled.crashed)
@@ -95,7 +95,7 @@ func _run() -> void:
 	sled.place_at(middle, 0, 12)
 	sled.position.y = field.bridge_height(middle) - 2
 	sled.on_ground = false
-	for i in 5: sled.step(1.0 / 60, 0, 0, false)
+	for i in 5: sled.step(1.0 / 60, 0, false)
 	_check("a fall underneath the deck stays in the ravine", sled.position.y < field.bridge_height(sled.distance()) - 1)
 	main.call("_check_bounds")
 	_check("falling under the deck is still a crash", sled.crashed)

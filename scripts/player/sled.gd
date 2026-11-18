@@ -58,8 +58,6 @@ var _spray: GPUParticles3D
 var _puff: GPUParticles3D
 var _trail: SnowTrail
 var _visual_spin := 0.0
-## How far the rider is crouched forward for speed, 0 to 1, eased.
-var _tuck_visual := 0.0
 ## How squashed the rider is from a landing; springs back to 0.
 var _squash := 0.0
 var _squash_speed := 0.0
@@ -154,9 +152,8 @@ func place_at(d: float, lateral := 0.0, start_speed := 0.0, keep_trail := false)
 	_update_visual(1.0)
 
 
-func step(delta: float, steer: float, tuck: float, jump: bool) -> void:
+func step(delta: float, steer: float, jump: bool) -> void:
 	steer_visual = lerpf(steer_visual, steer, 1.0 - exp(-8.0 * delta))
-	_tuck_visual = lerpf(_tuck_visual, tuck if on_ground and not crashed else 0.0, 1.0 - exp(-6.0 * delta))
 	if frozen:
 		_update_visual(delta)
 		return
@@ -168,7 +165,7 @@ func step(delta: float, steer: float, tuck: float, jump: bool) -> void:
 		if crashed:
 			_step_crash(dt)
 		else:
-			_step_physics(dt, steer, tuck, jump and first)
+			_step_physics(dt, steer, jump and first)
 		first = false
 	boost_time = maxf(0.0, boost_time - delta)
 	invulnerable_time = maxf(0.0, invulnerable_time - delta)
@@ -177,9 +174,9 @@ func step(delta: float, steer: float, tuck: float, jump: bool) -> void:
 	_update_trail()
 
 
-func _step_physics(dt: float, steer: float, tuck: float, jump: bool) -> void:
+func _step_physics(dt: float, steer: float, jump: bool) -> void:
 	if field.in_sewer(distance()):
-		_step_sewer(dt, steer, tuck, jump)
+		_step_sewer(dt, steer, jump)
 		return
 	sewer_active = false
 	var gravity := GRAVITY
@@ -224,7 +221,7 @@ func _step_physics(dt: float, steer: float, tuck: float, jump: bool) -> void:
 		var forward_speed := velocity.dot(along)
 		var side_speed := velocity.dot(side)
 		var normal_speed := velocity.dot(n)
-		var drag := spec.drag * (1.0 - 0.4 * tuck) * current * current
+		var drag := spec.drag * current * current
 		var friction := spec.friction * GRAVITY * maxf(n.y, 0.2) * (0.5 if on_ice else 1.0)
 		var planar := Vector2(forward_speed, side_speed)
 		var planar_speed := planar.length()
@@ -280,7 +277,7 @@ func sewer_frame() -> Basis:
 ## A pipe's normal force does no work. Transport tangent velocity between
 ## frames instead of repeatedly projecting it and losing speed on the curve.
 ## At the roof v_around²/r must beat gravity, otherwise contact releases.
-func _step_sewer(dt: float, steer: float, tuck: float, jump: bool) -> void:
+func _step_sewer(dt: float, steer: float, jump: bool) -> void:
 	var frame := sewer_frame()
 	var along := -frame.z
 	var around_speed := velocity.dot(frame.x)
@@ -320,7 +317,7 @@ func _step_sewer(dt: float, steer: float, tuck: float, jump: bool) -> void:
 			var turned := slip * exp(-spec.grip * grip * dt)
 			# Concrete is smooth: steering still scrubs, scraping doesn't apply
 			# the old heavy per-second wall brake.
-			var drag := spec.drag * (1 - 0.4 * tuck) * current * current
+			var drag := spec.drag * current * current
 			var friction := spec.friction * GRAVITY * 0.35
 			planar_speed = maxf(0, planar_speed * (1 - absf(slip - turned) * spec.scrub) - (drag + friction + brake) * dt)
 			planar = Vector2(cos(turned), sin(turned)) * planar_speed
@@ -568,17 +565,15 @@ func _update_visual(delta: float) -> void:
 		var seat := spec.seat_height if spec else 0.2
 		_rider.position = Vector3(0, seat + rattle + _squash * 0.2, 0.05)
 		_rider.scale = Vector3(1.0 - _squash * 0.4, 1.0 + _squash, 1.0 - _squash * 0.4)
-		# Leaning into turns, crouching forward to tuck, and in the air
-		# leaning back on the way up and forward coming down.
-		var pitch := -_tuck_visual * 0.32
+		# Lean into turns; pitch follows the flight automatically.
+		var pitch := 0.0
 		if not on_ground:
 			pitch += clampf(velocity.y * 0.025, -0.2, 0.2)
 		_rider.rotation.z = -steer_visual * 0.12
 		_rider.rotation.x = pitch * 0.4
 		_rider.rotation.y = 0.0
-		# The body bends too: into the turn, forward to tuck, arms up in
-		# a long jump.
-		_rider.animate(delta, steer_visual, _tuck_visual, not on_ground)
+		# The body bends into the turn and raises its arms in a long jump.
+		_rider.animate(delta, steer_visual, not on_ground)
 	_body.visible = invulnerable_time <= 0.0 or fmod(invulnerable_time, 0.2) < 0.12
 
 

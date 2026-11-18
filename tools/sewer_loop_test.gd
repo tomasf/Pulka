@@ -35,7 +35,7 @@ func _cases(seed_value: int) -> void:
 			var visible_rider := true
 			var level_horizon := true
 			for i in 420:
-				sled.step(1.0 / 60, side, 1, false)
+				sled.step(1.0 / 60, side, false)
 				camera.update_camera(1.0 / 60)
 				level_horizon = level_horizon and absf(camera.basis.x.dot(Vector3.UP)) < 0.001
 				visible_rider = visible_rider and camera.is_position_in_frustum(sled.position + sled.basis.y * 0.8) and camera.basis.is_finite()
@@ -69,7 +69,7 @@ func _cases(seed_value: int) -> void:
 	coast._sewer_heading = atan2(32, 28)
 	var initial_energy := coast.velocity.length_squared() * 0.5
 	var initial_height := coast.position.y
-	for i in 120: coast.step(1.0 / 60, 0, 0, false)
+	for i in 120: coast.step(1.0 / 60, 0, false)
 	var energy := coast.velocity.length_squared() * 0.5 + Sled.GRAVITY * (coast.position.y - initial_height)
 	_check("curving around the wall preserves energy without drag", absf(energy - initial_energy) / initial_energy < 0.02)
 	coast.free()
@@ -82,14 +82,14 @@ func _cases(seed_value: int) -> void:
 		sled.velocity = -frame.z * 40 + frame.x * circum_speed
 		sled.sewer_active = true
 		sled._sewer_heading = atan2(circum_speed, 40)
-		sled.step(1.0 / 60, 0, 0, false)
+		sled.step(1.0 / 60, 0, false)
 		_check("roof contact at %.0f m/s around the pipe" % circum_speed, sled.on_ground == (circum_speed > 11))
 		if circum_speed < 11:
-			for i in 60: sled.step(1.0 / 60, 0, 0, false)
+			for i in 60: sled.step(1.0 / 60, 0, false)
 			_check("slow roof ride falls inward", sled.position.y < field.sewer_height(sled.distance()) + 14 and not sled.crashed)
 		else:
 			sled._ground_time = 1
-			sled.step(1.0 / 60, 0, 0, true)
+			sled.step(1.0 / 60, 0, true)
 			_check("jumping releases roof contact", not sled.on_ground and sled.velocity.dot(sled.sewer_frame().y) > 1)
 		sled.free()
 	var exit_ride := _sled(field, VehicleSpec.all()[0], span.y - TerrainField.SEWER_INSET - 3, 0)
@@ -114,7 +114,7 @@ func _cases(seed_value: int) -> void:
 	var touched_snow := false
 	for i in 180:
 		var old_rotation := exit_camera.basis.get_rotation_quaternion()
-		exit_ride.step(1.0 / 60, 0, 0, false)
+		exit_ride.step(1.0 / 60, 0, false)
 		exit_camera.update_camera(1.0 / 60)
 		touched_snow = touched_snow or (not exit_ride.sewer_active and exit_ride.on_ground)
 		var turn := old_rotation.angle_to(exit_camera.basis.get_rotation_quaternion())

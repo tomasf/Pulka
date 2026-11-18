@@ -110,7 +110,7 @@ func _run() -> void:
 	sled.position.y -= 3
 	sled.on_ground = false
 	var below := sled.position.y
-	for i in 5: sled.step(1.0 / 60, 0, 0, false)
+	for i in 5: sled.step(1.0 / 60, 0, false)
 	_check("falling under a roof does not teleport onto it", sled.position.y < below + 0.1)
 	var chimney: Obstacle
 	for chunk: Chunk in world._chunks.values():
@@ -146,7 +146,7 @@ func _cross(field: TerrainField, span: Vector3, spec: VehicleSpec) -> Vector2i:
 		var steer := clampf(wrapf(desired - sled.yaw, -PI, PI) * 3, -1, 1)
 		var roof := field.roof_at(sled.position.x, d)
 		var jump := roof != null and roof.requires_jump and roof.finish - d < 1.25 and sled.on_ground
-		sled.step(1.0 / 60, steer, 1, jump)
+		sled.step(1.0 / 60, steer, jump)
 		if not sled.on_ground: airborne += 1
 		elif airborne > 0:
 			if airborne > 8: landings += 1
@@ -212,7 +212,7 @@ func _gap_probe(field: TerrainField, roof: TerrainField.Roof, spec: VehicleSpec,
 		var desired := atan2(slope, 1) - clampf(offset * 0.25 + drift * 0.4, -0.7, 0.7)
 		var steer := clampf(wrapf(desired - sled.yaw, -PI, PI) * 3, -1, 1)
 		var jump := press_jump and d < roof.finish and roof.finish - d < 1.25 and sled.on_ground
-		sled.step(1.0 / 60, steer, 1, jump)
+		sled.step(1.0 / 60, steer, jump)
 		if field.below_structure(sled.position) or sled.position.y < field.roof_base_height(sled.distance()) - 2: break
 		if sled.distance() > roof.finish + roof.gap_after and sled.on_ground:
 			cleared = true

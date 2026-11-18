@@ -110,18 +110,16 @@ static func _entries(group: String) -> Array:
 	groups["rider3d"].append(["face", func() -> Node3D: return _face3d()])
 	groups["riderside"] = [
 		["still side", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA), Vector3(-1, 0.15, 0))],
-		["tuck side", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA, 0.0, 1.0), Vector3(-1, 0.15, 0))],
 		["steer right back", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA, 1.0), Vector3(0, 0.3, 1))],
-		["air back", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA, 0.0, 0.0, true), Vector3(0, 0.3, 1))],
-		["air front", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA, 0.0, 0.0, true), Vector3(0.3, 0.2, -1))],
-		["air side", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.TEFAT, 0.0, 0.0, true), Vector3(-1, 0.2, 0))],
+		["air back", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA, 0.0, true), Vector3(0, 0.3, 1))],
+		["air front", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA, 0.0, true), Vector3(0.3, 0.2, -1))],
+		["air side", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.TEFAT, 0.0, true), Vector3(-1, 0.2, 0))],
 	]
 	groups["riderpose"] = [
 		["still", func() -> Node3D: return _ride3d(VehicleSpec.Model.PULKA)],
 		["steer right", func() -> Node3D: return _ride3d(VehicleSpec.Model.PULKA, 1.0)],
-		["tuck", func() -> Node3D: return _ride3d(VehicleSpec.Model.PULKA, 0.0, 1.0)],
-		["air", func() -> Node3D: return _ride3d(VehicleSpec.Model.PULKA, 0.0, 0.0, true)],
-		["flail", func() -> Node3D: return _ride3d(VehicleSpec.Model.PULKA, 0.0, 0.0, false, true)],
+		["air", func() -> Node3D: return _ride3d(VehicleSpec.Model.PULKA, 0.0, true)],
+		["flail", func() -> Node3D: return _ride3d(VehicleSpec.Model.PULKA, 0.0, false, true)],
 	]
 	groups["compare"] = [
 		["old", func() -> Node3D: return _ride(VehicleSpec.Model.PULKA, jacket, hat)],
@@ -246,8 +244,8 @@ const RIDE_POSES := ["pulka", "stjartlapp", "snowracer", "tefat", "wok"]
 
 
 ## The Blender-made rider on a ride, posed for it, optionally moving:
-## `steer`, `tuck`, a long jump (`air`) or a crash (`flail`).
-static func _ride3d(model: VehicleSpec.Model, steer := 0.0, tuck := 0.0, air := false, flail := false) -> Node3D:
+## `steer`, a long jump (`air`) or a crash (`flail`).
+static func _ride3d(model: VehicleSpec.Model, steer := 0.0, air := false, flail := false) -> Node3D:
 	var node := _mesh(RideModels.vehicle(model))
 	var rider := RiderRig.new()
 	rider.set_ride(model)
@@ -261,7 +259,7 @@ static func _ride3d(model: VehicleSpec.Model, steer := 0.0, tuck := 0.0, air := 
 			if flail:
 				rider.flail(1.0 / 60.0)
 			else:
-				rider.animate(1.0 / 60.0, steer, tuck, air))
+				rider.animate(1.0 / 60.0, steer, air))
 	return node
 
 

@@ -3,6 +3,7 @@ extends RefCounted
 ## One broad winter lake, with a seeded ice rim and a submerged basin.
 const SEGMENTS := 64
 const RINGS := [0.0, 0.30, 0.55, 0.75, 0.88, 0.95, 1.0]
+const WARNING_DISTANCE := 32.0
 static var _material: ShaderMaterial
 
 static func material() -> ShaderMaterial:
@@ -66,6 +67,13 @@ static func populate(world: SlopeWorld, chunk: Chunk, decor: Dictionary, lo: flo
 	var field := world.field
 	for water: Vector2 in TerrainField.LAKE_WATER:
 		var strip := Vector2(span.x + water.x, span.x + water.x + water.y)
+		# Own the warnings by their approach chunk, independently of the
+		# water mesh's chunk. A pair is readable from either player's side.
+		var warning_d := strip.x - WARNING_DISTANCE
+		if warning_d >= lo and warning_d < hi:
+			for side in [-1.0, 1.0]:
+				var x: float = field.center_x(warning_d) + side * (field.half_width(warning_d) + 1.2)
+				world.add_decor(decor, Props.water_warning_sign(), world.ground_xform(x, warning_d, -world.street_yaw(warning_d)))
 		if strip.x < lo or strip.x >= hi: continue
 		var surface := MeshInstance3D.new()
 		surface.name = "LakeWater"

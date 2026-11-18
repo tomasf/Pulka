@@ -13,7 +13,6 @@ static func configure() -> void:
 		_key(KEY_D), _key(KEY_RIGHT),
 		_axis(JOY_AXIS_LEFT_X, 1.0), _button(JOY_BUTTON_DPAD_RIGHT),
 	], 0.15)
-	_action(&"tuck", [_key(KEY_W), _key(KEY_UP), _axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)], 0.1)
 	_action(&"jump", [_key(KEY_SPACE), _button(JOY_BUTTON_A)])
 	_action(&"confirm", [_key(KEY_ENTER), _key(KEY_KP_ENTER), _key(KEY_SPACE), _button(JOY_BUTTON_A), _button(JOY_BUTTON_START)])
 	_action(&"back", [_key(KEY_BACKSPACE), _key(KEY_Q), _button(JOY_BUTTON_B)])

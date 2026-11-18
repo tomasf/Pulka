@@ -25,7 +25,7 @@ func _run() -> void:
 	_press(0, left, false)
 	failures += _check("right half steers right", touch.steer == 1.0)
 	_press(1, right, false)
-	failures += _check("released means straight", touch.steer == 0.0 and touch.tuck() == 1.0)
+	failures += _check("released means straight", touch.steer == 0.0)
 	_press(2, right, true)
 	var drag := InputEventScreenDrag.new()
 	drag.index = 2

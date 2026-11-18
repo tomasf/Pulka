@@ -93,7 +93,7 @@ func _run() -> void:
 				var drift := sled.velocity.x + sled.velocity.z * slope
 				var desired := atan2(slope, 1) - clampf(offset * 0.25 + drift * 0.4, -0.7, 0.7)
 				var steer := clampf(wrapf(desired - sled.yaw, -PI, PI) * 3, -1, 1)
-				sled.step(1.0 / 60, steer, 1, false)
+				sled.step(1.0 / 60, steer, false)
 				d = sled.distance()
 				if d > span.x + 7 and d < span.y - 7 and absf(sled.position.x - world.regions.lane_x(0, d)) < 17.3:
 					road_frames += 1

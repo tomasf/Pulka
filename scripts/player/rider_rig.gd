@@ -4,7 +4,7 @@ extends Node3D
 ## tools/blender/rider.py): one smooth skinned body on a skeleton. It sits
 ## the way each ride needs (a pose per ride, read from the file), wears the
 ## colours it is given, and moves with the ride: leaning into turns,
-## crouching to tuck, throwing its arms up in the air, flailing in a crash.
+## throwing its arms up in the air, flailing in a crash.
 
 const SCENE := preload("res://models/rider.glb")
 ## Pose names in the file, in VehicleSpec.Model order.
@@ -78,17 +78,16 @@ func dress(jacket: Color, hat: Color) -> void:
 			mesh.set_surface_override_material(surface, dressed)
 
 
-## Moves with the ride each frame. `steer` and `tuck` are -1..1 and 0..1;
+## Moves with the ride each frame. `steer` is -1..1;
 ## `airborne` while the ride is off the ground.
-func animate(delta: float, steer: float, tuck: float, airborne: bool) -> void:
+func animate(delta: float, steer: float, airborne: bool) -> void:
 	_time += delta
 	_air_time = _air_time + delta if airborne else 0.0
 	_cheer = move_toward(_cheer, 1.0 if _air_time > 0.45 else 0.0, delta * (4.0 if _air_time > 0.45 else 6.0))
 	var extra := {}
-	# Lean into the turn and forward to tuck, the head held level against it.
-	_add(extra, "spine", Quaternion(Vector3.FORWARD, steer * 0.18) * Quaternion(Vector3.RIGHT, -tuck * 0.42))
-	_add(extra, "neck", Quaternion(Vector3.RIGHT, tuck * 0.25))
-	_add(extra, "head", Quaternion(Vector3.FORWARD, -steer * 0.12) * Quaternion(Vector3.RIGHT, tuck * 0.15))
+	# Lean into the turn, with the head held level against it.
+	_add(extra, "spine", Quaternion(Vector3.FORWARD, steer * 0.18))
+	_add(extra, "head", Quaternion(Vector3.FORWARD, -steer * 0.12))
 	_apply(extra)
 	# Arms up in a long jump, in a V out over the shoulders (aimed in the
 	# rider's own space, clear of the head), then back to the handles.

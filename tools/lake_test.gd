@@ -51,13 +51,13 @@ func _run() -> void:
 				var offset := sled.position.x - field.center_x(d)
 				var drift := sled.velocity.x + sled.velocity.z * field.center_slope(d)
 				var desired := atan2(field.center_slope(d), 1) - clampf(offset * 0.25 + drift * 0.4, -0.7, 0.7)
-				sled.step(1.0 / 60, clampf(wrapf(desired - sled.yaw, -PI, PI) * 3, -1, 1), 1, false)
+				sled.step(1.0 / 60, clampf(wrapf(desired - sled.yaw, -PI, PI) * 3, -1, 1), false)
 				if sled.distance() > strip.y + 12 and sled.distance() < strip.y + TerrainField.LAKE_EXIT:
 					exit_air = maxf(exit_air, sled.position.y - field.height(sled.position.x, sled.distance()))
 			_check("seed %d: %s skims and reaches the downhill slope (%d splashes)" % [seed_value, spec.title, events.skim], sled.distance() > span.y + 20 and events.sink == 0 and events.skim > 0)
 			_check("%s leaves the lake without a high fall (%.2f m)" % [spec.title, exit_air], exit_air < 1.0)
 			sled.place_at(mid, 0, 3)
-			sled.step(1.0 / 120, 0, 0, false)
+			sled.step(1.0 / 120, 0, false)
 			_check("slow %s still sinks" % spec.title, events.sink > 0)
 			sled.free()
 		for speed in [25.0, 40.0]:
@@ -74,7 +74,7 @@ func _run() -> void:
 				var offset := sled.position.x - field.center_x(d)
 				var drift := sled.velocity.x + sled.velocity.z * field.center_slope(d)
 				var desired := atan2(field.center_slope(d), 1) - clampf(offset * 0.25 + drift * 0.4, -0.7, 0.7)
-				sled.step(1.0 / 60, clampf(wrapf(desired - sled.yaw, -PI, PI) * 3, -1, 1), 1, false)
+				sled.step(1.0 / 60, clampf(wrapf(desired - sled.yaw, -PI, PI) * 3, -1, 1), false)
 				if sled.distance() < strip.y + TerrainField.LAKE_EXIT:
 					air = maxf(air, sled.position.y - field.height(sled.position.x, sled.distance()))
 			_check("seed %d: exit keeps ground contact at %d km/h (%.3f m)" % [seed_value, speed * 3.6, air], sled.distance() > strip.y + TerrainField.LAKE_EXIT and air < 0.03)
