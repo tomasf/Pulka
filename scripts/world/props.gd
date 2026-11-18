@@ -707,31 +707,6 @@ static func ramp_flag() -> ArrayMesh:
 		return kit.build())
 
 
-static func sign_node(text: String, color: Color) -> Node3D:
-	var root := Node3D.new()
-	var kit := MeshKit.new()
-	kit.cylinder(0.07, 2.4, Vector3(-1.2, 1.2, 0), Color(0.5, 0.5, 0.55), 5)
-	kit.cylinder(0.07, 2.4, Vector3(1.2, 1.2, 0), Color(0.5, 0.5, 0.55), 5)
-	kit.box(Vector3(3.0, 1.2, 0.08), Vector3(0, 2.4, 0), color)
-	kit.box(Vector3(3.1, 0.12, 0.2), Vector3(0, 3.06, 0), Palette.SNOW)
-	var mesh := MeshInstance3D.new()
-	mesh.mesh = kit.build()
-	root.add_child(mesh)
-	var label := Label3D.new()
-	label.text = text
-	label.font_size = 48
-	label.pixel_size = 0.0075
-	label.outline_size = 0
-	label.modulate = Color(1, 1, 1)
-	label.position = Vector3(0, 2.4, 0.06)
-	label.width = 380.0
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.double_sided = false
-	label.shaded = false
-	root.add_child(label)
-	return root
-
-
 # --- Town ---
 
 static func town_house(variant: int) -> ArrayMesh:

@@ -80,7 +80,6 @@ static func _entries(group: String) -> Array:
 			["bench", func() -> Node3D: return _mesh(RegionProps.bench())],
 			["mast", func() -> Node3D: return _mesh(RegionProps.catenary_mast(8))],
 			["arrow", func() -> Node3D: return _mesh(RegionProps.arrow_board())],
-			["gantry", func() -> Node3D: return _mesh(RegionProps.sign_gantry(30))],
 			["cone", func() -> Node3D: return _mesh(RegionProps.cone())],
 			["tower", func() -> Node3D: return _mesh(RegionProps.control_tower())],
 			["terminal", func() -> Node3D: return _mesh(RegionProps.terminal())],

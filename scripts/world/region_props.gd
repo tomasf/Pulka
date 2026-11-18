@@ -251,21 +251,6 @@ static func arrow_board() -> ArrayMesh:
 
 # --- Motorway ---
 
-## Overhead sign gantry `span` metres across the motorway, signs facing +Z.
-static func sign_gantry(span: int) -> ArrayMesh:
-	return Props.cached_mesh("gantry%d" % span, func() -> ArrayMesh:
-		var kit := MeshKit.new()
-		var steel := Color(0.55, 0.58, 0.6)
-		var half := span * 0.5
-		for side in [-1.0, 1.0]:
-			kit.box(Vector3(0.45, 8.5, 0.45), Vector3(side * half, 4.25, 0), steel)
-			kit.box(Vector3(7.2, 2.6, 0.15), Vector3(side * 9.75, 7.3, 0.05), Color(0.1, 0.32, 0.7))
-			kit.box(Vector3(7.4, 0.1, 0.4), Vector3(side * 9.75, 8.66, 0.05), Palette.SNOW)
-		kit.box(Vector3(span, 0.5, 0.5), Vector3(0, 8.5, 0), steel)
-		kit.box(Vector3(span, 0.15, 0.7), Vector3(0, 8.82, 0), Palette.SNOW)
-		return kit.build())
-
-
 ## Articulated lorry, nose towards -Z.
 static func truck(variant: int) -> ArrayMesh:
 	return Props.cached_mesh("truck%d" % variant, func() -> ArrayMesh:

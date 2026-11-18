@@ -31,14 +31,6 @@ class ChunkBuild:
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
 
-const ZONE_SIGNS := {
-	TerrainField.Zone.OPEN: ["Öppen backe. Inga ursäkter.", Color(0.15, 0.45, 0.8)],
-	TerrainField.Zone.FOREST: ["Skogen: många träd, lite förstånd", Color(0.15, 0.45, 0.25)],
-	TerrainField.Zone.MOGULS: ["Puckelpist! Håll i mössan", Color(0.75, 0.3, 0.1)],
-	TerrainField.Zone.VILLAGE: ["Välkommen till Pulkaby", Color(0.6, 0.12, 0.12)],
-	TerrainField.Zone.WILDLIFE: ["Varning för älg (och hare)", Color(0.85, 0.65, 0.05)],
-}
-
 var field: TerrainField
 var engine_sound: AudioStream
 ## Extra sounds for region traffic (train horns, jets), set by the game.
@@ -504,18 +496,6 @@ func _place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator,
 				add_decor(decor, Props.lamp_post(), ground_xform(field.center_x(d) + hw + 4.0, d, -PI / 2.0))
 				add_decor(decor, Props.lamp_post(), ground_xform(field.center_x(d) - hw - 4.0, d, PI / 2.0))
 			d += 25.0
-	var zone_start := ceilf(d0 / TerrainField.ZONE_LENGTH) * TerrainField.ZONE_LENGTH
-	if zone_start >= d0 and zone_start < d1 and zone_start > 0.0 and field.region(zone_start) == TerrainField.Region.SLOPE:
-		var info: Array = ZONE_SIGNS[field.zone(zone_start + 1.0)]
-		add_sign(chunk, str(info[0]), info[1], zone_start, 1.0)
-
-
-func add_sign(chunk: Chunk, text: String, color: Color, d: float, side: float) -> void:
-	var board := Props.sign_node(text, color)
-	var x := field.center_x(d) + side * (field.half_width(d) + 3.5)
-	board.position = Vector3(x, field.height(x, d, false) - 0.2, -d)
-	board.rotation.y = -side * 0.35
-	chunk.add_child(board)
 
 
 func _place_ramps(chunk: Chunk, d0: float, d1: float) -> void:
@@ -604,8 +584,6 @@ func _place_roads(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, d
 			var sign_d := road_d - TerrainField.ROAD_HALF_WIDTH - 2.0
 			var sign_x: float = field.center_x(sign_d) + side * (field.half_width(sign_d) + 1.0)
 			add_decor(decor, Props.yield_sign(), ground_xform(sign_x, sign_d, -street_yaw(sign_d)))
-	for road_d in field.roads_between(d0 + 70.0, d1 + 70.0):
-		add_sign(chunk, "VÄG! Se upp för bilar", Color(0.85, 0.1, 0.1), road_d - 70.0, -1.0)
 
 
 # --- Gameplay objects ---

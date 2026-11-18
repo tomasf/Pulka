@@ -45,7 +45,7 @@ func place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, 
 		TerrainField.Region.BANDY:
 			_place_bandy(chunk, decor, rng, lo, hi, span)
 		TerrainField.Region.HIGHWAY:
-			_place_motorway(chunk, decor, rng, lo, hi, span)
+			_place_motorway(chunk, lo, hi)
 			_place_turn_off_arrows(decor, lo, hi, span)
 		TerrainField.Region.CLIFF:
 			_place_cliff(chunk, decor, rng, lo, hi, span)
@@ -168,15 +168,6 @@ func _place_park(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo
 		var x := field.center_x(lodge_d) - field.half_width(lodge_d) - 14.0
 		var xform := Transform3D(Basis(Vector3.UP, -PI / 2.0 - world.street_yaw(lodge_d)), Vector3(x, field.height(x, lodge_d, false) - 0.2, -lodge_d))
 		world.add_decor(decor, Props.town_house(3), xform)
-		var sign := Label3D.new()
-		sign.text = "Stugan – Våfflor 25:-"
-		sign.font_size = 64
-		sign.pixel_size = 0.009
-		sign.modulate = Color(1.0, 0.95, 0.75)
-		sign.shaded = false
-		sign.double_sided = false
-		sign.transform = xform * Transform3D(Basis(Vector3.UP, PI), Vector3(-0.9, 3.4, -4.62))
-		chunk.add_child(sign)
 
 
 func _lift_top(d: float) -> Vector3:
@@ -462,11 +453,8 @@ func _fixed(chunk: Chunk, kind: Obstacle.Kind, d: float, lateral: float, turn: f
 
 # --- Cliff ---
 
-const CLIFF_SIGNS := ["Stup ↓", "Oj.", "Håll i mössan"]
-
-
 ## A wall of rock along the edge (the boulders' snow caps make the cornice),
-## a sign that comes far too late and a crowd at the bottom of the landing.
+## and a crowd at the bottom of the landing.
 func _place_cliff(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: float, span: Vector3) -> void:
 	var edge := span.x + TerrainField.CLIFF_EDGE
 	if edge >= lo - 6.0 and edge < hi + 6.0:
@@ -482,7 +470,6 @@ func _place_cliff(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, l
 			var shape := Basis(Vector3.UP, rng.randf_range(-0.4, 0.4)).scaled(Vector3(rng.randf_range(3.0, 4.5), tall, rng.randf_range(2.0, 3.0)))
 			world.add_decor(decor, Props.rock(rng.randi_range(0, 1)), Transform3D(shape, Vector3(x, top - tall * 1.2, -(edge + 2.6))))
 			x += rng.randf_range(4.5, 6.5)
-		world.add_sign(chunk, CLIFF_SIGNS[rng.randi_range(0, CLIFF_SIGNS.size() - 1)], Color(0.85, 0.15, 0.1), edge - 3.0, world.random_sign(rng))
 	# Spectators either side of where the landing hill levels out.
 	var crowd := edge + TerrainField.CLIFF_LIP + TerrainField.CLIFF_RUNOUT * 0.8
 	if crowd >= lo and crowd < hi:
@@ -649,10 +636,11 @@ func _place_mall(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo
 		var e: float = end
 		if e >= lo and e < hi:
 			var width := int(field.half_width(e) * 2.0 + 1.0)
-			var xform := world.slope_xform(field.center_x(e), e, 0.0 if e < (span.x + span.y) * 0.5 else PI)
+			# Both entrance and exit signs face the approaching rider.
+			var xform := world.slope_xform(field.center_x(e), e, PI)
 			world.add_decor(decor, RegionProps.mall_entrance(width), xform)
 			var sign := Label3D.new()
-			sign.text = "PULKA GALLERIAN" if e < (span.x + span.y) * 0.5 else "Välkommen åter!"
+			sign.text = "SLASKPALATSET" if e < (span.x + span.y) * 0.5 else "Välkommen åter!"
 			sign.font_size = 120
 			sign.pixel_size = 0.012
 			sign.outline_size = 0
@@ -1077,13 +1065,7 @@ func _place_turn_off_arrows(decor: Dictionary, lo: float, hi: float, span: Vecto
 
 # --- Motorway ---
 
-const MOTORWAY_SIGNS := [
-	["E4 Backen", "Nedåt ↓"], ["Pulkastad 2", "Utfart 42"], ["Kiosken 500 m", "Glögg & korv"],
-	["Alla riktningar", "Utom uppåt"], ["Tomteland 7", "Nordpolen 2 400"],
-]
-
-
-func _place_motorway(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: float, span: Vector3) -> void:
+func _place_motorway(chunk: Chunk, lo: float, hi: float) -> void:
 	var asphalt := Color(0.33, 0.34, 0.37)
 	var white := Color(0.92, 0.92, 0.9)
 	chunk.add_child(_ribbon(lo, hi, -MOTORWAY_EDGE - 0.4, MOTORWAY_EDGE + 0.4, 0.03, asphalt))
@@ -1098,24 +1080,6 @@ func _place_motorway(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator
 		chunk.add_child(_ribbon(lo, hi, inner - 0.1, inner + 0.1, 0.05, white))
 		var divider := s * 9.75
 		chunk.add_child(_ribbon(lo, hi, divider - 0.08, divider + 0.08, 0.05, white, 3.0, 9.0))
-	var gantry := ceilf((lo - span.x) / 75.0) * 75.0 + span.x
-	while gantry < hi:
-		var local := gantry - span.x
-		if local > SWEEP_LENGTH and local < span.y - span.x - SWEEP_LENGTH:
-			var xform := Transform3D(lane_basis(0.0, gantry), lane_point(0.0, gantry))
-			world.add_decor(decor, RegionProps.sign_gantry(int(MOTORWAY_EDGE * 2.0 + 3.0)), xform)
-			var texts: Array = MOTORWAY_SIGNS[rng.randi_range(0, MOTORWAY_SIGNS.size() - 1)]
-			for k in 2:
-				var sign := Label3D.new()
-				sign.text = "%s\n%s" % [texts[0], texts[1]] if k == 0 else "%s" % texts[1]
-				sign.font_size = 64
-				sign.pixel_size = 0.012
-				sign.outline_size = 0
-				sign.shaded = false
-				sign.double_sided = false
-				sign.transform = xform * Transform3D(Basis.IDENTITY, Vector3(9.75 if k == 0 else -9.75, 7.3, 0.12))
-				chunk.add_child(sign)
-		gantry += 75.0
 
 
 ## A painted band along the swept motorway, between two lateral offsets,
