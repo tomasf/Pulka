@@ -27,8 +27,18 @@ I delad skärm följer ljus, dimma och snö varje spelares egen region. Testa me
 Kör utan `--headless` och lägg till `--capture` för spelbilder och en jämförelse
 som kontrollerar att utomhusbildens ljus inte ändras när den andra går in.
 
+Ett genomskinligt säkerhetsnät tonar fram nära osynliga sidogränser och följer
+den faktiska kraschgränsen längs terrängen. Det förvarnar även när man är på väg
+mot en snävare region och tonar bort när man styr tillbaka. Varje spelare ser
+sitt eget nät; synliga väggar och räcken behåller sina vanliga markeringar.
+Testa gränser, toning och separata vyer med
+`godot --headless --path . --script res://tools/boundary_net_test.gd -- --autopilot`.
+Utelämna `--headless` och lägg till `--capture` efter `--` för granskningsbilder
+och en kontroll av att nätet inte ändrar den andra spelarens bild.
+
 Bland specialregionerna finns en hängbro med 7,6 meter bred träbana över en
-ravin. Infarten smalnar av innan bron och räckena går att krascha i. Hoppar
+ravin. Varningsskyltar för avsmalnande väg står på båda sidor före infarten.
+Infarten smalnar av innan bron och räckena går att krascha i. Hoppar
 man över räcket kan man falla ner. Provkör nära bron med
 `godot --path . -- --start-region=bridge`, eller kör dess fysiktest med
 `godot --headless --path . --script res://tools/bridge_test.gd`.

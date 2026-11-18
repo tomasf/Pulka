@@ -47,6 +47,7 @@ func _run() -> void:
 	main.set("_autopilot", true)
 	main.set("_vehicle", 0)
 	main.set("_start_region", "bridge")
+	main.get("_rng").seed = 4711
 	main.call("_start_run")
 	main.set("state", 2)
 	var field: TerrainField = main.get("_field")
@@ -131,6 +132,29 @@ func _capture(main: Node, ends: Vector2) -> void:
 	for i in 10: await process_frame
 	await RenderingServer.frame_post_draw
 	root.get_texture().get_image().save_png("/tmp/pulka-bridge-overview.png")
+	# Review the warning from its readable face, with the bridge behind it.
+	var warning_d := ends.x - 42.0
+	var x := field.center_x(warning_d) + field.half_width(warning_d) + 1.0
+	var facing := Basis(Vector3.UP, -main.get("_world").street_yaw(warning_d))
+	target = Vector3(x, field.height(x, warning_d, false) + 2.75, -warning_d)
+	camera.position = target + facing * Vector3(-4, 0.6, 9)
+	camera.look_at(target + facing * Vector3(-1.5, 0, -1))
+	camera.fov = 55
+	main.get("_atmosphere").update_atmosphere(0, camera, 0, 0, false)
+	for i in 10: await process_frame
+	await RenderingServer.frame_post_draw
+	root.get_texture().get_image().save_png("/tmp/pulka-bridge-warning.png")
+	# An undistorted front view makes the face proportions easy to compare
+	# with the Swedish A5-1 reference, independently of camera perspective.
+	target.y += 0.11
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.size = 2.1
+	camera.position = target + facing * Vector3(0, 0, 10)
+	camera.look_at(target)
+	main.get("_atmosphere").update_atmosphere(0, camera, 0, 0, false)
+	for i in 10: await process_frame
+	await RenderingServer.frame_post_draw
+	root.get_texture().get_image().save_png("/tmp/pulka-bridge-warning-front.png")
 
 func _find(field: TerrainField) -> Vector3:
 	for d in range(800, 60000, 25):

@@ -698,6 +698,55 @@ static func yield_sign() -> ArrayMesh:
 		return kit.build())
 
 
+## A5-1 proportions: rounded aluminium plate, broad red rim and the original
+## bold, symmetric narrowing symbol. Source contours use a 456 x 405 face.
+## https://www.transportstyrelsen.se/sv/vagtrafik/trafikregler-och-vagmarken/vagmarken/varningsmarken/varning-for-avsmalnande-vag/
+## Front faces +Z, toward riders coming down the slope.
+static func road_narrows_sign() -> ArrayMesh:
+	return cached_mesh("road_narrows_sign", func() -> ArrayMesh:
+		var kit := MeshKit.new()
+		var steel := Color("929b9f")
+		kit.cylinder(0.035, 2.85, Vector3(0, 1.425, -0.055), steel, 10)
+		for y in [2.40, 2.85]:
+			kit.box(Vector3(0.22, 0.055, 0.025), Vector3(0, y, -0.017), steel)
+		# Six cubic arcs round the three corners without stretching the face.
+		var arcs := [
+			[Vector2(4.93711, 55.2762), Vector2(-1.6457, 43.8738), Vector2(-1.6457, 29.8262), Vector2(4.93711, 18.425)],
+			[Vector2(4.93711, 18.425), Vector2(11.5195, 7.02422), Vector2(23.6852, 0), Vector2(36.8508, 0)],
+			[Vector2(419.433, 0), Vector2(432.598, 0), Vector2(444.764, 7.02422), Vector2(451.346, 18.425)],
+			[Vector2(451.346, 18.425), Vector2(457.929, 29.8262), Vector2(457.929, 43.8738), Vector2(451.346, 55.2762)],
+			[Vector2(260.055, 386.602), Vector2(253.473, 398.004), Vector2(241.307, 405.027), Vector2(228.142, 405.027)],
+			[Vector2(228.142, 405.027), Vector2(214.977, 405.027), Vector2(202.811, 398.004), Vector2(196.229, 386.602)],
+		]
+		var outline := PackedVector2Array()
+		for arc: Array in arcs:
+			for i in 9:
+				var point: Vector2 = (arc[0] as Vector2).bezier_interpolate(arc[1], arc[2], arc[3], i / 8.0)
+				point = (point - Vector2(228.142, 0)) * 0.004
+				if outline.is_empty() or outline[-1].distance_squared_to(point) > 0.00000001:
+					outline.append(point)
+		kit.slab(outline, 0.012, Transform3D(Basis.IDENTITY, Vector3(0, 2.05, 0)), steel)
+		kit.slab(outline, 0.002, Transform3D(Basis.IDENTITY, Vector3(0, 2.05, 0.010)), Color("e4002b"))
+		var yellow := PackedVector2Array([Vector2(-181.4721, 42.5199), Vector2(181.472, 42.5199), Vector2(0, 356.838)])
+		for i in yellow.size(): yellow[i] *= 0.004
+		kit.slab(yellow, 0.002, Transform3D(Basis.IDENTITY, Vector3(0, 2.05, 0.015)), Color("ffcd00"))
+		# Convex pieces meet on the reference outline. Reflect their points,
+		# rather than the mesh basis, to keep both strokes' winding consistent.
+		var stroke := [
+			PackedVector2Array([Vector2(145.937, 56.6941), Vector2(179.953, 56.6941), Vector2(179.953, 119.055), Vector2(145.937, 130.394)]),
+			PackedVector2Array([Vector2(145.937, 130.394), Vector2(179.953, 119.055), Vector2(216.803, 164.409), Vector2(179.953, 175.748)]),
+			PackedVector2Array([Vector2(179.953, 175.748), Vector2(216.803, 164.409), Vector2(216.803, 232.441), Vector2(179.953, 232.441)]),
+		]
+		for side in [-1.0, 1.0]:
+			for piece: PackedVector2Array in stroke:
+				var polygon := piece.duplicate()
+				for i in polygon.size():
+					polygon[i] = Vector2((polygon[i].x - 228.142) * side, polygon[i].y) * 0.004
+				if side < 0: polygon.reverse()
+				kit.slab(polygon, 0.002, Transform3D(Basis.IDENTITY, Vector3(0, 2.05, 0.020)), Color("111111"))
+		return kit.build())
+
+
 static func ramp_flag() -> ArrayMesh:
 	return cached_mesh("flag", func() -> ArrayMesh:
 		var kit := MeshKit.new()

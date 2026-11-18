@@ -351,6 +351,7 @@ func _update_atmospheres(delta: float) -> void:
 		var playing := state == State.PLAYING and not p.sled.crashed
 		var rush := p.sled.speed() / 45.0 if playing and not _racing else 0.0
 		atmosphere.update_atmosphere(delta, p.camera, d, rush, p.sled.boost_time > 0.0 and not _racing)
+		p.boundary_net.update_net(_field, p.sled, delta, state == State.PLAYING)
 
 
 ## The rider out in front: the one events and shared game audio follow.
@@ -381,6 +382,9 @@ func _make_player(index: int, camera: ChaseCamera, controls: PlayerControls) -> 
 		p.atmosphere.view_index = index
 		_world_root.add_child(p.atmosphere)
 	p.atmosphere.bind_camera(camera)
+	p.boundary_net = BoundaryNet.new()
+	p.boundary_net.view_layer = p.atmosphere.view_layer()
+	p.atmosphere.add_child(p.boundary_net)
 	p.rumbles = not (_autopilot or _muted or DisplayServer.get_name() == "headless")
 	p.vehicle = _vehicle
 	sled.jumped.connect(_on_jumped.bind(p))
@@ -1551,7 +1555,6 @@ func _check_bounds(p: Player = null) -> void:
 		p = _players[0]
 	var d := p.sled.distance()
 	var outside := absf(p.sled.position.x - _field.center_x(d)) - _field.half_width(d)
-	var in_town := _field.region(d) == TerrainField.Region.TOWN
 	var kind := _field.region(d)
 	if _field.in_sewer(d):
 		# The pipe is a sliding contact resolved during each physics substep.
@@ -1565,7 +1568,7 @@ func _check_bounds(p: Player = null) -> void:
 			_crash("Rakt in i containern!", p)
 		elif _field.harbor_water(p.sled.position.x, d) and p.sled.position.y < _field.harbor_height(d) - 0.7:
 			_crash("Plums mellan kajerna!", p)
-		elif p.sled.position.x - _field.center_x(d) < -22:
+		elif p.sled.position.x - _field.center_x(d) < TerrainField.HARBOR_LEFT_BOUND:
 			_crash("Fel väg till lagret!", p)
 		return
 	if _field.in_rooftops(d):
@@ -1578,19 +1581,18 @@ func _check_bounds(p: Player = null) -> void:
 		if above_deck < -0.5 or (lateral > TerrainField.BRIDGE_HALF_WIDTH - 0.40 and above_deck < TerrainField.BRIDGE_RAIL_HEIGHT):
 			_crash("Du ramlade av bron!" if above_deck < -0.5 else "Rakt in i broräcket!", p)
 		return
-	if kind == TerrainField.Region.MALL and outside > 2.0:
-		_crash(["Rakt in i skyltfönstret!", "Du provade en tröja. Med ansiktet.", "Öppet köp gäller inte."][_rng.randi_range(0, 2)], p)
-		return
-	if kind == TerrainField.Region.BANDY and outside > 1.0:
-		_crash(["In i sargen!", "Utvisning, tio minuter!"][_rng.randi_range(0, 1)], p)
-		return
-	var in_woods := _field.region(d) == TerrainField.Region.WOODS
-	if in_woods and outside > 2.8:
-		_crash(["In i granskogen!", "Barr överallt.", "Skogen tog dig."][_rng.randi_range(0, 2)], p)
-	elif in_town and outside > 3.2:
-		_crash(["Rakt in i skyltfönstret!", "Du handlade lite på vägen.", "Butiken har stängt. Nu."][_rng.randi_range(0, 2)], p)
-	elif outside > 30.0:
-		_crash("Vilse i villaområdet!", p)
+	if outside <= _field.side_margin(d): return
+	match kind:
+		TerrainField.Region.MALL:
+			_crash(["Rakt in i skyltfönstret!", "Du provade en tröja. Med ansiktet.", "Öppet köp gäller inte."][_rng.randi_range(0, 2)], p)
+		TerrainField.Region.BANDY:
+			_crash(["In i sargen!", "Utvisning, tio minuter!"][_rng.randi_range(0, 1)], p)
+		TerrainField.Region.WOODS:
+			_crash(["In i granskogen!", "Barr överallt.", "Skogen tog dig."][_rng.randi_range(0, 2)], p)
+		TerrainField.Region.TOWN:
+			_crash(["Rakt in i skyltfönstret!", "Du handlade lite på vägen.", "Butiken har stängt. Nu."][_rng.randi_range(0, 2)], p)
+		_:
+			_crash("Vilse i villaområdet!", p)
 
 
 func _check_pickups(p: Player = null) -> void:

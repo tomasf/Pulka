@@ -497,6 +497,13 @@ func _place_cliff(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, l
 
 func _place_bridge(chunk: Chunk, decor: Dictionary, lo: float, hi: float, span: Vector3) -> void:
 	var ends := Vector2(span.x + TerrainField.BRIDGE_APPROACH, span.y - TerrainField.BRIDGE_APPROACH)
+	# Early in the approach, while the track is still wide. A pair stays
+	# visible from either side of the slope and from both split-screen views.
+	var warning_d := span.x + 8.0
+	if warning_d >= lo and warning_d < hi:
+		for side in [-1.0, 1.0]:
+			var x: float = field.center_x(warning_d) + side * (field.half_width(warning_d) + 1.0)
+			world.add_decor(decor, Props.road_narrows_sign(), world.ground_xform(x, warning_d, -world.street_yaw(warning_d)))
 	var mesh := SuspensionBridge.build(field, lo, hi, ends)
 	if mesh:
 		var instance := MeshInstance3D.new()

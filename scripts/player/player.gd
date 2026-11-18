@@ -14,6 +14,7 @@ var controls: PlayerControls
 var hud: Hud
 var race_hud: RaceHud
 var atmosphere: Atmosphere
+var boundary_net: BoundaryNet
 ## Off for test runs: no pad rumble.
 var rumbles := true
 

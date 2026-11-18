@@ -87,6 +87,7 @@ const ROOF_STREET_DEPTH := 12.0
 const CAVE_INSET := 30.0
 const HARBOR_INSET := 30.0
 const HARBOR_QUAY_EDGE := 20.0
+const HARBOR_LEFT_BOUND := -22.0
 const HARBOR_ROUTE_X := -7.0
 const HARBOR_ROUTE_HALF_WIDTH := 2.6
 const HARBOR_ROUTE_HEIGHT := 4.0
@@ -189,6 +190,28 @@ func half_width(d: float) -> float:
 		var width: float = cave_half_width(d) if int(span.z) == Region.ICE_CAVE else style(int(span.z)).width
 		hw = lerpf(hw, width, _span_weight(span, d))
 	return hw
+
+
+## Extra room beyond the marked track before an out-of-bounds crash.
+## The warning net and Main's crash check share these distances.
+func side_margin(d: float) -> float:
+	match region(d):
+		Region.WOODS: return 2.8
+		Region.TOWN: return 3.2
+		Region.MALL: return 2.0
+		Region.BANDY: return 1.0
+	return 30.0
+
+
+## Unmarked lateral limits, relative to center_x. Infinity means that side
+## already has a physical wall/railing, or allows falling rather than an
+## invisible lateral crash. Those places do not need a virtual net.
+func warning_bounds(d: float) -> Vector2:
+	if in_sewer(d) or in_cave(d) or on_bridge(d) or in_rooftops(d): return Vector2(-INF, INF)
+	if in_harbor(d): return Vector2(HARBOR_LEFT_BOUND, INF)
+	if region(d) in [Region.MALL, Region.BANDY]: return Vector2(-INF, INF)
+	var extent := half_width(d) + side_margin(d)
+	return Vector2(-extent, extent)
 
 
 # --- Special regions ---
