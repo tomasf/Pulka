@@ -148,9 +148,12 @@ Godot 4.7.2 med tvOS-plattformen från godotengine/godot#123885. Bygg den en gå
 med `tools/tvos/build_godot.sh` (hamnar i `../godot-tvos`) och exportera sedan
 med `tools/tvos/export.sh`, som skapar ett Xcode-projekt i `export/tvos`.
 
-Exporten förbereder också delade modeller och publikens stillbilder i
-`generated/world_meshes/cache.res`. Geometrin är identisk med de procedurbyggda
-modellerna; förberedelsen flyttar arbete från pågående åkning till bygget.
+Exporten förbereder också delade modeller, publikens stillbilder och
+stänkeffekter i `generated/world_meshes/cache.res`. Modellerna får enklare
+detaljnivåer på avstånd och delade vertexar i skuggpasset. Närgeometrins form
+och färger behålls. Publikens åtta poser delar geometri mellan klädfärger och
+ritas med en materialyta per person. Förberedelsen flyttar arbete från
+pågående åkning till bygget.
 Kör `godot --headless --path . --script res://tools/bake_world_meshes.gd` igen
 efter modelländringar, eller ta bort `generated/world_meshes` under utveckling
 för att använda de vanliga byggarna. Saknad cache fungerar som tidigare.
@@ -167,4 +170,20 @@ Resultatet uppdateras efter varje fall i appens cachekatalog som
 `python3 tools/tvos/profile_report.py resultat.json`. Stoppa appen efter testet;
 tvOS avslutar inte processen när Godot anropar `quit()`.
 
-Mätningar och begränsningar finns i [Apple TV-profileringen](docs/profiling/apple-tv-2026-11-17.md).
+`python3 tools/tvos/run_profile.py --label optimering --output /tmp/pulka-tv.json`
+kör hela testet tyst på Apple TV Köket, hämtar färska resultat och stoppar
+appens process även vid avbrott. `--config` tar samma JSON som ovan och
+`--device` väljer en annan ansluten enhet.
+
+Mätningar och begränsningar finns i [senaste Apple TV-profileringen](docs/profiling/apple-tv-2026-11-18.md)
+och [den tidigare mätningen](docs/profiling/apple-tv-2026-11-17.md).
+`tools/lod_test.gd` kontrollerar detaljnivåer, skuggor och importerade material.
+`tools/crowd_test.gd` kontrollerar publikens geometri, färger och uppskjutna
+cachemissar. Kör utan `--headless` och med `-- --capture` för bildjämförelser.
+`tools/animation_visibility_test.gd` kontrollerar att synliga djur fortsätter
+animera för endera kameran och pausas utanför båda. Apple TV använder en
+skuggkaskad per vy i tvåspelarläget, med samma skuggräckvidd som för en spelare.
+`tools/sky_budget_test.gd -- --shadows --capture` jämför skuggprecisionen
+med TV:ns skuggatlasstorlek i Mobile-renderaren.
+En Instruments-export av `time-profile` kan sammanställas med
+`python3 tools/tvos/cpu_report.py cpu.xml --json cpu-summary.json`.

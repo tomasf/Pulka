@@ -16,6 +16,9 @@ var _legacy_sky := false
 var _shadow_mode := -1
 var _shadows := true
 var _scale := -1.0
+var _radiance := -1
+var _shadow_distance := -1.0
+var _freeze_sky := false
 
 func run(main: Node) -> void:
 	root = get_tree().root
@@ -39,6 +42,9 @@ func run(main: Node) -> void:
 		_shadow_mode = int(config.get("shadow_mode", -1))
 		_shadows = bool(config.get("shadows", true))
 		_scale = float(config.get("scale", -1))
+		_radiance = int(config.get("radiance", -1))
+		_shadow_distance = float(config.get("shadow_distance", -1))
+		_freeze_sky = bool(config.get("freeze_sky", false))
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--profile-seconds="): _seconds = maxf(2, float(arg.get_slice("=", 1)))
 		if arg.begins_with("--profile-cases="): _cases = Array(arg.get_slice("=", 1).split(","))
@@ -48,11 +54,15 @@ func run(main: Node) -> void:
 	_info = {"os": OS.get_name(), "model": OS.get_model_name(), "renderer": RenderingServer.get_current_rendering_method(), "driver": RenderingServer.get_current_rendering_driver_name(), "screen": str(DisplayServer.screen_get_size()), "window": str(root.size), "refresh_hz": DisplayServer.screen_get_refresh_rate(), "quality": Quality.LEVEL_NAMES[Quality.level], "scale": root.scaling_3d_scale, "muted": AudioServer.is_bus_mute(0), "baked_audio": SoundBank.uses_baked_audio()}
 	print("DEVICE_PROFILE_INFO ", JSON.stringify(_info))
 	_info["baked_world"] = ResourceLoader.exists(Props.BAKED_WORLD)
+	_info["build"] = OS.get_environment("PULKA_PROFILE_BUILD")
 	_info["legacy_sky"] = _legacy_sky
 	_info["shadow_mode_override"] = _shadow_mode
 	_info["shadows"] = _shadows
 	_info["scale_override"] = _scale
 	_info["sky_radiance"] = 256
+	_info["radiance_override"] = _radiance
+	_info["shadow_distance_override"] = _shadow_distance
+	_info["freeze_sky"] = _freeze_sky
 	_save_results()
 	for count in _modes:
 		for name in _cases:
@@ -82,6 +92,8 @@ func _case(name: String, count: int) -> void:
 		p.atmosphere._sun.shadow_enabled = _shadows
 		if _shadow_mode >= 0: p.atmosphere._sun.directional_shadow_mode = _shadow_mode
 		if _scale > 0: p.camera.get_viewport().scaling_3d_scale = _scale
+		if _radiance >= 0: p.atmosphere._environment.sky.radiance_size = _radiance as Sky.RadianceSize
+		if _shadow_distance > 0: p.atmosphere._sun.directional_shadow_max_distance = _shadow_distance
 	var world: SlopeWorld = _main.get("_world")
 	world.profile_builds = true
 	world.build_profile.clear()
@@ -118,6 +130,7 @@ func _case(name: String, count: int) -> void:
 	var cpu: Array[float] = []
 	var gpu: Array[float] = []
 	var draws: Array[float] = []
+	var primitives: Array[float] = []
 	var spikes: Array[Dictionary] = []
 	var regions: Dictionary = {}
 	var mixed_indoor := 0
@@ -128,6 +141,8 @@ func _case(name: String, count: int) -> void:
 	world.build_profile.clear()
 	while Time.get_ticks_usec() < until:
 		await get_tree().process_frame
+		if _freeze_sky:
+			for p: Player in players: p.atmosphere._sky_state = Vector3(p.sled.distance(), p.atmosphere.storm, p.atmosphere.night_override)
 		var now := Time.get_ticks_usec()
 		var elapsed := (now - previous) / 1000.0
 		var pipelines := _pipelines()
@@ -144,6 +159,7 @@ func _case(name: String, count: int) -> void:
 		cpu.append(render_cpu)
 		gpu.append(render_gpu)
 		draws.append(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+		primitives.append(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME))
 		for p: Player in players:
 			var region_name: String = TerrainField.Region.keys()[p.sled.field.region(p.sled.distance())]
 			regions[region_name] = int(regions.get(region_name, 0)) + 1
@@ -152,7 +168,7 @@ func _case(name: String, count: int) -> void:
 			spikes.append({"ms": elapsed, "d": players[0].sled.distance(), "world_ms": world.last_update_us / 1000.0, "pipelines": pipelines - previous_pipelines, "builds": world.build_profile.duplicate()})
 		previous_pipelines = pipelines
 		world.build_profile.clear()
-	var result := {"case": name, "players": count, "setup_ms": setup_ms, "frame": _stats(wall), "logic": _stats(logic), "world": _stats(generation), "render_cpu": _stats(cpu), "gpu": _stats(gpu), "draw_calls": _stats(draws), "regions": regions, "mixed_indoor_frames": mixed_indoor, "distance": players[0].run_distance, "memory_mb": Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0, "spikes": spikes}
+	var result := {"case": name, "players": count, "setup_ms": setup_ms, "frame": _stats(wall), "logic": _stats(logic), "world": _stats(generation), "render_cpu": _stats(cpu), "gpu": _stats(gpu), "draw_calls": _stats(draws), "primitives": _stats(primitives), "regions": regions, "mixed_indoor_frames": mixed_indoor, "distance": players[0].run_distance, "memory_mb": Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0, "spikes": spikes}
 	_results.append(result)
 	print("DEVICE_PROFILE_RESULT ", JSON.stringify(result))
 	_save_results()

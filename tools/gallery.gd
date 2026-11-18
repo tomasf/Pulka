@@ -128,6 +128,9 @@ static func _entries(group: String) -> Array:
 		["new tefat", func() -> Node3D: return _ride3d(VehicleSpec.Model.TEFAT)],
 	]
 	groups["creatures"] = []
+	groups["animal_details"] = []
+	for kind in ["moose", "deer", "bear", "dog", "hare", "fox", "cat"]:
+		groups["animal_details"].append([kind, func() -> Node3D: return _creature(kind, "idle", 0)])
 	groups["people_motion"] = []
 	for pose in [["idle", 0.0], ["walk", 0.0], ["walk", 0.25], ["walk", 0.75], ["flail", 0.2], ["flail", 0.6]]:
 		groups["people_motion"].append(["person %s" % pose[0], func() -> Node3D: return _creature("person", pose[0], pose[1])])

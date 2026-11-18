@@ -1,0 +1,456 @@
+{
+  "complete": true,
+  "device": {
+    "baked_audio": true,
+    "baked_world": true,
+    "build": "visibility-one-cascade-20261118T195125170273Z",
+    "driver": "metal",
+    "freeze_sky": false,
+    "legacy_sky": false,
+    "model": "AppleTV14,1",
+    "muted": true,
+    "os": "tvOS",
+    "quality": "Hög",
+    "radiance_override": -1,
+    "refresh_hz": 50.0,
+    "renderer": "mobile",
+    "scale": 1.0,
+    "scale_override": -1.0,
+    "screen": "(1920, 1080)",
+    "shadow_distance_override": -1.0,
+    "shadow_mode_override": 0,
+    "shadows": true,
+    "sky_radiance": 256,
+    "window": "(1920, 1080)"
+  },
+  "results": [
+    {
+      "case": "bandy",
+      "distance": 791.65625,
+      "draw_calls": {
+        "max": 2517.0,
+        "median": 1945.0,
+        "n": 1001,
+        "over20": 1001,
+        "over34": 1001,
+        "over50": 1001,
+        "p95": 2476.0,
+        "p99": 2498.0
+      },
+      "frame": {
+        "max": 20.401,
+        "median": 19.999,
+        "n": 1001,
+        "over20": 483,
+        "over34": 0,
+        "over50": 0,
+        "p95": 20.073,
+        "p99": 20.09
+      },
+      "gpu": {
+        "max": 0.0,
+        "median": 0.0,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "logic": {
+        "max": 7.181,
+        "median": 2.547,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 5.336,
+        "p99": 5.966
+      },
+      "memory_mb": 0.0,
+      "mixed_indoor_frames": 0,
+      "players": 2,
+      "primitives": {
+        "max": 1011010.0,
+        "median": 702032.0,
+        "n": 1001,
+        "over20": 1001,
+        "over34": 1001,
+        "over50": 1001,
+        "p95": 956682.0,
+        "p99": 997316.0
+      },
+      "regions": {
+        "BANDY": 537,
+        "SLOPE": 1465
+      },
+      "render_cpu": {
+        "max": 4.03399998950958,
+        "median": 1.74099999806285,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 2.0170000205636,
+        "p99": 2.4620000243783
+      },
+      "setup_ms": 377.102,
+      "spikes": [],
+      "world": {
+        "max": 5.148,
+        "median": 1.232,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 3.968,
+        "p99": 4.388
+      }
+    },
+    {
+      "case": "park",
+      "distance": 960.50390625,
+      "draw_calls": {
+        "max": 2170.0,
+        "median": 1662.0,
+        "n": 1001,
+        "over20": 1001,
+        "over34": 1001,
+        "over50": 1001,
+        "p95": 2083.0,
+        "p99": 2136.0
+      },
+      "frame": {
+        "max": 20.21,
+        "median": 19.998,
+        "n": 1001,
+        "over20": 482,
+        "over34": 0,
+        "over50": 0,
+        "p95": 20.073,
+        "p99": 20.1
+      },
+      "gpu": {
+        "max": 0.0,
+        "median": 0.0,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "logic": {
+        "max": 7.532,
+        "median": 2.704,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 5.393,
+        "p99": 6.335
+      },
+      "memory_mb": 0.0,
+      "mixed_indoor_frames": 0,
+      "players": 2,
+      "primitives": {
+        "max": 756639.0,
+        "median": 614150.0,
+        "n": 1001,
+        "over20": 1001,
+        "over34": 1001,
+        "over50": 1001,
+        "p95": 715972.0,
+        "p99": 749140.0
+      },
+      "regions": {
+        "PARK": 661,
+        "SLOPE": 1341
+      },
+      "render_cpu": {
+        "max": 3.21400004458427,
+        "median": 1.57999997198582,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 1.93599997028708,
+        "p99": 2.283999984622
+      },
+      "setup_ms": 344.126,
+      "spikes": [],
+      "world": {
+        "max": 5.568,
+        "median": 1.101,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 3.897,
+        "p99": 4.428
+      }
+    },
+    {
+      "case": "woods/blizzard",
+      "distance": 859.7236328125,
+      "draw_calls": {
+        "max": 1913.0,
+        "median": 1336.0,
+        "n": 1000,
+        "over20": 1000,
+        "over34": 1000,
+        "over50": 1000,
+        "p95": 1830.0,
+        "p99": 1891.0
+      },
+      "frame": {
+        "max": 24.058,
+        "median": 19.996,
+        "n": 1000,
+        "over20": 466,
+        "over34": 0,
+        "over50": 0,
+        "p95": 20.283,
+        "p99": 21.191
+      },
+      "gpu": {
+        "max": 0.0,
+        "median": 0.0,
+        "n": 1000,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "logic": {
+        "max": 11.979,
+        "median": 3.561,
+        "n": 1000,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 7.207,
+        "p99": 9.297
+      },
+      "memory_mb": 0.0,
+      "mixed_indoor_frames": 0,
+      "players": 2,
+      "primitives": {
+        "max": 769298.0,
+        "median": 639888.0,
+        "n": 1000,
+        "over20": 1000,
+        "over34": 1000,
+        "over50": 1000,
+        "p95": 725606.0,
+        "p99": 754354.0
+      },
+      "regions": {
+        "SLOPE": 1315,
+        "WOODS": 685
+      },
+      "render_cpu": {
+        "max": 3.01600001594424,
+        "median": 1.26000000423193,
+        "n": 1000,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 1.939999961555,
+        "p99": 2.17599997794628
+      },
+      "setup_ms": 329.328,
+      "spikes": [],
+      "world": {
+        "max": 6.419,
+        "median": 1.24,
+        "n": 1000,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 4.043,
+        "p99": 5.196
+      }
+    },
+    {
+      "case": "mall",
+      "distance": 836.1923828125,
+      "draw_calls": {
+        "max": 2419.0,
+        "median": 2043.0,
+        "n": 993,
+        "over20": 993,
+        "over34": 993,
+        "over50": 993,
+        "p95": 2250.0,
+        "p99": 2350.0
+      },
+      "frame": {
+        "max": 60.058,
+        "median": 19.993,
+        "n": 993,
+        "over20": 479,
+        "over34": 4,
+        "over50": 3,
+        "p95": 20.597,
+        "p99": 23.411
+      },
+      "gpu": {
+        "max": 0.0,
+        "median": 0.0,
+        "n": 993,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "logic": {
+        "max": 8.132,
+        "median": 2.385,
+        "n": 993,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 5.014,
+        "p99": 5.929
+      },
+      "memory_mb": 0.0,
+      "mixed_indoor_frames": 398,
+      "players": 2,
+      "primitives": {
+        "max": 902524.0,
+        "median": 691396.0,
+        "n": 993,
+        "over20": 993,
+        "over34": 993,
+        "over50": 993,
+        "p95": 820534.0,
+        "p99": 875290.0
+      },
+      "regions": {
+        "MALL": 548,
+        "SLOPE": 1438
+      },
+      "render_cpu": {
+        "max": 3.91799995946884,
+        "median": 2.0090000154376,
+        "n": 993,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 2.35699996626377,
+        "p99": 2.8800000038147
+      },
+      "setup_ms": 320.821,
+      "spikes": [
+        {
+          "builds": [
+            {
+              "index": 249,
+              "stage": 2,
+              "us": 1631
+            },
+            {
+              "index": 250,
+              "stage": 0,
+              "us": 1652
+            }
+          ],
+          "d": 12150.0146484375,
+          "ms": 39.971,
+          "pipelines": 1,
+          "world_ms": 3.935
+        },
+        {
+          "builds": [
+            {
+              "index": 250,
+              "stage": 0,
+              "us": 531
+            }
+          ],
+          "d": 12150.7177734375,
+          "ms": 60.058,
+          "pipelines": 0,
+          "world_ms": 3.213
+        },
+        {
+          "builds": [
+            {
+              "index": 250,
+              "stage": 2,
+              "us": 1490
+            },
+            {
+              "index": 251,
+              "stage": 0,
+              "us": 1638
+            }
+          ],
+          "d": 12162.77734375,
+          "ms": 25.877,
+          "pipelines": 0,
+          "world_ms": 3.797
+        },
+        {
+          "builds": [
+            {
+              "index": 251,
+              "stage": 0,
+              "us": 654
+            }
+          ],
+          "d": 12163.4267578125,
+          "ms": 54.119,
+          "pipelines": 0,
+          "world_ms": 3.258
+        },
+        {
+          "builds": [
+            {
+              "index": 252,
+              "stage": 0,
+              "us": 709
+            }
+          ],
+          "d": 12176.13671875,
+          "ms": 59.382,
+          "pipelines": 0,
+          "world_ms": 3.546
+        },
+        {
+          "builds": [],
+          "d": 12188.5888671875,
+          "ms": 26.042,
+          "pipelines": 0,
+          "world_ms": 2.871
+        }
+      ],
+      "world": {
+        "max": 6.32,
+        "median": 1.251,
+        "n": 993,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 3.991,
+        "p99": 4.377
+      }
+    }
+  ],
+  "run_config": {
+    "seconds": 20,
+    "cases": [
+      "bandy",
+      "park",
+      "woods/blizzard",
+      "mall"
+    ],
+    "modes": [
+      2
+    ],
+    "shadow_mode": 0
+  }
+}

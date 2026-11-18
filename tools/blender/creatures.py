@@ -310,6 +310,8 @@ class QuadrupedModel:
         if spec.get("bind"):
             spec["bind"](rig, coat)
 
+        K.merge_rigid_details([obj for obj, _bone in rigid])
+
         K.animate(rig, "walk", 24, spec.get("walk_animation", lambda r, t: QuadrupedModel.trot(r, t, spec)))
         K.animate(rig, "idle", 60, spec.get("idle_animation", QuadrupedModel.idle))
         if spec.get("gallop"):

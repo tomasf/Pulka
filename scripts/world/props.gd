@@ -8,6 +8,7 @@ const BAKED_WORLD := "res://generated/world_meshes/cache.res"
 static var use_baked_world := true
 static var _checked_world_cache := false
 static var _pipeline_meshes: Array = []
+static var _effects := {}
 
 
 static func _load_world_cache() -> void:
@@ -17,7 +18,9 @@ static func _load_world_cache() -> void:
 		var archive: Resource = load(BAKED_WORLD)
 		_cache.merge(archive.get_meta("meshes", {}), false)
 		_baked.merge(archive.get_meta("poses", {}), false)
+		_crowd.merge(archive.get_meta("crowd", {}), false)
 		_pipeline_meshes = archive.get_meta("pipeline_meshes", [])
+		_effects = archive.get_meta("effects", {})
 
 
 static func cached_mesh(key: String, builder: Callable) -> ArrayMesh:
@@ -1237,6 +1240,7 @@ static func posed(rig: Rig, phase: float, prepare_ahead := false) -> Node3D:
 ## Geometry is shared by model, clip and eighth of a cycle. Clothes are
 ## surface overrides on each instance, so eight outfits need no extra skinning.
 static var _baked := {}
+static var _crowd := {}
 static var _pose_jobs := {}
 static var _pose_order: Array[String] = []
 
@@ -1245,6 +1249,30 @@ static func _pose_key(rig: Rig, phase: float) -> String:
 	var step := posmod(roundi(phase / TAU * 8.0), 8)
 	var clip := &"idle" if rig.kind == "person" else rig.gait
 	return "%s_%s_%d" % [rig.kind, clip, step]
+
+
+## Static spectators keep the same eight poses and individual outfits, but
+## each uses one draw instead of a separate surface for every material.
+static func crowd(rig: Rig, phase: float) -> MeshInstance3D:
+	var still := MeshInstance3D.new()
+	_load_world_cache()
+	var key := _pose_key(rig, phase)
+	if _crowd.has(key):
+		still.mesh = _crowd[key]
+		CrowdMesh.dress(still, rig.colours)
+	else:
+		if not _pose_jobs.has(key):
+			_pose_jobs[key] = {"rig": rig, "phase": phase, "waiters": []}
+			_pose_order.append(key)
+		(_pose_jobs[key].waiters as Array).append({"node": weakref(still), "rig": rig, "crowd": true})
+	return still
+
+
+static func crowd_mesh(rig: Rig, phase: float) -> ArrayMesh:
+	_load_world_cache()
+	var key := _pose_key(rig, phase)
+	if not _crowd.has(key): _crowd[key] = CrowdMesh.build(baked(rig, phase))
+	return _crowd[key]
 
 
 ## Synchronous for tools and figures that need to appear immediately.
@@ -1273,8 +1301,12 @@ static func prepare_poses(deadline: int) -> void:
 		var mesh := baked(job.rig, job.phase)
 		for entry: Dictionary in live:
 			var node := (entry.node as WeakRef).get_ref() as MeshInstance3D
-			node.mesh = mesh
-			CreatureRig.dress_mesh(node, (entry.rig as Rig).colours)
+			if entry.get("crowd", false):
+				node.mesh = crowd_mesh(entry.rig, job.phase)
+				CrowdMesh.dress(node, (entry.rig as Rig).colours)
+			else:
+				node.mesh = mesh
+				CreatureRig.dress_mesh(node, (entry.rig as Rig).colours)
 		return
 
 

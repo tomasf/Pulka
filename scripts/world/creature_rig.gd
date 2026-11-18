@@ -28,6 +28,10 @@ var _player: AnimationPlayer
 var _skeleton: Skeleton3D
 var _meshes: Array[MeshInstance3D] = []
 var _current := &""
+var animation_distance_squared := 180.0 * 180.0
+var _on_screen := false
+var _near_animation := true
+var _visibility_budget := false
 
 
 func _init(kind: String) -> void:
@@ -42,8 +46,8 @@ func _init(kind: String) -> void:
 		var mesh := node as MeshInstance3D
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		_meshes.append(mesh)
-		# Painted bodies (a bear's shaded coat) carry their colours in the
-		# vertices; the import leaves the material ignoring them.
+		# The post-import script prepares painted materials before loading.
+		# Keep this fallback for older imports and custom creature scenes.
 		for surface in mesh.mesh.get_surface_count():
 			var original := mesh.mesh.surface_get_material(surface) as StandardMaterial3D
 			if original != null and mesh.mesh.surface_get_format(surface) & Mesh.ARRAY_FORMAT_COLOR:
@@ -54,6 +58,49 @@ func _init(kind: String) -> void:
 	for name: String in LOOPS:
 		if _player.has_animation(name):
 			_player.get_animation(name).loop_mode = Animation.LOOP_LINEAR
+	# Streaming keeps hundreds of figures alive well beyond either camera.
+	# Off-screen skeletal updates still upload bones and deform mesh bounds.
+	# The notifier combines all viewports, so either split-screen player keeps
+	# an on-screen animal animated. Movement/collisions keep ticking normally.
+	if DisplayServer.get_name() != "headless":
+		var notifier := VisibleOnScreenNotifier3D.new()
+		var bounds := AABB()
+		var first := true
+		for mesh in _meshes:
+			var transform := Transform3D.IDENTITY
+			var node: Node3D = mesh
+			while node != self:
+				transform = node.transform * transform
+				node = node.get_parent() as Node3D
+			var box := transform * mesh.mesh.get_aabb()
+			bounds = box if first else bounds.merge(box)
+			first = false
+		notifier.aabb = bounds.grow(1.0)
+		# Small distant silhouettes do not need full skeletal updates. Larger
+		# animals keep animating farther away; nearby figures are unchanged.
+		animation_distance_squared = pow(clampf(bounds.size.y * 90, 100, 250), 2)
+		_visibility_budget = true
+		notifier.screen_entered.connect(_set_on_screen.bind(true))
+		notifier.screen_exited.connect(_set_on_screen.bind(false))
+		# Keep AnimationMixer's track caches and current pose when suspended.
+		_player.process_mode = Node.PROCESS_MODE_DISABLED
+		add_child(notifier)
+
+
+func _set_on_screen(on_screen: bool) -> void:
+	_on_screen = on_screen
+	_apply_animation_budget()
+
+
+func set_animation_near(nearby: bool) -> void:
+	if nearby == _near_animation: return
+	_near_animation = nearby
+	_apply_animation_budget()
+
+
+func _apply_animation_budget() -> void:
+	if _visibility_budget and is_instance_valid(_player):
+		_player.process_mode = Node.PROCESS_MODE_INHERIT if _on_screen and _near_animation else Node.PROCESS_MODE_DISABLED
 
 
 ## A stable body pivot, unaffected by waving arms, antlers or flailing.

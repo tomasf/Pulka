@@ -1,0 +1,1074 @@
+{
+  "complete": true,
+  "device": {
+    "baked_audio": true,
+    "baked_world": true,
+    "build": "visibility-20261118T194748019146Z",
+    "driver": "metal",
+    "freeze_sky": false,
+    "legacy_sky": false,
+    "model": "AppleTV14,1",
+    "muted": true,
+    "os": "tvOS",
+    "quality": "Hög",
+    "radiance_override": -1,
+    "refresh_hz": 50.0,
+    "renderer": "mobile",
+    "scale": 1.0,
+    "scale_override": -1.0,
+    "screen": "(1920, 1080)",
+    "shadow_distance_override": -1.0,
+    "shadow_mode_override": -1,
+    "shadows": true,
+    "sky_radiance": 256,
+    "window": "(1920, 1080)"
+  },
+  "results": [
+    {
+      "case": "mall",
+      "distance": 848.091796875,
+      "draw_calls": {
+        "max": 2246.0,
+        "median": 2020.0,
+        "n": 992,
+        "over20": 992,
+        "over34": 992,
+        "over50": 992,
+        "p95": 2193.0,
+        "p99": 2229.0
+      },
+      "frame": {
+        "max": 80.078,
+        "median": 20.006,
+        "n": 992,
+        "over20": 511,
+        "over34": 4,
+        "over50": 3,
+        "p95": 20.75,
+        "p99": 23.588
+      },
+      "gpu": {
+        "max": 0.0,
+        "median": 0.0,
+        "n": 992,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "logic": {
+        "max": 8.315,
+        "median": 2.374,
+        "n": 992,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 4.923,
+        "p99": 5.483
+      },
+      "memory_mb": 0.0,
+      "mixed_indoor_frames": 286,
+      "players": 2,
+      "primitives": {
+        "max": 1006220.0,
+        "median": 777618.0,
+        "n": 992,
+        "over20": 992,
+        "over34": 992,
+        "over50": 992,
+        "p95": 921754.0,
+        "p99": 972558.0
+      },
+      "regions": {
+        "MALL": 512,
+        "SLOPE": 1472
+      },
+      "render_cpu": {
+        "max": 3.48200009042025,
+        "median": 1.93900002154708,
+        "n": 992,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 2.23700002735853,
+        "p99": 2.53699997228384
+      },
+      "setup_ms": 355.838,
+      "spikes": [
+        {
+          "builds": [
+            {
+              "index": 249,
+              "stage": 2,
+              "us": 1829
+            },
+            {
+              "index": 250,
+              "stage": 0,
+              "us": 828
+            }
+          ],
+          "d": 12147.6494140625,
+          "ms": 38.283,
+          "pipelines": 1,
+          "world_ms": 3.265
+        },
+        {
+          "builds": [
+            {
+              "index": 250,
+              "stage": 0,
+              "us": 1032
+            }
+          ],
+          "d": 12149.0576171875,
+          "ms": 80.078,
+          "pipelines": 0,
+          "world_ms": 3.973
+        },
+        {
+          "builds": [
+            {
+              "index": 250,
+              "stage": 2,
+              "us": 1491
+            },
+            {
+              "index": 251,
+              "stage": 0,
+              "us": 1637
+            }
+          ],
+          "d": 12161.4755859375,
+          "ms": 25.447,
+          "pipelines": 0,
+          "world_ms": 3.783
+        },
+        {
+          "builds": [
+            {
+              "index": 251,
+              "stage": 0,
+              "us": 605
+            }
+          ],
+          "d": 12162.27734375,
+          "ms": 54.578,
+          "pipelines": 0,
+          "world_ms": 3.204
+        },
+        {
+          "builds": [
+            {
+              "index": 252,
+              "stage": 0,
+              "us": 610
+            }
+          ],
+          "d": 12174.7431640625,
+          "ms": 53.736,
+          "pipelines": 0,
+          "world_ms": 3.325
+        },
+        {
+          "builds": [],
+          "d": 12867.4541015625,
+          "ms": 30.703,
+          "pipelines": 0,
+          "world_ms": 1.28
+        }
+      ],
+      "world": {
+        "max": 7.071,
+        "median": 1.238,
+        "n": 992,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 3.942,
+        "p99": 4.294
+      }
+    },
+    {
+      "case": "woods",
+      "distance": 815.2421875,
+      "draw_calls": {
+        "max": 1949.0,
+        "median": 1376.0,
+        "n": 1001,
+        "over20": 1001,
+        "over34": 1001,
+        "over50": 1001,
+        "p95": 1784.0,
+        "p99": 1934.0
+      },
+      "frame": {
+        "max": 20.14,
+        "median": 19.999,
+        "n": 1001,
+        "over20": 492,
+        "over34": 0,
+        "over50": 0,
+        "p95": 20.071,
+        "p99": 20.101
+      },
+      "gpu": {
+        "max": 0.0,
+        "median": 0.0,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "logic": {
+        "max": 14.103,
+        "median": 3.54,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 6.983,
+        "p99": 8.987
+      },
+      "memory_mb": 0.0,
+      "mixed_indoor_frames": 0,
+      "players": 2,
+      "primitives": {
+        "max": 984860.0,
+        "median": 767776.0,
+        "n": 1001,
+        "over20": 1001,
+        "over34": 1001,
+        "over50": 1001,
+        "p95": 902222.0,
+        "p99": 949060.0
+      },
+      "regions": {
+        "SLOPE": 1300,
+        "WOODS": 702
+      },
+      "render_cpu": {
+        "max": 3.04499999129772,
+        "median": 1.29800000190735,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 1.86600000908971,
+        "p99": 2.07899999058247
+      },
+      "setup_ms": 305.287,
+      "spikes": [],
+      "world": {
+        "max": 6.161,
+        "median": 1.19,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 4.025,
+        "p99": 4.79
+      }
+    },
+    {
+      "case": "bandy",
+      "distance": 775.60546875,
+      "draw_calls": {
+        "max": 2379.0,
+        "median": 2005.0,
+        "n": 948,
+        "over20": 948,
+        "over34": 948,
+        "over50": 948,
+        "p95": 2318.0,
+        "p99": 2369.0
+      },
+      "frame": {
+        "max": 60.14,
+        "median": 20.012,
+        "n": 948,
+        "over20": 526,
+        "over34": 14,
+        "over50": 6,
+        "p95": 26.312,
+        "p99": 47.8
+      },
+      "gpu": {
+        "max": 0.0,
+        "median": 0.0,
+        "n": 948,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "logic": {
+        "max": 9.256,
+        "median": 2.792,
+        "n": 948,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 5.993,
+        "p99": 7.358
+      },
+      "memory_mb": 0.0,
+      "mixed_indoor_frames": 0,
+      "players": 2,
+      "primitives": {
+        "max": 1185682.0,
+        "median": 873614.0,
+        "n": 948,
+        "over20": 948,
+        "over34": 948,
+        "over50": 948,
+        "p95": 1094776.0,
+        "p99": 1149076.0
+      },
+      "regions": {
+        "BANDY": 487,
+        "SLOPE": 1409
+      },
+      "render_cpu": {
+        "max": 4.68400001943111,
+        "median": 1.85599998167157,
+        "n": 948,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 3.04400001960993,
+        "p99": 3.40400001019239
+      },
+      "setup_ms": 321.031,
+      "spikes": [
+        {
+          "builds": [
+            {
+              "index": 774,
+              "stage": 0,
+              "us": 2782
+            }
+          ],
+          "d": 38251.83203125,
+          "ms": 26.15,
+          "pipelines": 0,
+          "world_ms": 4.224
+        },
+        {
+          "builds": [
+            {
+              "index": 774,
+              "stage": 0,
+              "us": 3150
+            }
+          ],
+          "d": 38252.6015625,
+          "ms": 52.855,
+          "pipelines": 0,
+          "world_ms": 4.74
+        },
+        {
+          "builds": [
+            {
+              "index": 774,
+              "stage": 0,
+              "us": 3153
+            }
+          ],
+          "d": 38254.85546875,
+          "ms": 56.933,
+          "pipelines": 0,
+          "world_ms": 4.711
+        },
+        {
+          "builds": [
+            {
+              "index": 774,
+              "stage": 0,
+              "us": 3119
+            }
+          ],
+          "d": 38256.4765625,
+          "ms": 40.022,
+          "pipelines": 0,
+          "world_ms": 4.71
+        },
+        {
+          "builds": [
+            {
+              "index": 774,
+              "stage": 0,
+              "us": 3661
+            }
+          ],
+          "d": 38257.546875,
+          "ms": 60.077,
+          "pipelines": 0,
+          "world_ms": 5.516
+        },
+        {
+          "builds": [
+            {
+              "index": 774,
+              "stage": 0,
+              "us": 2614
+            }
+          ],
+          "d": 38258.8359375,
+          "ms": 60.002,
+          "pipelines": 0,
+          "world_ms": 5.158
+        },
+        {
+          "builds": [
+            {
+              "index": 774,
+              "stage": 0,
+              "us": 3579
+            }
+          ],
+          "d": 38260.2109375,
+          "ms": 60.095,
+          "pipelines": 0,
+          "world_ms": 5.794
+        },
+        {
+          "builds": [
+            {
+              "index": 774,
+              "stage": 1,
+              "us": 2066
+            }
+          ],
+          "d": 38262.12890625,
+          "ms": 60.14,
+          "pipelines": 0,
+          "world_ms": 4.032
+        },
+        {
+          "builds": [
+            {
+              "index": 774,
+              "stage": 3,
+              "us": 17
+            },
+            {
+              "index": 774,
+              "stage": 4,
+              "us": 3329
+            }
+          ],
+          "d": 38263.71484375,
+          "ms": 32.27,
+          "pipelines": 0,
+          "world_ms": 5.302
+        },
+        {
+          "builds": [],
+          "d": 38264.42578125,
+          "ms": 47.8,
+          "pipelines": 0,
+          "world_ms": 1.856
+        },
+        {
+          "builds": [],
+          "d": 38265.5390625,
+          "ms": 25.132,
+          "pipelines": 0,
+          "world_ms": 1.765
+        },
+        {
+          "builds": [],
+          "d": 38265.89453125,
+          "ms": 25.635,
+          "pipelines": 0,
+          "world_ms": 1.825
+        },
+        {
+          "builds": [],
+          "d": 38266.48828125,
+          "ms": 29.237,
+          "pipelines": 0,
+          "world_ms": 1.774
+        },
+        {
+          "builds": [],
+          "d": 38266.96484375,
+          "ms": 27.704,
+          "pipelines": 0,
+          "world_ms": 1.817
+        },
+        {
+          "builds": [],
+          "d": 38267.4609375,
+          "ms": 27.164,
+          "pipelines": 0,
+          "world_ms": 1.813
+        },
+        {
+          "builds": [],
+          "d": 38267.95703125,
+          "ms": 45.159,
+          "pipelines": 0,
+          "world_ms": 1.835
+        },
+        {
+          "builds": [],
+          "d": 38269.8203125,
+          "ms": 27.888,
+          "pipelines": 0,
+          "world_ms": 1.866
+        },
+        {
+          "builds": [],
+          "d": 38270.31640625,
+          "ms": 30.726,
+          "pipelines": 0,
+          "world_ms": 1.822
+        },
+        {
+          "builds": [],
+          "d": 38271.765625,
+          "ms": 30.993,
+          "pipelines": 0,
+          "world_ms": 1.588
+        },
+        {
+          "builds": [],
+          "d": 38272.71875,
+          "ms": 29.463,
+          "pipelines": 0,
+          "world_ms": 1.674
+        },
+        {
+          "builds": [],
+          "d": 38273.2421875,
+          "ms": 47.878,
+          "pipelines": 0,
+          "world_ms": 1.903
+        },
+        {
+          "builds": [],
+          "d": 38274.8359375,
+          "ms": 29.78,
+          "pipelines": 0,
+          "world_ms": 1.805
+        },
+        {
+          "builds": [],
+          "d": 38275.37890625,
+          "ms": 30.264,
+          "pipelines": 0,
+          "world_ms": 1.665
+        },
+        {
+          "builds": [],
+          "d": 38276.5,
+          "ms": 29.594,
+          "pipelines": 0,
+          "world_ms": 1.803
+        },
+        {
+          "builds": [],
+          "d": 38277.07421875,
+          "ms": 48.815,
+          "pipelines": 0,
+          "world_ms": 1.821
+        },
+        {
+          "builds": [],
+          "d": 38279.00390625,
+          "ms": 28.948,
+          "pipelines": 0,
+          "world_ms": 1.798
+        },
+        {
+          "builds": [],
+          "d": 38279.62890625,
+          "ms": 28.263,
+          "pipelines": 0,
+          "world_ms": 1.632
+        },
+        {
+          "builds": [],
+          "d": 38280.265625,
+          "ms": 25.796,
+          "pipelines": 0,
+          "world_ms": 1.684
+        },
+        {
+          "builds": [],
+          "d": 38280.8984375,
+          "ms": 26.912,
+          "pipelines": 0,
+          "world_ms": 1.518
+        },
+        {
+          "builds": [],
+          "d": 38281.5390625,
+          "ms": 47.302,
+          "pipelines": 0,
+          "world_ms": 1.534
+        },
+        {
+          "builds": [],
+          "d": 38284.98046875,
+          "ms": 27.017,
+          "pipelines": 0,
+          "world_ms": 1.376
+        },
+        {
+          "builds": [],
+          "d": 38286.23828125,
+          "ms": 25.466,
+          "pipelines": 0,
+          "world_ms": 1.468
+        },
+        {
+          "builds": [],
+          "d": 38286.859375,
+          "ms": 25.404,
+          "pipelines": 0,
+          "world_ms": 1.307
+        },
+        {
+          "builds": [],
+          "d": 38287.4765625,
+          "ms": 29.124,
+          "pipelines": 0,
+          "world_ms": 1.381
+        },
+        {
+          "builds": [],
+          "d": 38288.16796875,
+          "ms": 25.801,
+          "pipelines": 0,
+          "world_ms": 1.286
+        },
+        {
+          "builds": [],
+          "d": 38289.4453125,
+          "ms": 30.25,
+          "pipelines": 0,
+          "world_ms": 1.329
+        },
+        {
+          "builds": [],
+          "d": 38290.75,
+          "ms": 26.655,
+          "pipelines": 0,
+          "world_ms": 1.55
+        },
+        {
+          "builds": [],
+          "d": 38292.06640625,
+          "ms": 28.626,
+          "pipelines": 0,
+          "world_ms": 1.377
+        },
+        {
+          "builds": [],
+          "d": 38293.4140625,
+          "ms": 26.472,
+          "pipelines": 0,
+          "world_ms": 1.264
+        },
+        {
+          "builds": [],
+          "d": 38294.73828125,
+          "ms": 26.69,
+          "pipelines": 0,
+          "world_ms": 1.402
+        },
+        {
+          "builds": [],
+          "d": 38296.03125,
+          "ms": 26.312,
+          "pipelines": 0,
+          "world_ms": 1.203
+        },
+        {
+          "builds": [],
+          "d": 38296.66796875,
+          "ms": 30.362,
+          "pipelines": 0,
+          "world_ms": 1.233
+        },
+        {
+          "builds": [],
+          "d": 38297.9296875,
+          "ms": 27.161,
+          "pipelines": 0,
+          "world_ms": 1.308
+        },
+        {
+          "builds": [],
+          "d": 38298.5625,
+          "ms": 28.937,
+          "pipelines": 0,
+          "world_ms": 1.41
+        },
+        {
+          "builds": [],
+          "d": 38299.8515625,
+          "ms": 25.526,
+          "pipelines": 0,
+          "world_ms": 1.39
+        },
+        {
+          "builds": [
+            {
+              "index": 775,
+              "stage": 0,
+              "us": 3040
+            }
+          ],
+          "d": 38300.49609375,
+          "ms": 25.137,
+          "pipelines": 0,
+          "world_ms": 4.388
+        },
+        {
+          "builds": [
+            {
+              "index": 775,
+              "stage": 0,
+              "us": 3295
+            }
+          ],
+          "d": 38301.140625,
+          "ms": 28.296,
+          "pipelines": 0,
+          "world_ms": 4.688
+        },
+        {
+          "builds": [
+            {
+              "index": 775,
+              "stage": 0,
+              "us": 2607
+            }
+          ],
+          "d": 38302.46484375,
+          "ms": 26.145,
+          "pipelines": 0,
+          "world_ms": 4.019
+        },
+        {
+          "builds": [
+            {
+              "index": 775,
+              "stage": 0,
+              "us": 3343
+            }
+          ],
+          "d": 38303.140625,
+          "ms": 25.966,
+          "pipelines": 0,
+          "world_ms": 4.716
+        },
+        {
+          "builds": [
+            {
+              "index": 775,
+              "stage": 0,
+              "us": 2503
+            }
+          ],
+          "d": 38303.8203125,
+          "ms": 44.763,
+          "pipelines": 0,
+          "world_ms": 3.943
+        },
+        {
+          "builds": [
+            {
+              "index": 775,
+              "stage": 0,
+              "us": 968
+            },
+            {
+              "index": 775,
+              "stage": 1,
+              "us": 1650
+            }
+          ],
+          "d": 38306.82421875,
+          "ms": 27.488,
+          "pipelines": 0,
+          "world_ms": 4.162
+        },
+        {
+          "builds": [
+            {
+              "index": 775,
+              "stage": 1,
+              "us": 2658
+            }
+          ],
+          "d": 38307.5625,
+          "ms": 48.018,
+          "pipelines": 0,
+          "world_ms": 4.347
+        },
+        {
+          "builds": [],
+          "d": 38310.93359375,
+          "ms": 25.857,
+          "pipelines": 0,
+          "world_ms": 1.594
+        },
+        {
+          "builds": [],
+          "d": 38312.49609375,
+          "ms": 26.418,
+          "pipelines": 0,
+          "world_ms": 1.822
+        },
+        {
+          "builds": [],
+          "d": 38314.08203125,
+          "ms": 25.628,
+          "pipelines": 0,
+          "world_ms": 1.477
+        },
+        {
+          "builds": [],
+          "d": 38315.703125,
+          "ms": 28.647,
+          "pipelines": 0,
+          "world_ms": 1.48
+        },
+        {
+          "builds": [],
+          "d": 38320.67578125,
+          "ms": 26.389,
+          "pipelines": 0,
+          "world_ms": 1.356
+        },
+        {
+          "builds": [],
+          "d": 38326.375,
+          "ms": 26.778,
+          "pipelines": 0,
+          "world_ms": 1.384
+        },
+        {
+          "builds": [],
+          "d": 38333.546875,
+          "ms": 25.459,
+          "pipelines": 0,
+          "world_ms": 1.354
+        },
+        {
+          "builds": [],
+          "d": 38346.5703125,
+          "ms": 27.44,
+          "pipelines": 0,
+          "world_ms": 1.369
+        }
+      ],
+      "world": {
+        "max": 5.794,
+        "median": 1.367,
+        "n": 948,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 4.273,
+        "p99": 4.771
+      }
+    },
+    {
+      "case": "park",
+      "distance": 913.080078125,
+      "draw_calls": {
+        "max": 2098.0,
+        "median": 1731.0,
+        "n": 1001,
+        "over20": 1001,
+        "over34": 1001,
+        "over50": 1001,
+        "p95": 2041.0,
+        "p99": 2080.0
+      },
+      "frame": {
+        "max": 20.143,
+        "median": 19.998,
+        "n": 1001,
+        "over20": 484,
+        "over34": 0,
+        "over50": 0,
+        "p95": 20.068,
+        "p99": 20.092
+      },
+      "gpu": {
+        "max": 0.0,
+        "median": 0.0,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "logic": {
+        "max": 6.963,
+        "median": 2.65,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 5.252,
+        "p99": 6.025
+      },
+      "memory_mb": 0.0,
+      "mixed_indoor_frames": 0,
+      "players": 2,
+      "primitives": {
+        "max": 914944.0,
+        "median": 717478.0,
+        "n": 1001,
+        "over20": 1001,
+        "over34": 1001,
+        "over50": 1001,
+        "p95": 849152.0,
+        "p99": 892418.0
+      },
+      "regions": {
+        "PARK": 637,
+        "SLOPE": 1365
+      },
+      "render_cpu": {
+        "max": 3.4770000680685,
+        "median": 1.62999997133017,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 1.98599997934699,
+        "p99": 2.2089999679327
+      },
+      "setup_ms": 336.668,
+      "spikes": [],
+      "world": {
+        "max": 5.545,
+        "median": 1.045,
+        "n": 1001,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 3.834,
+        "p99": 4.166
+      }
+    },
+    {
+      "case": "woods/blizzard",
+      "distance": 837.3349609375,
+      "draw_calls": {
+        "max": 1891.0,
+        "median": 1366.0,
+        "n": 1000,
+        "over20": 1000,
+        "over34": 1000,
+        "over50": 1000,
+        "p95": 1682.0,
+        "p99": 1724.0
+      },
+      "frame": {
+        "max": 25.893,
+        "median": 19.997,
+        "n": 1000,
+        "over20": 470,
+        "over34": 0,
+        "over50": 0,
+        "p95": 20.343,
+        "p99": 22.035
+      },
+      "gpu": {
+        "max": 0.0,
+        "median": 0.0,
+        "n": 1000,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "logic": {
+        "max": 14.263,
+        "median": 3.406,
+        "n": 1000,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 7.064,
+        "p99": 9.525
+      },
+      "memory_mb": 0.0,
+      "mixed_indoor_frames": 0,
+      "players": 2,
+      "primitives": {
+        "max": 908398.0,
+        "median": 765140.0,
+        "n": 1000,
+        "over20": 1000,
+        "over34": 1000,
+        "over50": 1000,
+        "p95": 849376.0,
+        "p99": 871918.0
+      },
+      "regions": {
+        "SLOPE": 1279,
+        "WOODS": 721
+      },
+      "render_cpu": {
+        "max": 3.41400005382299,
+        "median": 1.31599999958277,
+        "n": 1000,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 1.90399997353554,
+        "p99": 2.28800002878904
+      },
+      "setup_ms": 316.971,
+      "spikes": [
+        {
+          "builds": [],
+          "d": 11646.2685546875,
+          "ms": 25.893,
+          "pipelines": 0,
+          "world_ms": 1.573
+        }
+      ],
+      "world": {
+        "max": 7.552,
+        "median": 1.238,
+        "n": 1000,
+        "over20": 0,
+        "over34": 0,
+        "over50": 0,
+        "p95": 4.053,
+        "p99": 4.916
+      }
+    }
+  ],
+  "run_config": {
+    "seconds": 20,
+    "cases": [
+      "mall",
+      "woods",
+      "bandy",
+      "park",
+      "woods/blizzard"
+    ],
+    "modes": [
+      2
+    ]
+  }
+}

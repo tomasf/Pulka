@@ -142,9 +142,9 @@ func copy_weather(source: Atmosphere) -> void:
 
 
 ## Picks up the graphics level (Quality.level), also when it changes.
-func apply_quality() -> void:
+func apply_quality(split := false) -> void:
 	_sun.directional_shadow_max_distance = Quality.shadow_distance()
-	_sun.directional_shadow_mode = Quality.shadow_mode()
+	_sun.directional_shadow_mode = Quality.shadow_mode(split)
 	_snow.amount = maxi(Quality.snowflakes(), 1)
 
 

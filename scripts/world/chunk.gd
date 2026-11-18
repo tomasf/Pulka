@@ -19,6 +19,13 @@ func tick(delta: float, observers := PackedVector3Array(), speeds := PackedFloat
 	for bird in birds:
 		bird.tick(delta, observers, speeds)
 	for mover in movers:
+		if mover._creature != null and not observers.is_empty():
+			var nearby := false
+			for observer in observers:
+				if mover.position.distance_squared_to(observer) < mover._creature.animation_distance_squared:
+					nearby = true
+					break
+			mover._creature.set_animation_near(nearby)
 		mover.tick(delta)
 	for road in roads:
 		road.tick(delta)

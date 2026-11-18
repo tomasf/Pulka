@@ -18,6 +18,7 @@ func _run() -> void:
 	var players: Array = main.get("_players")
 	var first: Player = players[0]
 	var second: Player = players[1]
+	_check("split-screen applies the platform shadow budget", first.atmosphere._sun.directional_shadow_mode == Quality.shadow_mode(true) and second.atmosphere._sun.directional_shadow_mode == Quality.shadow_mode(true))
 	for p: Player in players:
 		p.sled.set_vehicle(VehicleSpec.all()[0], RandomNumberGenerator.new(), Player.COLORS[p.index])
 		p.sled.frozen = true
@@ -58,6 +59,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	_check("solo keeps its own environment and removes the second weather", removed.get_ref() == null and first.camera.environment == first.atmosphere._environment and main.get("_players").size() == 1)
+	_check("solo restores its full shadow budget", first.atmosphere._sun.directional_shadow_mode == Quality.shadow_mode(false))
 	main.call("_build_split")
 	_check("a new race creates fresh independent weather", main.get("_players")[1].atmosphere != first.atmosphere and main.get("_players")[1].camera.environment != first.camera.environment)
 	main.call("_enter_menu")

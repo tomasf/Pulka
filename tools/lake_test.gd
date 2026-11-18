@@ -132,6 +132,13 @@ func _run() -> void:
 		player.sled.place_at((strip.x + strip.y) * 0.5, 0, 3)
 		main.call("_after_crash", player)
 		_check("player %d recovers safely beyond the lake" % (player.index + 1), player.sled.distance() > strip.y and not field.is_water(player.sled.distance(), player.sled.position.x) and player.sled.position.distance_to(player.camera.position) < 35)
+	var first_splash := Splash.spawn(root, Vector3.ZERO, Vector3(0, 0, -30), .8)
+	var second_splash := Splash.spawn(root, Vector3.ZERO, Vector3.ZERO, 1.8)
+	first_splash._process(.6)
+	_check("overlapping splashes fade independently", first_splash._ring_material.albedo_color.a < .2 and second_splash._ring_material.albedo_color.a > .5)
+	_check("splash rings retain their speed-dependent stretch", first_splash._stretch > second_splash._stretch)
+	first_splash.free()
+	second_splash.free()
 	main.queue_free()
 	await process_frame
 	await process_frame

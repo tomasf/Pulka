@@ -849,6 +849,8 @@ func _build_split() -> void:
 	for p in _players:
 		sleds.append(p.sled)
 	_director.sleds = sleds
+	for p in _players:
+		p.atmosphere.apply_quality(true)
 
 
 ## Back to one player on the whole screen.
@@ -874,6 +876,7 @@ func _leave_split() -> void:
 	_racing = false
 	_hud.racing = false
 	_director.sleds = [first.sled]
+	first.atmosphere.apply_quality(false)
 
 
 func _start_race() -> void:
@@ -1211,7 +1214,7 @@ func _apply_graphics() -> void:
 	viewport.scaling_3d_mode = Quality.scaling_mode()
 	viewport.scaling_3d_scale = Quality.render_scale()
 	for p in _players:
-		p.atmosphere.apply_quality()
+		p.atmosphere.apply_quality(_players.size() > 1)
 		var half := p.camera.get_viewport()
 		if half != viewport:
 			half.scaling_3d_mode = Quality.scaling_mode()

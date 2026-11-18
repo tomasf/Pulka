@@ -276,6 +276,53 @@ class ModelKit:
             obj.parent = rig
 
     @staticmethod
+    def merge_rigid_details(objects):
+        """One skinned draw for opaque fixed-colour eyes, paws and antlers.
+
+        Only surfaces with ModelKit's default roughness are eligible. Keep
+        painted coats and glossy details separate. Joining retains named bone weights and the
+        shared armature modifier; no positions or animations are changed.
+        """
+        # A hare's painted inner ears share its head object. Leave that
+        # object intact rather than flattening a linked paint material.
+        def compatible(material):
+            if not material.use_nodes:
+                return False
+            bsdf = material.node_tree.nodes.get("Principled BSDF")
+            if bsdf is None:
+                return False
+            return (not bsdf.inputs["Base Color"].is_linked
+                    and abs(bsdf.inputs["Roughness"].default_value - .85) < 1e-5
+                    and bsdf.inputs["Base Color"].default_value[3] == 1.0
+                    and bsdf.inputs["Metallic"].default_value == 0.0)
+
+        eligible = [obj for obj in objects if all(compatible(material) for material in obj.data.materials)]
+        if not eligible:
+            return None
+        obj = ModelKit.join(eligible, "details")
+        mesh = obj.data
+        colours = []
+        for material in mesh.materials:
+            bsdf = material.node_tree.nodes.get("Principled BSDF")
+            assert not bsdf.inputs["Base Color"].is_linked, material.name
+            colours.append(tuple(bsdf.inputs["Base Color"].default_value))
+        layer = mesh.color_attributes.new("Col", "FLOAT_COLOR", "CORNER")
+        for polygon in mesh.polygons:
+            for loop in polygon.loop_indices:
+                layer.data[loop].color = colours[polygon.material_index]
+        mesh.materials.clear()
+        mat = bpy.data.materials.new("details")
+        mat.use_nodes = True
+        node = mat.node_tree.nodes.new("ShaderNodeVertexColor")
+        node.layer_name = "Col"
+        bsdf = mat.node_tree.nodes.get("Principled BSDF")
+        mat.node_tree.links.new(node.outputs["Color"], bsdf.inputs["Base Color"])
+        bsdf.inputs["Roughness"].default_value = .85
+        mesh.materials.append(mat)
+        for polygon in mesh.polygons: polygon.material_index = 0
+        return obj
+
+    @staticmethod
     def animate(rig, name, frames, pose, loop=True):
         """Records an action: `pose(rig, t)` sets the pose bones for t in
         0..1 across `frames` frames; a loop repeats its first frame last."""

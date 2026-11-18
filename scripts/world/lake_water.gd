@@ -21,25 +21,26 @@ static func _point(field: TerrainField, strip: Vector2, radius: float, angle: fl
 
 static func water_mesh(field: TerrainField, strip: Vector2) -> ArrayMesh:
 	var kit := MeshKit.new()
+	# Adjacent rings share their vertices. Sampling the shore and track for
+	# every quad corner repeated the same expensive terrain work four times.
+	kit._vertices.append(_point(field, strip, 0, 0))
+	kit._normals.append(Vector3.UP)
+	kit._colors.append(Color(1, 1, 1, 1))
 	for ring in range(1, RINGS.size()):
 		for i in SEGMENTS:
-			var a := TAU * i / SEGMENTS
-			var b := TAU * (i + 1) / SEGMENTS
-			var first := kit._vertices.size()
-			var p := _point(field, strip, RINGS[ring - 1], a)
-			var q := _point(field, strip, RINGS[ring], a)
-			var r := _point(field, strip, RINGS[ring], b)
-			var s := _point(field, strip, RINGS[ring - 1], b)
-			if ring == 1:
-				kit._vertices.append_array([p, q, r])
-			else:
-				kit._vertices.append_array([p, q, r, s])
-			for vertex in range(first, kit._vertices.size()):
-				var at := kit._vertices[vertex]
-				kit._normals.append(Vector3.UP)
-				kit._colors.append(Color(1, 1, 1, clampf(field.lake_shore_distance(at.x, -at.z) / 6, 0, 1)))
-			kit._triangle_facing(first, first + 1, first + 2)
-			if ring > 1: kit._triangle_facing(first, first + 2, first + 3)
+			var at := _point(field, strip, RINGS[ring], TAU * i / SEGMENTS)
+			kit._vertices.append(at)
+			kit._normals.append(Vector3.UP)
+			kit._colors.append(Color(1, 1, 1, clampf(field.lake_shore_distance(at.x, -at.z) / 6, 0, 1)))
+	for ring in range(1, RINGS.size()):
+		for i in SEGMENTS:
+			var next := (i + 1) % SEGMENTS
+			var p := 0 if ring == 1 else 1 + (ring - 2) * SEGMENTS + i
+			var q := 1 + (ring - 1) * SEGMENTS + i
+			var r := 1 + (ring - 1) * SEGMENTS + next
+			var s := 0 if ring == 1 else 1 + (ring - 2) * SEGMENTS + next
+			kit._triangle_facing(p, q, r)
+			if ring > 1: kit._triangle_facing(p, r, s)
 	var mesh := kit.build()
 	mesh.surface_set_material(0, material())
 	return mesh

@@ -56,10 +56,10 @@ static func shadow_distance() -> float:
 	return (80.0 if reduced_effects() else 140.0) * [0.6, 0.8, 1.0][level]
 
 
-## Two cascades keep shadows sharp up close and reaching far, at twice the
-## shadow drawing; lower levels make do with one.
-static func shadow_mode() -> DirectionalLight3D.ShadowMode:
-	return DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if level == Level.HIGH else DirectionalLight3D.SHADOW_ORTHOGONAL
+## Two cascades sharpen nearby shadows. Apple TV split-screen uses one per
+## view to fit its 20 ms frame budget, keeping the same shadow reach.
+static func shadow_mode(split := false) -> DirectionalLight3D.ShadowMode:
+	return DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if level == Level.HIGH and not (is_tv() and split) else DirectionalLight3D.SHADOW_ORTHOGONAL
 
 
 static func base_fog() -> float:
