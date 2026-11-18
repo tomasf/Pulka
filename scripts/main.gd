@@ -31,7 +31,7 @@ const CRASH_LINES := {
 	Obstacle.Kind.PERSON: [
 		"Ursäkta! Ursäkta!", "%s såg dig inte komma.", "%s tappade termosen!", "%s spillde ut hela kaffet.",
 		"Förlåt, %s!", "%s ska ringa kommunen om det här.", "%s skakar på huvudet.", "%s hade precis borstat av sig.",
-		"Strike på %s!", "%s skriver ett argt inlägg i Facebookgruppen."],
+		"Strike på %s!", "%s skriver ett argt inlägg i Facebookgruppen.", "%s hör av sig till länsstyrelsen."],
 	Obstacle.Kind.KID: [
 		"Barnet skrattade. Du grät.", "%s vann den duellen.", "%s ska skvallra för fröken.", "%s vill åka en gång till!",
 		"%s tappade vanten.", "%s står kvar. Du ligger ner."],
@@ -41,7 +41,7 @@ const CRASH_LINES := {
 	Obstacle.Kind.BEAR: [
 		"Du väckte björnen. Grattis.", "Björnen ville bara sova.", "Det var inte Nalle Puh.",
 		"Skogens tyngsta kram.", "Björnen har inte gått i ide än. Nu vet du varför.", "Mästerbrumm vann."],
-	Obstacle.Kind.CAR: ["Tuuut! Bilen hade företräde.", "Titta åt båda hållen nästa gång!", "Pulka mot Volvo. Volvo vann."],
+	Obstacle.Kind.CAR: ["Tuuut! Bilen hade företräde.", "Titta åt båda hållen nästa gång!", "Pulka mot bil. Bil vann."],
 	Obstacle.Kind.PLOW: ["Plogbilen plogade dig.", "Du blev en snövall."],
 	Obstacle.Kind.BIN: ["Soptunnan tog hand om dig.", "Rätt i återvinningen!"],
 	Obstacle.Kind.CART: ["Kundvagnen vann.", "Du blev handlad.", "Kassa 3 är stängd."],
@@ -58,14 +58,14 @@ const CRASH_LINES := {
 ## Who you ran into: filled into the `%s` of a person's or child's crash line.
 const PERSON_NAMES := [
 	"Farbror Bengt", "Mormor", "Morfar", "Tant Gunnel", "Farmor Ingrid", "Gunnar från bastuklubben", "Kent-Åke",
-	"Stig-Helmer", "Birgitta i kiosken", "Lasse från lagret", "Rektorn", "Pastor Lennart", "Kerstin med staven",
-	"Sture", "Agneta", "Leif-Olle", "Grannen Ulla", "Ronny", "Lisbeth", "Börje", "Åsa-Nisse", "Göran från styrelsen",
+	"Stig-Bruno", "Birgitta i kiosken", "Lasse från lagret", "Rektorn", "Pastor Lennart", "Kerstin med staven",
+	"Sture", "Agneta", "Leif-Olle", "Grannen Ulla", "Ronny", "Lisbeth", "Börje", "Gröt-Robert", "Göran från styrelsen",
 	"Tant Margit", "Kalle på macken", "Yvonne", "Benny", "Morbror Jan", "Gudrun", "Lars-Erik", "Pirjo", "Ahmed",
 	"Jukka", "Svetlana", "Pappa", "Mamma", "Liftskötaren Roger", "Konditorn Sven", "Fiskaren Torbjörn",
 ]
 const KID_NAMES := [
 	"Lilla Elsa", "Lilla Alice", "Lille Nils", "Saga", "Wilma", "Elton", "Liam", "Maja", "Hugo", "Ebba",
-	"Theo", "Selma", "Olle", "Lilla My", "Vincent", "Freja", "Melvin", "Tindra", "Noah", "Alva", "Kevin", "Isak",
+	"Theo", "Selma", "Olle", "My", "Vincent", "Freja", "Melvin", "Tindra", "Noah", "Alva", "Kevin", "Isak",
 ]
 const BIRCH_CRASH_LINES := ["Björken vann.", "Trädkramare!", "Näver i munnen.", "Björken stod där först.", "Björken rörde inte en kvist."]
 const GAME_OVER_LINES := [

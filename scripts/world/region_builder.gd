@@ -75,14 +75,7 @@ func _place_town(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, lo
 			var facing: float = (PI / 2.0 if side > 0.0 else -PI / 2.0) - yaw
 			var xform := Transform3D(Basis(Vector3.UP, facing), Vector3(x, field.height(x, d, false) - 0.1, -d))
 			world.add_decor(decor, Props.town_house(variant), xform)
-			var sign := Label3D.new()
-			sign.text = Shops.TOWN[variant % Shops.TOWN.size()][0]
-			sign.font_size = 64
-			sign.pixel_size = 0.009
-			sign.outline_size = 0
-			sign.modulate = Color(1.0, 0.95, 0.75)
-			sign.shaded = false
-			sign.double_sided = false
+			var sign := Shops.town_sign(variant)
 			sign.transform = xform * Transform3D(Basis(Vector3.UP, PI), Vector3(-0.9, 3.4, -4.62))
 			chunk.add_child(sign)
 			d += 9.6

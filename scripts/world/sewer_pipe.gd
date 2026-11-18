@@ -262,7 +262,12 @@ static func lamp() -> ArrayMesh:
 				m.cylinder(0.033, 0.035, Vector3(x, y, -0.045), Color("969680"), 6, Vector3(PI / 2, 0, 0))
 		m.box(Vector3(0.38, 0.76, 0.20), Vector3(0, 0, -0.23), Color("454c46"))
 		m.ellipsoid(Vector3(0.17, 0.26, 0.14), Vector3(0, 0, -0.33), Color(1, 0.68, 0.20, 0.35))
-		for x in [-0.16, 0, 0.16]: m.box(Vector3(0.025, 0.55, 0.03), Vector3(x, 0, -0.47), Color("4e5143"))
+		var cage := Color("4e5143")
+		for y in [-0.28, 0.28]:
+			m.box(Vector3(0.39, 0.035, 0.035), Vector3(0, y, -0.49), cage)
+			for x in [-0.18, 0.18]:
+				m.capsule_between(Vector3(x, y, -0.26), Vector3(x, y, -0.49), 0.018, cage, 6)
+		for x in [-0.16, 0, 0.16]: m.box(Vector3(0.025, 0.56, 0.035), Vector3(x, 0, -0.49), cage)
 		return m.build())
 
 

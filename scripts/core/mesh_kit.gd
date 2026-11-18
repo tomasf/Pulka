@@ -54,6 +54,20 @@ func box(size: Vector3, pos: Vector3, color: Color, rot := Vector3.ZERO) -> Mesh
 	return _add_arrays(_unit_box, Transform3D(Basis.from_euler(rot) * Basis.from_scale(size), pos), color)
 
 
+## A planar panel, with its front facing the requested side.
+func quad(a: Vector3, b: Vector3, c: Vector3, d: Vector3, color: Color, facing: Vector3) -> MeshKit:
+	var normal := (b - a).cross(c - a).normalized()
+	if normal.dot(facing) < 0: normal = -normal
+	var first := _vertices.size()
+	for point in [a, b, c, d]:
+		_vertices.append(point)
+		_normals.append(normal)
+		_colors.append(color.srgb_to_linear())
+	_triangle_facing(first, first + 1, first + 2)
+	_triangle_facing(first, first + 2, first + 3)
+	return self
+
+
 func cylinder(radius: float, height: float, pos: Vector3, color: Color, segments := 12, rot := Vector3.ZERO, top_radius := -1.0) -> MeshKit:
 	var top := radius if top_radius < 0.0 else top_radius
 	# Keep the original path for degenerate shapes with no invertible scale.
@@ -106,6 +120,14 @@ func capsule(radius: float, height: float, pos: Vector3, color: Color, rot := Ve
 	mesh.radial_segments = 12
 	mesh.rings = 4
 	return add(mesh, Transform3D(Basis.from_euler(rot) * Basis.from_scale(scale), pos), color)
+
+
+## A straight metal rail with flat ends, cheaper than a rounded capsule.
+func cylinder_between(a: Vector3, b: Vector3, radius: float, color: Color, segments := 6) -> MeshKit:
+	var span := b - a
+	if span.length_squared() < 0.000001: return self
+	var turn := Basis(Quaternion(Vector3.UP, span.normalized()))
+	return cylinder(radius, span.length(), (a + b) * 0.5, color, segments, turn.get_euler())
 
 
 ## A capsule spanning from a to b: a limb, a tube, a branch.

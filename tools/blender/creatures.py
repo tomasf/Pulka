@@ -99,14 +99,22 @@ class PersonModel:
                             [(r, r) for r in sizes], "jacket")
             sleeves.append((sleeve, tag))
 
-        leg_joints, leg_radii, leg_edges = [(0, 0.95, 0)], [(0.17, 0.13)], []
+        # A branched Skin joint at the crotch makes broad, square flaps.
+        # Weld two rounded trouser legs into a compact pelvis instead.
+        trouser_parts = [K.ellipsoid("waist", (0, 0.9, 0), (0.18, 0.12, 0.135), "pants")]
         for s in (-1, 1):
-            base = len(leg_joints)
-            leg_joints += [side(PersonModel.HIP, s), side(PersonModel.KNEE, s), side((0.1, 0.16, 0.01), s)]
-            leg_radii += [(0.095, 0.095), (0.078, 0.078), (0.066, 0.066)]
-            leg_edges += [(0, base), (base, base + 1), (base + 1, base + 2)]
-        pants = K.skin("pants", leg_joints, leg_edges, leg_radii, "pants")
-        trunks = K.ellipsoid("trunks", (0, 0.9, 0.0), (0.185, 0.1, 0.145), "trunks", segments=20, rings=10)
+            chain = [side((0.1, 0.94, 0), s), side((0.1, 0.75, 0), s),
+                     side(PersonModel.KNEE, s), side((0.1, 0.16, 0.01), s)]
+            trouser_parts.append(K.skin("leg", chain, [(0, 1), (1, 2), (2, 3)],
+                                        [(0.105, 0.105), (0.093, 0.10), (0.078, 0.078), (0.066, 0.066)], "pants"))
+        pants = K.sculpt(trouser_parts, "pants", voxel=0.007, smoothing=5, keep=0.06)
+        pants.data.materials.append(K.material("pants"))
+        pants.data.materials.append(K.material("trunks"))
+        # Bathers recolour the top of the very same surface: no second,
+        # intersecting pair of shorts over the winter trousers.
+        for polygon in pants.data.polygons:
+            height = sum((pants.matrix_world @ pants.data.vertices[i].co).z for i in polygon.vertices) / len(polygon.vertices)
+            polygon.material_index = 1 if height > 0.805 else 0
 
         trim = []
         for tag, s in (("L", -1), ("R", 1)):
@@ -143,7 +151,7 @@ class PersonModel:
                 "upper_arm." + tag: PersonModel.smooth(1.10, 1.26, p.y),
                 "forearm." + tag: 1 - PersonModel.smooth(1.10, 1.26, p.y),
             })
-        K.weigh(rig, [], rigid + trim + [(trunks, "hips"), (scarf, "spine")])
+        K.weigh(rig, [], rigid + trim + [(scarf, "spine")])
 
         K.animate(rig, "walk", 24, PersonModel.walk)
         K.animate(rig, "idle", 60, PersonModel.idle)

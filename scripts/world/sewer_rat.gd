@@ -36,7 +36,8 @@ func configure(field: TerrainField, at: Vector3, seed_value: int, solids: Array[
 	var parent: Node3D = self
 	for i in 3:
 		var joint := Node3D.new()
-		joint.position = Vector3(0, 0.12, 0.26) if i == 0 else Vector3(0, -0.015, 0.22)
+		joint.position = Vector3(0, 0.19, 0.30) if i == 0 else Vector3(0, -0.14 if i == 1 else -0.04, 0.22)
+		joint.rotation.y = sin(_time * 0.45 - i * 0.8) * 0.20
 		parent.add_child(joint)
 		var piece := MeshInstance3D.new()
 		piece.mesh = tail_piece(i)
@@ -145,27 +146,31 @@ static func body(variant: int) -> ArrayMesh:
 		var rings: Array[PackedVector3Array] = []
 		# One continuous arched back tapers through the shoulders and skull
 		# into the narrow muzzle, rather than separate round body lumps.
-		for section in [Vector4(0.025, 0.07, 0.18, 0.30), Vector4(0.14, 0.15, 0.20, 0.16), Vector4(0.135, 0.15, 0.21, 0.02), Vector4(0.115, 0.115, 0.22, -0.16), Vector4(0.105, 0.10, 0.235, -0.25), Vector4(0.06, 0.055, 0.18, -0.37), Vector4(0.018, 0.022, 0.16, -0.48)]:
+		for section in [Vector4(0.01, 0.015, 0.19, 0.335), Vector4(0.05, 0.06, 0.19, 0.30), Vector4(0.10, 0.12, 0.20, 0.25), Vector4(0.14, 0.15, 0.20, 0.16), Vector4(0.135, 0.15, 0.21, 0.02), Vector4(0.115, 0.115, 0.22, -0.16), Vector4(0.105, 0.10, 0.235, -0.25), Vector4(0.06, 0.055, 0.18, -0.37), Vector4(0.018, 0.022, 0.16, -0.48)]:
 			var ring := PackedVector3Array()
 			for k in 14:
 				var angle := TAU * k / 14
 				ring.append(Vector3(cos(angle) * section.x, section.z + sin(angle) * section.y, section.w))
 			rings.append(ring)
-		m.loft(rings, PackedFloat32Array([1, 1, 1, 1, 1, 1, 1]), Transform3D.IDENTITY, coat)
+		m.loft(rings, PackedFloat32Array([1, 1, 1, 1, 1, 1, 1, 1, 1]), Transform3D.IDENTITY, coat)
+		m.ellipsoid(Vector3(0.011, 0.016, 0.015), Vector3(0, 0.19, 0.335), coat)
 		m.ellipsoid(Vector3(0.027, 0.022, 0.018), Vector3(0, 0.16, -0.48), Color("bd8c7d"))
 		for side in [-1.0, 1.0]:
 			m.ellipsoid(Vector3(0.052, 0.07, 0.025), Vector3(side * 0.11, 0.33, -0.20), coat, Vector3(0, side * 0.4, side * -0.25))
 			m.ellipsoid(Vector3(0.036, 0.049, 0.012), Vector3(side * 0.114, 0.335, -0.222), Color("b58d80"))
-			m.sphere(0.019, Vector3(side * 0.10, 0.255, -0.315), Color("121b18"), Vector3.ONE, 8, 4)
-			m.sphere(0.005, Vector3(side * 0.111, 0.263, -0.327), Color("d2d3b5"), Vector3.ONE, 6, 3)
+			m.ellipsoid(Vector3(0.012, 0.016, 0.017), Vector3(side * 0.079, 0.247, -0.282), Color("121b18"))
+			m.sphere(0.003, Vector3(side * 0.089, 0.251, -0.286), Color("d2d3b5"), Vector3.ONE, 6, 3)
+			m.ellipsoid(Vector3(0.065, 0.085, 0.09), Vector3(side * 0.095, 0.14, 0.16), coat)
 			for i in 3:
-				m.box(Vector3(0.13, 0.004, 0.004), Vector3(side * 0.11, 0.17 + i * 0.012, -0.41), Color("b9b7a0"), Vector3(0, side * (i - 1) * 0.4, 0))
+				m.capsule_between(Vector3(side * 0.025, 0.175, -0.435), Vector3(side * 0.17, 0.16 + i * 0.02, -0.44 + (i - 1) * 0.045), 0.002, Color("b9b7a0"), 4)
 		return m.build())
 
 
 static func paw() -> ArrayMesh:
 	return Props.cached_mesh("rat_paw", func() -> ArrayMesh:
 		var m := MeshKit.new()
+		# The upper leg reaches inside the belly, including at full stride.
+		m.capsule_between(Vector3(0, 0.105, 0.012), Vector3(0, -0.045, 0), 0.032, Color("968674"), 8)
 		m.ellipsoid(Vector3(0.026, 0.055, 0.028), Vector3(0, -0.035, 0), Color("9d8171"))
 		m.ellipsoid(Vector3(0.04, 0.017, 0.06), Vector3(0, -0.084, -0.025), Color("c29a86"))
 		return m.build())
@@ -174,5 +179,19 @@ static func paw() -> ArrayMesh:
 static func tail_piece(index: int) -> ArrayMesh:
 	return Props.cached_mesh("rat_tail_%d" % index, func() -> ArrayMesh:
 		var m := MeshKit.new()
-		m.cylinder(0.025 - index * 0.006, 0.23, Vector3(0, 0, 0.11), Color("b28d7c"), 7, Vector3(PI / 2, 0, 0), 0.020 - index * 0.006)
+		var radii := [0.028, 0.019, 0.010, 0.0025]
+		var drop: float = [0.14, 0.04, 0.0][index]
+		var rings: Array[PackedVector3Array] = []
+		for step in 5:
+			var t := step / 4.0
+			var ring := PackedVector3Array()
+			var radius := lerpf(radii[index], radii[index + 1], t)
+			for k in 12:
+				var angle := TAU * k / 12
+				ring.append(Vector3(cos(angle) * radius, -drop * smoothstep(0, 1, t) + sin(angle) * radius, 0.22 * t))
+			rings.append(ring)
+		m.loft(rings, PackedFloat32Array([1, 1, 1, 1, 1]), Transform3D.IDENTITY, Color("a7877e"))
+		# Overlapping joint caps keep the articulated tail continuous as it bends.
+		m.sphere(radii[index], Vector3.ZERO, Color("a7877e"), Vector3.ONE, 10, 6)
+		if index == 2: m.sphere(radii[3], Vector3(0, 0, 0.22), Color("a7877e"), Vector3.ONE, 8, 4)
 		return m.build())

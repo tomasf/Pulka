@@ -471,7 +471,8 @@ static func plow() -> ArrayMesh:
 		var glass := Color(0.16, 0.22, 0.3)
 		var black := Color(0.1, 0.1, 0.11)
 		var lengthwise := Basis(Vector3.UP, -PI / 2.0)
-		kit.box(Vector3(2.5, 0.45, 7.2), Vector3(0, 0.85, 0.2), black)
+		# Keep the chassis behind even the swept-back end of the angled blade.
+		kit.box(Vector3(2.5, 0.45, 6.65), Vector3(0, 0.85, 0.475), black)
 		# Cab: a tall box with a raked windscreen and side windows.
 		kit.slab(PackedVector2Array([Vector2(-0.6, 0.9), Vector2(-0.6, 3.2), Vector2(-2.3, 3.2), Vector2(-2.75, 2.2), Vector2(-2.8, 0.9)]), 2.45, Transform3D(lengthwise, Vector3.ZERO), orange)
 		kit.slab(PackedVector2Array([Vector2(-0.9, 2.05), Vector2(-0.9, 2.95), Vector2(-2.44, 2.95), Vector2(-2.77, 2.2), Vector2(-2.7, 2.05)]), 2.5, Transform3D(lengthwise, Vector3.ZERO), glass)
@@ -494,17 +495,28 @@ static func plow() -> ArrayMesh:
 		for side in [-1.0, 1.0]:
 			for axle in [-1.8, 1.4, 2.9]:
 				wheel(kit, Vector3(1.05 * side, 0.55, axle), 0.55, 0.42, Color(0.85, 0.85, 0.82))
-		# The blade: curved strips angled across the front, on a frame.
-		for k in 5:
-			var t := k / 4.0
-			var y := 0.25 + t * 1.0
-			var lean := -3.45 - sin(t * PI * 0.8) * 0.25 + t * 0.15
-			kit.box(Vector3(3.6, 0.22, 0.12), Vector3(0, y, lean), orange.darkened(0.08 * k), Vector3(-0.5 + t * 1.0, 0.35, 0))
-		kit.box(Vector3(3.7, 0.08, 0.1), Vector3(0, 0.15, -3.5), Color(0.3, 0.3, 0.32), Vector3(0, 0.35, 0))
+		# A continuous rolled steel blade, with thickness and closed ends.
+		# All panels share their boundary positions, unlike the old loose strips.
+		var blade := Transform3D(Basis(Vector3.UP, 0.35), Vector3(0, 0, -3.5))
+		for k in 10:
+			var a := k / 10.0
+			var b := (k + 1) / 10.0
+			var p := Vector3(0, 0.15 + a * 1.2, -sin(a * PI * 0.8) * 0.3 + a * 0.17)
+			var q := Vector3(0, 0.15 + b * 1.2, -sin(b * PI * 0.8) * 0.3 + b * 0.17)
+			for front in [true, false]:
+				var offset := Vector3(0, 0, -0.04 if front else 0.06)
+				kit.quad(blade * (p + Vector3.LEFT * 1.8 + offset), blade * (p + Vector3.RIGHT * 1.8 + offset), blade * (q + Vector3.RIGHT * 1.8 + offset), blade * (q + Vector3.LEFT * 1.8 + offset), orange, blade.basis * (Vector3.FORWARD if front else Vector3.BACK))
+			for side in [-1.0, 1.0]:
+				var edge := Vector3(side * 1.8, 0, 0)
+				kit.quad(blade * (p + edge + Vector3.FORWARD * 0.04), blade * (q + edge + Vector3.FORWARD * 0.04), blade * (q + edge + Vector3.BACK * 0.06), blade * (p + edge + Vector3.BACK * 0.06), orange.darkened(0.15), blade.basis * Vector3.RIGHT * side)
+			if k == 0 or k == 9:
+				var end := p if k == 0 else q
+				kit.quad(blade * (end + Vector3(-1.8, 0, -0.04)), blade * (end + Vector3(1.8, 0, -0.04)), blade * (end + Vector3(1.8, 0, 0.06)), blade * (end + Vector3(-1.8, 0, 0.06)), orange, Vector3.DOWN if k == 0 else Vector3.UP)
+		kit.box(Vector3(3.7, 0.10, 0.14), blade * Vector3(0, 0.15, 0), Color(0.3, 0.3, 0.32), Vector3(0, 0.35, 0))
 		kit.box(Vector3(0.2, 0.2, 1.0), Vector3(0, 0.7, -3.0), black)
 		for side in [-1.0, 1.0]:
-			kit.cylinder(0.04, 1.1, Vector3(1.6 * side, 1.4, -3.4 + side * 0.55), black, 6)
-			kit.sphere(0.06, Vector3(1.6 * side, 1.95, -3.4 + side * 0.55), Color(1.0, 0.3, 0.1))
+			kit.cylinder(0.04, 1.1, blade * Vector3(1.6 * side, 1.4, -0.1), black, 6)
+			kit.sphere(0.06, blade * Vector3(1.6 * side, 1.95, -0.1), Color(1.0, 0.3, 0.1))
 		return kit.build())
 
 
@@ -907,9 +919,11 @@ static func reeds() -> ArrayMesh:
 			var angle := i * 2.4
 			var r := 0.15 + (i % 3) * 0.12
 			var tall := 1.0 + (i % 4) * 0.25
-			var base := Vector3(cos(angle) * r, tall * 0.5, sin(angle) * r)
-			kit.cylinder(0.018, tall, base, Color(0.75, 0.62, 0.38), 5, Vector3(sin(angle) * 0.15, 0, cos(angle) * 0.15))
-			kit.capsule(0.04, 0.22, base + Vector3(0, tall * 0.5, 0), Color(0.45, 0.3, 0.18))
+			var base := Vector3(cos(angle) * r, 0, sin(angle) * r)
+			var lean := Vector3(sin(angle) * 0.15, 0, cos(angle) * 0.15)
+			var along := Basis.from_euler(lean) * Vector3.UP
+			kit.cylinder(0.018, tall, base + along * tall * 0.5, Color(0.75, 0.62, 0.38), 5, lean)
+			kit.capsule(0.04, 0.22, base + along * (tall - 0.04), Color(0.45, 0.3, 0.18), lean)
 		return kit.build())
 
 
@@ -1234,16 +1248,37 @@ static func gingerbread() -> ArrayMesh:
 			kit.capsule(0.06, 0.26, Vector3(0.15 * side, 0.03, 0), dough, Vector3(0, 0, side * 1.1), flat)
 			kit.capsule(0.065, 0.28, Vector3(0.07 * side, -0.2, 0), dough, Vector3(0, 0, side * 0.35), flat)
 			# Icing: eyes, a zigzag at each wrist and ankle.
-			kit.sphere(0.017, Vector3(0.045 * side, 0.23, -0.05), icing, Vector3(1, 1, 0.5), 6, 4)
-			for k in 3:
-				kit.capsule_between(Vector3(0.24 * side, 0.08 - k * 0.025, -0.027), Vector3(0.25 * side, 0.065 - k * 0.025, -0.027), 0.008, icing, 4)
-				kit.capsule_between(Vector3(0.08 * side - 0.03 + k * 0.03, -0.3, -0.028), Vector3(0.08 * side - 0.015 + k * 0.03, -0.28, -0.028), 0.008, icing, 4)
+			kit.sphere(0.017, _ginger_point(Vector2(0.045 * side, 0.23)), icing, Vector3(1, 1, 0.5), 8, 4)
+			for limb in [Vector3(0.15 * side, 0.03, side * 1.1), Vector3(0.07 * side, -0.2, side * 0.35)]:
+				var along := Vector2(-sin(limb.z), cos(limb.z))
+				var across := Vector2(cos(limb.z), sin(limb.z))
+				var center := Vector2(limb.x, limb.y) - along * 0.07
+				for k in 4:
+					var a: Vector2 = center + across * (-0.04 + k * 0.02) + along * (0.01 if k % 2 else 0)
+					var b: Vector2 = center + across * (-0.04 + (k + 1) * 0.02) + along * (0 if k % 2 else 0.01)
+					kit.capsule_between(_ginger_point(a), _ginger_point(b), 0.006, icing, 6)
 		for k in 5:
 			var t := (k - 2.0) / 2.0
-			kit.sphere(0.009, Vector3(t * 0.045, 0.165 + t * t * 0.015, -0.051), icing, Vector3.ONE, 5, 3)
+			kit.sphere(0.009, _ginger_point(Vector2(t * 0.045, 0.165 + t * t * 0.015)), icing, Vector3.ONE, 8, 4)
 		for k in 3:
-			kit.sphere(0.02, Vector3(0, 0.07 - k * 0.07, -0.047), [Color(0.95, 0.15, 0.15), icing, Color(0.2, 0.65, 0.3)][k], Vector3(1, 1, 0.5), 8, 4)
+			kit.sphere(0.02, _ginger_point(Vector2(0, 0.07 - k * 0.07)), [Color(0.95, 0.15, 0.15), icing, Color(0.2, 0.65, 0.3)][k], Vector3(1, 1, 0.5), 8, 4)
 		return kit.build())
+
+
+## Project icing onto the actual flattened capsule/sphere surface. The
+## wrist and ankle decorations use the same rotated axes as the biscuit.
+static func _ginger_point(point: Vector2) -> Vector3:
+	var depth := 0.0
+	for part in [Vector4(0, 0.2, 0.13, 0.26), Vector4(0, -0.02, 0.12, 0.3), Vector4(-0.15, 0.03, 0.06, 0.26), Vector4(0.15, 0.03, 0.06, 0.26), Vector4(-0.07, -0.2, 0.065, 0.28), Vector4(0.07, -0.2, 0.065, 0.28)]:
+		var angle := 0.0
+		if absf(part.x) > 0.1: angle = signf(part.x) * 1.1
+		elif part.x != 0: angle = signf(part.x) * 0.35
+		var along := Vector2(-sin(angle), cos(angle))
+		var local := point - Vector2(part.x, part.y)
+		var half := maxf(part.w * 0.5 - part.z, 0)
+		var distance := (local - along * clampf(local.dot(along), -half, half)).length_squared()
+		depth = maxf(depth, sqrt(maxf(0, part.z * part.z - distance)) * 0.4)
+	return Vector3(point.x, point.y, -depth + 0.002)
 
 
 ## A red knitted mitten like the ones counting your lives: a rounded palm,

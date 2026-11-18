@@ -211,25 +211,127 @@ static func fender() -> ArrayMesh:
 		return m.build())
 
 
+## Compact feeder vessel: flared hull, working deck, corrugated cargo,
+## accommodation and a bridge with proper windows, rails and deck equipment.
 static func ship() -> ArrayMesh:
 	return Props.cached_mesh("container_ship", func() -> ArrayMesh:
 		var m := MeshKit.new()
+		var hull := Color("263f55")
+		var steel := Color("b5c3c9")
+		var dark := Color("25323a")
+		var deck := Color("775b4a")
 		var rings: Array[PackedVector3Array] = []
-		for y in [-3.0, -0.8, 1.5, 2.0]:
+		for level in [Vector2(-3, 0.76), Vector2(-0.45, 0.97), Vector2(2.15, 1)]:
 			var ring := PackedVector3Array()
-			var width := 5.5 if y < -1 else 7.5
-			for p in [Vector2(-width, -27), Vector2(0, -35), Vector2(width, -27), Vector2(width, 29), Vector2(-width, 29)]:
-				ring.append(Vector3(p.x, y, p.y))
+			for p in [Vector2(-7.5, -26), Vector2(-4.8, -32), Vector2(0, -35), Vector2(4.8, -32), Vector2(7.5, -26), Vector2(7.5, 26), Vector2(6, 29), Vector2(-6, 29), Vector2(-7.5, 26)]:
+				var sheer := clampf((-p.y - 22) / 13, 0, 1) * 0.65
+				ring.append(Vector3(p.x * level.y, level.x + sheer, p.y * (0.94 if level.x < -1 else 1)))
 			rings.append(ring)
-		m.loft(rings, PackedFloat32Array([1, 1, 1, 1]), Transform3D.IDENTITY, Color("263b51"), true)
-		m.box(Vector3(14, 0.4, 50), Vector3(0, 2.1, 0), Color("a45840"))
-		for x in [-3.7, 3.7]:
-			for z in [-18.0, -5.0, 8.0]:
-				m.box(Vector3(6.8, 4.5, 12), Vector3(x, 4.5, z), COLORS[posmod(int(x + z), COLORS.size())])
-				m.box(Vector3(6.8, 0.15, 12), Vector3(x, 6.8, z), Color("dae7eb"))
-		m.box(Vector3(12, 8, 9), Vector3(0, 6, 23), Color("d9e3e8"))
-		m.box(Vector3(13, 2.8, 10), Vector3(0, 11.2, 23), Color("ecf0e8"))
-		m.box(Vector3(11.8, 1.3, 0.12), Vector3(0, 11.4, 17.94), Color("35536a"))
-		m.box(Vector3(2.8, 5, 3), Vector3(2, 13.5, 25), Color("bf6943"))
-		m.cylinder(0.1, 7, Vector3(-3, 15.5, 22), Color("c4d2d9"), 6)
+		m.loft([rings[0], rings[1]], PackedFloat32Array([1, 1]), Transform3D.IDENTITY, Color("724638"))
+		m.loft([rings[1], rings[2]], PackedFloat32Array([1, 1]), Transform3D.IDENTITY, hull, true)
+		# Deck cap follows the bow instead of projecting through its sides.
+		var edge := rings[2]
+		for i in edge.size():
+			var a := edge[i]
+			var b := edge[(i + 1) % edge.size()]
+			m.quad(a + Vector3.UP * 0.02, b + Vector3.UP * 0.02, b * Vector3(0.92, 1, 0.97) + Vector3.UP * 0.02, a * Vector3(0.92, 1, 0.97) + Vector3.UP * 0.02, deck, Vector3.UP)
+			_ship_rail(m, a, b, steel)
+		m.box(Vector3(13.8, 0.12, 45), Vector3(0, 2.22, -2.5), deck)
+		for side in [-1.0, 1.0]:
+			m.box(Vector3(0.05, 0.12, 48), Vector3(side * 7.48, 1.50, 0), Color("cfdae0"))
+			for z in [-20.0, -4.0, 12.0, 24.0]:
+				m.box(Vector3(0.12, 0.18, 0.8), Vector3(side * 7.49, 0.35, z), hull.darkened(0.3))
+		# Lashings, distinct doors and ribs make the cargo read as containers.
+		for lane in 2:
+			for bay in 3:
+				var x := -3.55 + lane * 7.1
+				var z := -18.5 + bay * 12.7
+				var stacks := 1 if bay == 0 else 2
+				for level in stacks:
+					_ship_container(m, Vector3(x, 2.31 + level * 3.47, z), COLORS[(lane + bay * 2 + level * 3) % COLORS.size()])
+		# Accommodation block, distinct deck levels and projecting wheelhouse.
+		m.box(Vector3(10.6, 7.7, 8.7), Vector3(0, 6.15, 23.2), Color("d5dcd9"))
+		for y in [4.9, 7.4, 10.0]:
+			m.box(Vector3(10.85, 0.15, 8.95), Vector3(0, y, 23.2), steel)
+		for side in [-1.0, 1.0]:
+			for y in [4.0, 6.5, 8.8]:
+				for z in [20.6, 23.0, 25.4]:
+					m.cylinder(0.31, 0.08, Vector3(side * 5.33, y, z), steel.darkened(0.25), 12, Vector3(0, 0, PI / 2))
+					m.cylinder(0.24, 0.09, Vector3(side * 5.36, y, z), Color("304c61"), 12, Vector3(0, 0, PI / 2))
+			# Wall ladder, firmly mounted at both rails and each rung.
+			for z in [26.0, 26.6]: m.cylinder_between(Vector3(side * 5.48, 2.3, z), Vector3(side * 5.48, 10.05, z), 0.045, steel, 6)
+			for step in 21: m.cylinder_between(Vector3(side * 5.48, 2.6 + step * 0.35, 26), Vector3(side * 5.48, 2.6 + step * 0.35, 26.6), 0.035, steel, 6)
+			for y in [3.0, 6.0, 9.0]:
+				for z in [26.0, 26.6]: m.cylinder_between(Vector3(side * 5.3, y, z), Vector3(side * 5.48, y, z), 0.045, steel, 6)
+		m.box(Vector3(13.7, 0.18, 10.8), Vector3(0, 10.07, 23.2), steel)
+		m.box(Vector3(12.9, 2.1, 9.5), Vector3(0, 11.2, 23.2), Color("e5e9e0"))
+		m.box(Vector3(13.6, 0.22, 10.1), Vector3(0, 12.37, 23.2), steel)
+		m.box(Vector3(12.7, 0.08, 9.4), Vector3(0, 12.52, 23.2), Palette.SNOW)
+		for end in [-1.0, 1.0]:
+			for i in 7:
+				m.box(Vector3(1.49, 1.03, 0.08), Vector3(-5.22 + i * 1.74, 11.55, 23.2 + end * 4.79), dark)
+				m.box(Vector3(1.34, 0.87, 0.09), Vector3(-5.22 + i * 1.74, 11.55, 23.2 + end * 4.82), Color("345d70"))
+			_ship_rail(m, Vector3(-6.7, 10.17, 23.2 + end * 5.25), Vector3(6.7, 10.17, 23.2 + end * 5.25), steel, 0.8)
+		for side in [-1.0, 1.0]:
+			for i in 4:
+				m.box(Vector3(0.08, 1.03, 1.6), Vector3(side * 6.48, 11.55, 20.1 + i * 2.0), dark)
+				m.box(Vector3(0.09, 0.87, 1.43), Vector3(side * 6.52, 11.55, 20.1 + i * 2.0), Color("345d70"))
+			_ship_rail(m, Vector3(side * 6.7, 10.17, 17.95), Vector3(side * 6.7, 10.17, 28.45), steel, 0.8)
+			# Rescue boat in its cradle, with supporting davits.
+			var boat := Vector3(side * 6.2, 6.0, 23.2)
+			m.ellipsoid(Vector3(0.8, 0.65, 2.25), boat, Color("dc702e"))
+			m.ellipsoid(Vector3(0.63, 0.40, 1.3), boat + Vector3(0, 0.42, -0.2), Color("df8e45"))
+			m.box(Vector3(1.25, 0.3, 0.9), boat + Vector3(0, 0.5, -0.65), Color("3c535e"))
+			for z in [21.6, 24.8]:
+				m.cylinder_between(Vector3(side * 5.2, 4.95, z), Vector3(side * 7.0, 5.55, z), 0.09, steel, 8)
+				m.cylinder_between(Vector3(side * 5.2, 7.45, z), Vector3(side * 6.3, 7.45, z), 0.08, steel, 8)
+				m.cylinder_between(Vector3(side * 6.3, 7.45, z), Vector3(side * 6.3, 6.3, z), 0.028, dark, 6)
+		# Funnel, radar, navigation lights, mast and aerials.
+		m.box(Vector3(2.5, 3.3, 2.6), Vector3(2.4, 14.0, 25.3), Color("b75a3c"))
+		m.box(Vector3(2.6, 0.55, 2.7), Vector3(2.4, 15.65, 25.3), dark)
+		m.box(Vector3(0.9, 0.25, 0.9), Vector3(-1.2, 12.65, 22.7), steel)
+		m.cylinder_between(Vector3(-1.2, 12.65, 22.7), Vector3(-1.2, 18.5, 22.7), 0.085, steel, 8)
+		for y in [15.0, 16.5, 17.5]: m.box(Vector3(3.2 - (y - 15) * 0.6, 0.07, 0.08), Vector3(-1.2, y, 22.7), steel)
+		m.box(Vector3(1.5, 0.16, 0.3), Vector3(-1.2, 15.1, 22.7), Color("e7e9e3"))
+		m.sphere(0.18, Vector3(-1.2, 18.55, 22.7), Color("e5e9df"), Vector3.ONE, 10, 6)
+		for side in [-1.0, 1.0]:
+			m.cylinder_between(Vector3(-1.2, 17.0, 22.7), Vector3(side * 4.5, 12.6, 26), 0.018, dark, 6)
+			m.box(Vector3(0.45, 0.35, 0.5), Vector3(side * 6.3, 12.65, 20), Color("a94b42") if side < 0 else Color("4d9d73"))
+		# Working bow: anchor windlass, mooring bitts and a short foremast.
+		m.box(Vector3(1.1, 0.24, 1.05), Vector3(0, 2.62, -28.3), steel)
+		m.cylinder(0.42, 0.55, Vector3(0, 3.0, -28.3), dark, 12)
+		m.cylinder(0.55, 0.8, Vector3(0, 3.36, -28.3), steel, 12, Vector3(0, 0, PI / 2))
+		for side in [-1.0, 1.0]:
+			for z in [-27.5, 26.5]:
+				var base := 2.43 if z < 0 else 2.21
+				m.box(Vector3(1.3, 0.12, 0.8), Vector3(side * 4.3, base, z), dark)
+				for x in [-0.35, 0.35]:
+					m.cylinder(0.15, 0.65, Vector3(side * 4.3 + x, base + 0.33, z), dark, 10)
+					m.cylinder(0.23, 0.08, Vector3(side * 4.3 + x, base + 0.67, z), steel, 10)
+		m.cylinder_between(Vector3(0, 2.64, -32), Vector3(0, 7.0, -32), 0.065, steel, 8)
+		m.box(Vector3(1.5, 0.07, 0.1), Vector3(0, 6.6, -32), steel)
 		return m.build())
+
+
+static func _ship_container(m: MeshKit, base: Vector3, paint: Color) -> void:
+	m.box(Vector3(6.65, 3.4, 12.2), base + Vector3.UP * 1.7, paint)
+	var trim := paint.darkened(0.22)
+	for side in [-1.0, 1.0]:
+		for rib in 15:
+			m.box(Vector3(0.08, 2.95, 0.12), base + Vector3(side * 3.34, 1.7, -5.8 + rib * 0.83), paint.lightened(0.08))
+		for y in [0.10, 3.30]: m.box(Vector3(0.12, 0.18, 12.2), base + Vector3(side * 3.30, y, 0), trim)
+		for z in [-6.02, 6.02]: m.box(Vector3(0.15, 3.4, 0.18), base + Vector3(side * 3.26, 1.7, z), trim)
+	for end in [-1.0, 1.0]:
+		m.box(Vector3(0.045, 3.15, 0.06), base + Vector3(0, 1.7, end * 6.13), trim)
+		for x in [-2.6, -0.7, 0.7, 2.6]:
+			m.box(Vector3(0.055, 2.95, 0.08), base + Vector3(x, 1.7, end * 6.15), Color("aeb8bd"))
+			m.box(Vector3(0.28, 0.06, 0.12), base + Vector3(x, 1.25, end * 6.17), Color("c6ccce"))
+	m.box(Vector3(6.5, 0.055, 11.9), base + Vector3(0, 3.43, 0), Palette.SNOW)
+
+
+static func _ship_rail(m: MeshKit, a: Vector3, b: Vector3, color: Color, height := 0.85) -> void:
+	for y in [height * 0.50, height]: m.cylinder_between(a + Vector3.UP * y, b + Vector3.UP * y, 0.03, color, 6)
+	var posts := ceili(a.distance_to(b) / 2.5)
+	for i in posts + 1:
+		var at := a.lerp(b, i / float(posts))
+		m.cylinder_between(at, at + Vector3.UP * height, 0.04, color, 6)

@@ -24,6 +24,11 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	AudioServer.set_bus_mute(0, true)
+	# Offline artwork uses real output pixels, independently of the game's
+	# 1600 x 900 UI coordinates and the desktop window's aspect ratio.
+	root.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
+	root.msaa_3d = Viewport.MSAA_4X
 	_build_scene()
 	await _render("icon.png", Vector2i(1024, 1024), "all")
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://icons"))
@@ -111,14 +116,15 @@ func _build_scene() -> void:
 	var sled := MeshInstance3D.new()
 	sled.mesh = RideModels.vehicle(VehicleSpec.Model.PULKA)
 	ride.add_child(sled)
-	var rider := MeshInstance3D.new()
-	rider.mesh = RideModels.rider(JACKET, HAT, VehicleSpec.Model.PULKA)
-	rider.position = Vector3(0, 0.16, 0.05)
-	rider.rotation.z = -0.1
+	var rider := RiderRig.new()
+	rider.set_ride(VehicleSpec.Model.PULKA)
+	rider.dress(JACKET, HAT)
+	rider.position = Vector3(0, VehicleSpec.all()[VehicleSpec.Model.PULKA].seat_height, 0.05)
 	ride.add_child(rider)
 	_ride = ride
 	_foreground.append(ride)
 	_world.add_child(ride)
+	for i in 60: rider.animate(1.0 / 60, 0.35, 0.15, false)
 	# Snow kicked up behind and beside the ride.
 	for i in 60:
 		var puff := MeshInstance3D.new()
@@ -180,9 +186,7 @@ func _render(path: String, size: Vector2i, layer: String, banner := false) -> vo
 	# The back layer keeps the ride's shadow on the snow, just not the ride.
 	var casting := GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY if layer == "back" else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	for node in _foreground:
-		for mesh in [node] + node.get_children():
-			if mesh is GeometryInstance3D:
-				(mesh as GeometryInstance3D).cast_shadow = casting
+		_set_casting(node, casting)
 	var environment: Environment = (_world.get_child(0) as WorldEnvironment).environment
 	environment.background_mode = Environment.BG_CLEAR_COLOR if layer == "front" else Environment.BG_SKY
 	var aspect := float(size.x) / size.y
@@ -210,3 +214,12 @@ func _render(path: String, size: Vector2i, layer: String, banner := false) -> vo
 	print("Saved ", path)
 	if title:
 		title.get_parent().queue_free()
+		await process_frame
+
+
+## The current rider is skinned and nested several levels down in a rig.
+## Include every mesh when separating the foreground and shadow layers.
+func _set_casting(node: Node, casting: GeometryInstance3D.ShadowCastingSetting) -> void:
+	if node is GeometryInstance3D:
+		(node as GeometryInstance3D).cast_shadow = casting
+	for child in node.get_children(): _set_casting(child, casting)

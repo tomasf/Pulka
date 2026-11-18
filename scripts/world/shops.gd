@@ -362,6 +362,15 @@ static func _display_sled(kit: MeshKit, base: Vector3) -> void:
 
 
 ## A text sign: a flat, unlit label.
+## Fit every shop name inside its five-metre sign, including long names.
+static func town_sign(index: int) -> Label3D:
+	var sign := label(TOWN[index % TOWN.size()][0], 64, 0.009, Color(1, 0.95, 0.75))
+	var font := ThemeDB.fallback_font
+	var width := font.get_string_size(sign.text, HORIZONTAL_ALIGNMENT_LEFT, -1, sign.font_size).x
+	sign.pixel_size = minf(sign.pixel_size, 4.5 / maxf(width, 1))
+	return sign
+
+
 static func label(text: String, size: int, pixel: float, color := Color(1, 1, 1)) -> Label3D:
 	var sign := Label3D.new()
 	sign.text = text

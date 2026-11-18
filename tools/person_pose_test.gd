@@ -10,7 +10,9 @@ func _run() -> void:
 	var skeleton: Skeleton3D = person._skeleton
 	var garments := 0
 	var clean := true
+	var triangles := 0
 	for mesh in person._meshes:
+		for surface in mesh.mesh.get_surface_count(): triangles += mesh.mesh.surface_get_array_index_len(surface) / 3
 		var allowed: Array[String] = []
 		if mesh.name == "pants": allowed = ["hips", "thigh.L", "thigh.R", "shin.L", "shin.R"]
 		elif mesh.name == "jacket_body": allowed = ["hips", "spine", "neck"]
@@ -29,6 +31,7 @@ func _run() -> void:
 				if bone < 0: bone = skeleton.find_bone(mesh.skin.get_bind_name(bones[i]))
 				clean = clean and allowed.has(skeleton.get_bone_name(bone))
 	_check("all four garments bind only to their own anatomical joints", garments == 4 and clean)
+	_check("smooth trousers keep the crowd model below 14000 triangles (%d)" % triangles, triangles <= 14000)
 	var reference := person.bake(&"wave", 0)
 	var fixed_surfaces: Array[int] = []
 	var surface_index := 0

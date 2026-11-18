@@ -154,36 +154,100 @@ static func sleeper() -> ArrayMesh:
 
 ## Electric locomotive with its cab facing -Z: a flat nose that leans back
 ## a little, a raked windscreen, buffers and lamps, a pantograph on the roof.
+## Rc-inspired twin-cab electric locomotive. Panels, equipment and running
+## gear remain merged into one opaque mesh, as with the road vehicles.
 static func locomotive() -> ArrayMesh:
 	return Props.cached_mesh("loco", func() -> ArrayMesh:
 		var kit := MeshKit.new()
-		var paint := Color(0.75, 0.12, 0.12)
-		var glass := Color(0.2, 0.28, 0.38)
-		var dark := Color(0.12, 0.12, 0.13)
-		# Side profile (z, y), extruded across the width.
-		var profile := PackedVector2Array([
-			Vector2(8.0, 0.7), Vector2(8.0, 3.9), Vector2(-6.6, 3.9),
-			Vector2(-7.4, 2.7), Vector2(-7.6, 1.1), Vector2(-7.5, 0.7),
-		])
-		kit.slab(profile, 3.0, Transform3D(Basis(Vector3.UP, -PI / 2.0), Vector3.ZERO), paint)
-		# Windscreen on the raked part, side windows of the cab.
-		kit.box(Vector3(2.5, 1.0, 0.06), Vector3(0, 3.3, -7.03), glass, Vector3(0.588, 0, 0))
-		kit.box(Vector3(3.04, 0.8, 1.1), Vector3(0, 3.15, -5.9), glass)
-		# A white stripe along the sides and a yellow one across the nose.
-		kit.box(Vector3(3.04, 0.14, 13.8), Vector3(0, 1.75, 0.9), Color(0.95, 0.95, 0.95))
-		kit.box(Vector3(2.9, 0.42, 0.06), Vector3(0, 1.6, -7.56), Color(1.0, 0.85, 0.1), Vector3(0.124, 0, 0))
+		var paint := Color("b9362b")
+		var dark := Color("293139")
+		var metal := Color("9da8aa")
+		var cream := Color("e9e2cf")
+		var glass := Color("233e50")
+		var profile := PackedVector2Array([Vector2(7.6, 0.9), Vector2(7.6, 2.5), Vector2(7.15, 3.7), Vector2(6.9, 3.88), Vector2(-6.9, 3.88), Vector2(-7.15, 3.7), Vector2(-7.6, 2.5), Vector2(-7.6, 0.9)])
+		kit.slab(profile, 3.0, Transform3D(Basis(Vector3.UP, -PI / 2), Vector3.ZERO), paint)
+		kit.box(Vector3(3.02, 0.42, 14.6), Vector3(0, 1.05, 0), dark)
+		kit.box(Vector3(2.4, 0.45, 6.5), Vector3(0, 0.6, 0), dark)
+		# Curved roof shoulders and narrow strips of settled snow.
+		var roof: Array[PackedVector3Array] = []
+		for z in [-6.95, 6.95]:
+			roof.append(PackedVector3Array([Vector3(-1.5, 3.68, z), Vector3(-1.32, 3.97, z), Vector3(-0.95, 4.08, z), Vector3(0.95, 4.08, z), Vector3(1.32, 3.97, z), Vector3(1.5, 3.68, z)]))
+		for i in 5: kit.quad(roof[0][i], roof[1][i], roof[1][i + 1], roof[0][i + 1], dark, Vector3.UP)
 		for side in [-1.0, 1.0]:
-			kit.box(Vector3(0.36, 0.22, 0.08), Vector3(1.0 * side, 1.05, -7.6), Palette.HEADLIGHT)
-			kit.cylinder(0.17, 0.4, Vector3(1.05 * side, 0.6, -7.75), Color(0.25, 0.25, 0.27), 10, Vector3(PI / 2.0, 0, 0))
-		kit.box(Vector3(0.3, 0.2, 0.08), Vector3(0, 3.78, -6.68), Palette.HEADLIGHT)
-		kit.box(Vector3(3.0, 0.35, 0.3), Vector3(0, 0.6, -7.45), dark)
-		kit.box(Vector3(3.1, 0.25, 14.8), Vector3(0, 4.0, 0.7), Palette.SNOW)
-		# Pantograph, folded half up towards the overhead line.
-		kit.box(Vector3(1.2, 0.15, 1.2), Vector3(0, 4.15, 2.5), dark)
-		kit.box(Vector3(0.08, 1.5, 0.08), Vector3(0, 4.85, 2.15), dark, Vector3(-0.55, 0, 0))
-		kit.box(Vector3(1.7, 0.06, 0.12), Vector3(0, 5.5, 1.8), dark)
-		_bogies(kit, 15.0)
+			kit.box(Vector3(0.22, 0.045, 12.6), Vector3(side * 1.04, 4.085, 0), Palette.SNOW)
+			kit.box(Vector3(0.045, 0.17, 14.8), Vector3(side * 1.51, 1.95, 0), cream)
+			kit.box(Vector3(0.045, 0.10, 13.5), Vector3(side * 1.51, 3.66, 0), cream)
+			# Corrugations and roof-level intake grilles.
+			for row in 11:
+				var y := 1.27 + row * 0.205
+				if absf(y - 1.95) < 0.18: continue
+				kit.box(Vector3(0.025, 0.023, 8.1), Vector3(side * 1.514, y, 0), paint.lightened(0.09))
+			for z in [-3.1, -1.05, 1.05, 3.1]:
+				kit.cylinder(0.31, 0.035, Vector3(side * 1.535, 2.83, z), dark, 16, Vector3(0, 0, PI / 2))
+				kit.cylinder(0.255, 0.045, Vector3(side * 1.55, 2.83, z), glass, 16, Vector3(0, 0, PI / 2))
+				kit.box(Vector3(0.045, 0.31, 1.55), Vector3(side * 1.52, 3.43, z), dark)
+				for slat in 7:
+					kit.box(Vector3(0.03, 0.23, 0.035), Vector3(side * 1.55, 3.43, z - 0.64 + slat * 0.21), metal.darkened(0.45))
+			for end in [-1.0, 1.0]:
+				# Cab side glass, access door, handle, steps and grab rails.
+				kit.box(Vector3(0.04, 0.94, 1.32), Vector3(side * 1.52, 3.10, end * 5.95), cream)
+				kit.box(Vector3(0.045, 0.80, 1.17), Vector3(side * 1.55, 3.10, end * 5.95), glass)
+				kit.box(Vector3(0.04, 2.42, 0.88), Vector3(side * 1.525, 2.18, end * 4.75), dark)
+				kit.box(Vector3(0.045, 2.32, 0.78), Vector3(side * 1.55, 2.18, end * 4.75), paint)
+				kit.box(Vector3(0.05, 0.70, 0.53), Vector3(side * 1.58, 2.96, end * 4.75), glass)
+				kit.box(Vector3(0.06, 0.06, 0.18), Vector3(side * 1.60, 2.15, end * 4.99), metal)
+				for step in 3: kit.box(Vector3(0.30, 0.09, 0.72), Vector3(side * 1.50, 0.65 + step * 0.22, end * 4.75), metal.darkened(0.2))
+				for z in [end * 4.19, end * 5.31]:
+					kit.cylinder_between(Vector3(side * 1.62, 1.30, z), Vector3(side * 1.62, 2.55, z), 0.026, cream, 6)
+					for y in [1.3, 2.55]: kit.cylinder_between(Vector3(side * 1.5, y, z), Vector3(side * 1.62, y, z), 0.026, cream, 6)
+				# Visible springs and axle-box covers on each bogie.
+				for axle in [-0.75, 0.75]:
+					var z: float = end * 5.3 + axle
+					kit.box(Vector3(0.18, 0.30, 0.40), Vector3(side * 1.05, 0.48, z), metal.darkened(0.4))
+					for coil in 4: kit.cylinder(0.13, 0.045, Vector3(side * 1.04, 0.72 + coil * 0.065, z), dark.lightened(0.16), 8)
+		for end in [-1.0, 1.0]:
+			_loco_cab(kit, end, paint, cream, metal, glass, dark)
+			# Two jointed diamond pantographs with insulators, not a loose pole.
+			var z: float = end * 3.55
+			kit.box(Vector3(1.25, 0.12, 1.8), Vector3(0, 4.17, z), dark)
+			for x in [-0.46, 0.46]:
+				for offset in [-0.62, 0.62]:
+					kit.cylinder(0.10, 0.25, Vector3(x, 4.35, z + offset), Color("796050"), 10)
+					var foot := Vector3(x, 4.48, z + offset)
+					var elbow := Vector3(x, 5.02, z + signf(offset) * 0.91)
+					var top := Vector3(x, 5.65, z)
+					kit.cylinder_between(foot, elbow, 0.033, metal, 6)
+					kit.cylinder_between(elbow, top, 0.028, metal, 6)
+					kit.sphere(0.06, elbow, dark, Vector3.ONE, 8, 4)
+			kit.box(Vector3(1.8, 0.06, 0.18), Vector3(0, 5.65, z), dark)
+			kit.box(Vector3(1.2, 0.05, 0.16), Vector3(0, 4.48, z), metal)
+		for z in [-1.4, 0, 1.4]:
+			kit.cylinder(0.12, 0.3, Vector3(0, 4.25, z), Color("795844"), 10)
+		kit.cylinder_between(Vector3(0, 4.42, -3.55), Vector3(0, 4.42, 3.55), 0.025, Color("a26746"), 6)
+		_bogies(kit, 15)
 		return kit.build())
+
+
+static func _loco_cab(kit: MeshKit, end: float, paint: Color, cream: Color, metal: Color, glass: Color, dark: Color) -> void:
+	var nose := func(x: float, y: float, offset := 0.0) -> Vector3:
+		return Vector3(x, y, end * (7.6 - maxf(y - 2.5, 0) * 0.375 + offset))
+	for side in [-1.0, 1.0]:
+		var left := 0.055 if side > 0 else -1.30
+		var right := 1.30 if side > 0 else -0.055
+		kit.quad(nose.call(left, 2.65, 0.012), nose.call(right, 2.65, 0.012), nose.call(right, 3.58, 0.012), nose.call(left, 3.58, 0.012), dark, Vector3.BACK * end)
+		kit.quad(nose.call(left + 0.055, 2.71, 0.022), nose.call(right - 0.055, 2.71, 0.022), nose.call(right - 0.055, 3.52, 0.022), nose.call(left + 0.055, 3.52, 0.022), glass, Vector3.BACK * end)
+		kit.cylinder_between(nose.call(side * 0.34, 2.71, 0.035), nose.call(side * 0.82, 3.05, 0.035), 0.017, dark, 6)
+		kit.cylinder(0.20, 0.10, Vector3(side * 1.05, 1.65, end * 7.63), metal, 14, Vector3(PI / 2, 0, 0))
+		kit.cylinder(0.15, 0.11, Vector3(side * 1.05, 1.65, end * 7.65), Palette.HEADLIGHT, 14, Vector3(PI / 2, 0, 0))
+		kit.cylinder(0.14, 0.33, Vector3(side * 0.95, 0.68, end * 7.70), metal.darkened(0.3), 12, Vector3(PI / 2, 0, 0))
+		kit.cylinder(0.25, 0.09, Vector3(side * 0.95, 0.68, end * 7.89), dark, 14, Vector3(PI / 2, 0, 0))
+		kit.cylinder_between(Vector3(side * 1.28, 2.25, end * 7.64), Vector3(side * 0.12, 1.99, end * 7.64), 0.055, cream, 6)
+		kit.box(Vector3(0.16, 0.08, 0.19), Vector3(side * 0.48, 3.93, end * 6.94), paint)
+		kit.cylinder(0.09, 0.12, Vector3(side * 0.48, 4.02, end * 6.94), Palette.HEADLIGHT, 12, Vector3(PI / 2, 0, 0))
+	kit.box(Vector3(2.7, 0.17, 0.16), Vector3(0, 1.02, end * 7.64), cream)
+	kit.box(Vector3(3.05, 0.20, 0.35), Vector3(0, 0.82, end * 7.45), dark)
+	kit.box(Vector3(0.25, 0.25, 0.62), Vector3(0, 0.68, end * 7.85), metal.darkened(0.4))
+	kit.cylinder_between(Vector3(0.25, 1.16, end * 7.64), Vector3(0.32, 0.55, end * 7.84), 0.045, dark, 8)
 
 
 ## A passenger coach: a rounded roof, a band of lit windows, doors at
