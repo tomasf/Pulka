@@ -316,8 +316,18 @@ func _span_weight(span: Vector3, d: float) -> float:
 
 const SWEEP_LENGTH := 90.0
 const SWEEP_REACH := 75.0
+## Motorways continue beyond the visible hillside instead of ending in a
+## nearby snow bank. Longer bends retain usable lane widths on the way in.
+const MOTORWAY_SWEEP_REACH := 150.0
+const MOTORWAY_SWEEP_LENGTH := 120.0
 ## Half width of the strip the tracks or lanes occupy.
 const CORRIDOR := {Region.RAIL: 11.0, Region.HIGHWAY: 19.0}
+const MOTORWAY_EDGE := 17.0
+const MOTORWAY_LIFT := 0.06
+## Keep the coarser outer terrain triangles clear of the road as it sweeps
+## across the hillside, then blend the snowy cutting into the natural bank.
+const MOTORWAY_CUT_FLAT := MOTORWAY_EDGE + 12.0
+const MOTORWAY_CUT_BLEND := 10.0
 
 
 ## Sideways offset of a swept region's tracks or lanes at distance d: far
@@ -328,9 +338,11 @@ func sweep(d: float) -> float:
 	if not CORRIDOR.has(int(span.z)):
 		return 0.0
 	var side := 1.0 if hash01(int(span.x), 51) < 0.5 else -1.0
-	var arriving := 1.0 - smoothstep(span.x, span.x + SWEEP_LENGTH, d)
-	var leaving := smoothstep(span.y - SWEEP_LENGTH, span.y, d)
-	return side * SWEEP_REACH * (arriving - leaving)
+	var length := MOTORWAY_SWEEP_LENGTH if int(span.z) == Region.HIGHWAY else SWEEP_LENGTH
+	var reach := MOTORWAY_SWEEP_REACH if int(span.z) == Region.HIGHWAY else SWEEP_REACH
+	var arriving := 1.0 - smoothstep(span.x, span.x + length, d)
+	var leaving := smoothstep(span.y - length, span.y, d)
+	return side * reach * (arriving - leaving)
 
 
 ## True within `margin` metres of the tracks or lanes of a swept region.
@@ -339,6 +351,17 @@ func in_corridor(x: float, d: float, margin := 0.0) -> bool:
 	if not CORRIDOR.has(kind):
 		return false
 	return absf(x - center_x(d) - sweep(d)) < float(CORRIDOR[kind]) + margin
+
+
+## One crosswise level roadbed shared by asphalt, sled contact and traffic.
+## Sampling the original banks at each lane made a flat road float above
+## the sled and bury other parts of it under the snow.
+func motorway_height(d: float) -> float:
+	return base_height(d) + MOTORWAY_LIFT
+
+
+func motorway_normal(d: float) -> Vector3:
+	return Vector3(0, 1, (motorway_height(d + 0.1) - motorway_height(d - 0.1)) / 0.2).normalized()
 
 
 func style(kind: int) -> Dictionary:
@@ -754,7 +777,8 @@ func height(x: float, d: float, with_ramps := true, with_structures := true) -> 
 	var look := style(int(span.z))
 	var rough: float = look.rough if weight > 0.0 else 1.0
 	var calm := 1.0 - weight * (1.0 - rough)
-	var h := base_height(d)
+	var base := base_height(d)
+	var h := base
 	# Rails and roads run on smooth ground; the banks beside them stay.
 	if weight > 0.0 and in_corridor(x, d, 8.0):
 		calm = 0.0
@@ -789,6 +813,17 @@ func height(x: float, d: float, with_ramps := true, with_structures := true) -> 
 		h = lerpf(h, road_level(road), w)
 	if with_ramps:
 		h += ramp_height(x, d)
+	if int(span.z) == Region.HIGHWAY:
+		var lateral := absf(x - center_x(d) - sweep(d))
+		var cutting := 1.0 - smoothstep(MOTORWAY_CUT_FLAT, MOTORWAY_CUT_FLAT + MOTORWAY_CUT_BLEND, lateral)
+		# Finish the transition before the first visible asphalt (6 m in),
+		# including the snow mesh's neighbouring rows at chunk boundaries.
+		var ends := smoothstep(span.x, span.x + 4, d) * (1.0 - smoothstep(span.y - 4, span.y, d))
+		h = lerpf(h, base, cutting * ends)
+		if with_structures:
+			var road_weight := 1.0 - smoothstep(MOTORWAY_EDGE + 0.4, MOTORWAY_EDGE + 0.8, lateral)
+			var visible := smoothstep(span.x + 4, span.x + 6, d) * (1.0 - smoothstep(span.y - 6, span.y - 4, d))
+			h += MOTORWAY_LIFT * road_weight * visible
 	if int(span.z) == Region.BRIDGE:
 		var ends := Vector2(span.x + BRIDGE_APPROACH, span.y - BRIDGE_APPROACH)
 		h += (_bridge_profile(ends, d) - base_height(d)) * _bridge_alignment(span, d)

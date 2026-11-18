@@ -89,7 +89,8 @@ func _place_all() -> void:
 		var info: Array = RegionBuilder.MOTORWAY_LANES[_lanes[i]]
 		var d := _ds[i]
 		var vehicle := obstacles[i]
-		vehicle.visible = d > _span.x + 2.0 and d < _span.y - 2.0
+		vehicle.visible = d > _span.x + 6.0 and d < _span.y - 6.0
 		var tangent := regions.lane_point(float(info[0]), d + float(info[1]) * 1.5) - regions.lane_point(float(info[0]), d - float(info[1]) * 1.5)
-		vehicle.transform = Transform3D(Basis.looking_at(tangent, Vector3.UP), regions.lane_point(float(info[0]), d, 0.02))
+		var normal := _world.field.motorway_normal(d)
+		vehicle.transform = Transform3D(Basis.looking_at(tangent, normal), regions.lane_point(float(info[0]), d, 0.015))
 		vehicle.velocity = tangent / 3 * _flows[_lanes[i]].speeds[_flow_indices[i]]

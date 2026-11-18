@@ -105,6 +105,13 @@ Kontrollera geometri och fördelning med
 En modellöversikt kan renderas med
 `godot --path . --script res://tools/car_preview.gd -- /tmp/pulka-cars.png`.
 
+Motorvägens asfalt, körfysik och trafik använder samma tvärplana vägbädd.
+Snön formas till en mjuk skärning runt vägen, även där den svänger in och ut
+från sidan av backen. Kontrollera höjder mot de faktiska asfalt- och snötrianglarna,
+bilarnas hjulkontakt och alla åkdon med
+`godot --headless --path . --script res://tools/motorway_test.gd`.
+Kör utan `--headless` och lägg till `-- --capture` för granskningsbilder i `/tmp`.
+
 ## Apple TV
 
 Godot saknar officiellt tvOS-stöd, så Apple TV-versionen byggs med en egen

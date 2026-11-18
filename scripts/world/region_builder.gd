@@ -309,7 +309,7 @@ const TRAIN_LANES := [-8.0, 8.0]
 const MOTORWAY_LANES := [[13.0, 1.0, 13.0, 17.0], [6.5, 1.0, 16.0, 21.0], [-6.5, -1.0, 21.0, 26.0], [-13.0, -1.0, 18.0, 23.0]]
 ## Half width of the snowy median strip between the carriageways.
 const MOTORWAY_MEDIAN := 2.6
-const MOTORWAY_EDGE := 17.0
+const MOTORWAY_EDGE := TerrainField.MOTORWAY_EDGE
 const SWEEP_LENGTH := TerrainField.SWEEP_LENGTH
 
 
@@ -324,7 +324,8 @@ func lane_x(lane: float, d: float) -> float:
 
 func lane_point(lane: float, d: float, lift := 0.0) -> Vector3:
 	var x := lane_x(lane, d)
-	return Vector3(x, field.height(x, d, false) + lift, -d)
+	var y := field.motorway_height(d) if field.region(d) == TerrainField.Region.HIGHWAY else field.height(x, d, false)
+	return Vector3(x, y + lift, -d)
 
 
 ## Orientation along a swept lane, nose towards decreasing d when `direction` is +1.
@@ -1053,8 +1054,9 @@ func _rink_paint(lx: float, d: float, hw: float) -> Color:
 ## Arrows pointing straight down the hill where the tracks or lanes start
 ## to veer away, on whichever edges are clear of them.
 func _place_turn_off_arrows(decor: Dictionary, lo: float, hi: float, span: Vector3) -> void:
+	var length := TerrainField.MOTORWAY_SWEEP_LENGTH if int(span.z) == TerrainField.Region.HIGHWAY else SWEEP_LENGTH
 	for offset in [12.0, 32.0, 52.0]:
-		var at: float = span.y - SWEEP_LENGTH + offset
+		var at: float = span.y - length + offset
 		if at < lo or at >= hi:
 			continue
 		for side in [-1.0, 1.0]:
@@ -1068,18 +1070,18 @@ func _place_turn_off_arrows(decor: Dictionary, lo: float, hi: float, span: Vecto
 func _place_motorway(chunk: Chunk, lo: float, hi: float) -> void:
 	var asphalt := Color(0.33, 0.34, 0.37)
 	var white := Color(0.92, 0.92, 0.9)
-	chunk.add_child(_ribbon(lo, hi, -MOTORWAY_EDGE - 0.4, MOTORWAY_EDGE + 0.4, 0.03, asphalt))
+	chunk.add_child(_ribbon(lo, hi, -MOTORWAY_EDGE - 0.4, MOTORWAY_EDGE + 0.4, 0.0, asphalt))
 	# Swedish markings, all white: a wide broken edge line (1 m + 2 m) by the
 	# hard shoulder, a solid line along the median and 3 m + 9 m lane lines.
-	chunk.add_child(_ribbon(lo, hi, -MOTORWAY_MEDIAN, MOTORWAY_MEDIAN, 0.04, Color(0.86, 0.88, 0.93)))
+	chunk.add_child(_ribbon(lo, hi, -MOTORWAY_MEDIAN, MOTORWAY_MEDIAN, 0.01, Color(0.86, 0.88, 0.93)))
 	for side in [-1.0, 1.0]:
 		var s: float = side
 		var shoulder := s * (MOTORWAY_EDGE - 0.6)
-		chunk.add_child(_ribbon(lo, hi, shoulder - 0.15, shoulder + 0.15, 0.05, white, 1.0, 2.0))
+		chunk.add_child(_ribbon(lo, hi, shoulder - 0.15, shoulder + 0.15, 0.02, white, 1.0, 2.0))
 		var inner := s * (MOTORWAY_MEDIAN + 0.5)
-		chunk.add_child(_ribbon(lo, hi, inner - 0.1, inner + 0.1, 0.05, white))
+		chunk.add_child(_ribbon(lo, hi, inner - 0.1, inner + 0.1, 0.02, white))
 		var divider := s * 9.75
-		chunk.add_child(_ribbon(lo, hi, divider - 0.08, divider + 0.08, 0.05, white, 3.0, 9.0))
+		chunk.add_child(_ribbon(lo, hi, divider - 0.08, divider + 0.08, 0.02, white, 3.0, 9.0))
 
 
 ## A painted band along the swept motorway, between two lateral offsets,
@@ -1096,10 +1098,12 @@ func _ribbon(lo: float, hi: float, from: float, to: float, lift: float, color: C
 	while d < ceilf(hi):
 		var painted := dash <= 0.0 or fposmod(d, dash + gap) < dash
 		if painted:
-			var a := lane_point(from, d, lift)
-			var b := lane_point(to, d, lift)
-			var e := lane_point(from, d + step, lift)
-			var f := lane_point(to, d + step, lift)
+			var first := maxf(d, lo)
+			var last := minf(d + step, hi)
+			var a := lane_point(from, first, lift)
+			var b := lane_point(to, first, lift)
+			var e := lane_point(from, last, lift)
+			var f := lane_point(to, last, lift)
 			world.triangle(vertices, normals, colors, a, e, b, linear)
 			world.triangle(vertices, normals, colors, b, e, f, linear)
 		d += step
