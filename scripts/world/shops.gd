@@ -109,7 +109,7 @@ static func _back_wall(kit: MeshKit, kind: Kind, origin: Vector3, width: float, 
 			var at: Vector3 = origin + Vector3(side * width * 0.3, 2.2, -0.03)
 			kit.box(Vector3(2.0, 1.3, 0.03), at, band.darkened(0.3))
 			kit.box(Vector3(1.8, 1.1, 0.035), at, colors[(seed + 2 + int(side)) % colors.size()])
-			kit.sphere(0.35, at + Vector3(-0.4, 0, -0.03), Palette.SKIN, Vector3(0.8, 1, 0.1), 12, 6)
+			kit.sphere(0.35, at + Vector3(-0.4, 0, -0.03), Palette.SKINS[posmod(seed * 3 + int(side), Palette.SKINS.size())], Vector3(0.8, 1, 0.1), 12, 6)
 			kit.box(Vector3(0.8, 0.12, 0.04), at + Vector3(0.45, 0.25, -0.03), Color(1, 1, 1))
 			kit.box(Vector3(0.6, 0.08, 0.04), at + Vector3(0.45, 0.0, -0.03), Color(1, 1, 1))
 
@@ -205,7 +205,7 @@ static func display(kit: MeshKit, kind: Kind, origin: Vector3, width: float, dep
 			# A big glossy poster: a smiling face in soft focus.
 			var poster: Vector3 = at.call(0, 2.0, depth - 0.02)
 			kit.box(Vector3(2.4, 1.6, 0.04), poster, Color(1.0, 0.85, 0.85))
-			kit.sphere(0.5, poster + Vector3(0, 0, -0.05), Palette.SKIN, Vector3(0.8, 1, 0.1), 14, 8)
+			kit.sphere(0.5, poster + Vector3(0, 0, -0.05), Palette.SKINS[posmod(seed * 5 + 2, Palette.SKINS.size())], Vector3(0.8, 1, 0.1), 14, 8)
 			kit.ellipsoid(Vector3(0.18, 0.05, 0.02), poster + Vector3(0, -0.2, -0.1), Color(0.85, 0.15, 0.3))
 		Kind.SALE:
 			for i in 3:

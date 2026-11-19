@@ -606,7 +606,7 @@ func obstacle_rig(kind: Obstacle.Kind, rng: RandomNumberGenerator) -> Props.Rig:
 		Obstacle.Kind.SNOWMAN:
 			return Props.Rig.of(Props.snowman())
 		Obstacle.Kind.PERSON, Obstacle.Kind.KID:
-			return Props.person(rng.randi_range(0, 7))
+			return Props.random_person(rng)
 		Obstacle.Kind.DOG:
 			return Props.dog()
 		Obstacle.Kind.FOX:

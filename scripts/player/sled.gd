@@ -133,7 +133,7 @@ func set_vehicle(new_spec: VehicleSpec, rng: RandomNumberGenerator, jacket := Co
 	_trick = GrabTrick.for_model(spec.model)
 	var coat := Palette.pick(Palette.JACKETS, rng) if jacket.a == 0.0 else jacket
 	_rider.set_ride(spec.model)
-	_rider.dress(coat, Palette.pick(Palette.JACKETS, rng))
+	_rider.dress(coat, Palette.pick(Palette.JACKETS, rng), Palette.random_look(rng))
 	_reset_rider()
 
 

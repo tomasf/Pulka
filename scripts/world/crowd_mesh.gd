@@ -2,7 +2,8 @@ class_name CrowdMesh
 extends RefCounted
 ## Merge a baked person into one surface without duplicating outfit geometry.
 ## Normally baked at export; the same builder handles a missing local cache.
-const CLOTHES := ["jacket", "jacket_trim", "pants", "trunks", "hat", "hat_cuff", "scarf"]
+## Materials coloured per spectator: the clothes, then skin, cheeks and hair.
+const TINTED := ["jacket", "jacket_trim", "pants", "trunks", "hat", "hat_cuff", "scarf", "skin", "cheek", "hair"]
 static var _material: ShaderMaterial
 
 static func material() -> ShaderMaterial:
@@ -22,7 +23,7 @@ static func build(source: ArrayMesh) -> ArrayMesh:
 		var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var shade := source.surface_get_material(surface) as StandardMaterial3D
 		assert(shade != null and shade.albedo_texture == null)
-		var slot := CLOTHES.find(shade.resource_name) + 1
+		var slot := TINTED.find(shade.resource_name) + 1
 		var colour := shade.albedo_color.srgb_to_linear()
 		var painted: PackedColorArray = arrays[Mesh.ARRAY_COLOR] if arrays[Mesh.ARRAY_COLOR] != null else PackedColorArray()
 		var offset := vertices.size()
@@ -50,6 +51,6 @@ static func build(source: ArrayMesh) -> ArrayMesh:
 	mesh.surface_set_material(0, material())
 	return mesh
 
-static func dress(instance: MeshInstance3D, clothes: Dictionary) -> void:
-	for name: String in CLOTHES:
-		if clothes.has(name): instance.set_instance_shader_parameter(name, clothes[name])
+static func dress(instance: MeshInstance3D, colours: Dictionary) -> void:
+	for name: String in TINTED:
+		if colours.has(name): instance.set_instance_shader_parameter(name, colours[name])

@@ -1,6 +1,6 @@
 shader_type spatial;
 // Static crowd poses share one surface and one mesh for every outfit.
-// Material IDs ride in CUSTOM0; the seven clothing colours stay per instance.
+// Material IDs ride in CUSTOM0; clothing, skin and hair colours stay per instance.
 instance uniform vec4 jacket : source_color = vec4(0.9, 0.2, 0.2, 1.0);
 instance uniform vec4 jacket_trim : source_color = vec4(0.935, 0.48, 0.48, 1.0);
 instance uniform vec4 pants : source_color = vec4(0.12, 0.14, 0.25, 1.0);
@@ -8,6 +8,9 @@ instance uniform vec4 trunks : source_color = vec4(0.12, 0.14, 0.25, 1.0);
 instance uniform vec4 hat : source_color = vec4(0.2, 0.7, 0.35, 1.0);
 instance uniform vec4 hat_cuff : source_color = vec4(0.16, 0.56, 0.28, 1.0);
 instance uniform vec4 scarf : source_color = vec4(0.98, 0.75, 0.1, 1.0);
+instance uniform vec4 skin : source_color = vec4(0.96, 0.78, 0.66, 1.0);
+instance uniform vec4 cheek : source_color = vec4(0.97, 0.62, 0.58, 1.0);
+instance uniform vec4 hair : source_color = vec4(0.42, 0.26, 0.14, 1.0);
 varying vec3 albedo;
 
 void vertex() {
@@ -20,6 +23,9 @@ void vertex() {
 	else if (part == 5) { albedo = hat.rgb; }
 	else if (part == 6) { albedo = hat_cuff.rgb; }
 	else if (part == 7) { albedo = scarf.rgb; }
+	else if (part == 8) { albedo = skin.rgb; }
+	else if (part == 9) { albedo = cheek.rgb; }
+	else if (part == 10) { albedo = hair.rgb; }
 }
 
 void fragment() {

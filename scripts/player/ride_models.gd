@@ -405,7 +405,7 @@ static func rider(jacket: Color, hat: Color, model := VehicleSpec.Model.PULKA) -
 ## A simple round cartoon face: dark oval eyes with a glint, a small nose
 ## and smile, hair round the back and a beanie that sits above the eyes.
 static func head(kit: MeshKit, at: Vector3, hat: Color) -> void:
-	var skin := Palette.SKIN
+	var skin: Color = Palette.SKINS[1]
 	kit.sphere(0.15, at, skin, Vector3(1.0, 1.02, 0.97), 16, 10)
 	kit.ellipsoid(Vector3(0.152, 0.125, 0.122), at + Vector3(0, 0.012, 0.042), HAIR)
 	for side in [-1.0, 1.0]:

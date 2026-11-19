@@ -204,7 +204,7 @@ func _throw() -> void:
 	if field.on_bridge(launch_d) or field.in_rooftops(launch_d): return
 	var x := field.center_x(launch_d) + side * (field.half_width(launch_d) + _rng.randf_range(1.0, 3.5))
 	var ground := field.height(x, launch_d)
-	var thrower := Props.posed(Props.person(_rng.randi_range(0, 7)), 1.0)
+	var thrower := Props.posed(Props.random_person(_rng), 1.0)
 	thrower.scale = Vector3.ONE * 0.62
 	thrower.position = Vector3(x, ground, -launch_d)
 	var aim := target - thrower.position

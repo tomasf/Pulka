@@ -33,7 +33,7 @@ func _run() -> void:
 	world.add_child(ground)
 	var rigs := [
 		[Obstacle.Kind.MOOSE, Props.moose()], [Obstacle.Kind.DEER, Props.deer()], [Obstacle.Kind.DOG, Props.dog()],
-		[Obstacle.Kind.PERSON, Props.person(1)], [Obstacle.Kind.PERSON, Props.person(4)], [Obstacle.Kind.HARE, Props.hare()],
+		[Obstacle.Kind.PERSON, Props.person(1, 13)], [Obstacle.Kind.PERSON, Props.person(4, 6)], [Obstacle.Kind.HARE, Props.hare()],
 	]
 	var walkers: Array[Obstacle] = []
 	for i in rigs.size():

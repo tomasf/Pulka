@@ -99,7 +99,7 @@ static func populate(world: SlopeWorld, chunk: Chunk, decor: Dictionary, lo: flo
 		world.add_decor(decor, RegionProps.jetty(), Transform3D(Basis.IDENTITY, Vector3(jetty_x, field.water_level(strip), -(strip.x + 0.5))))
 		world.add_decor(decor, Props.house(0), world.ground_xform(jetty_x - 9, strip.x - 3, PI / 2, 0.55, 0.3))
 		for k in 2:
-			var bather := Props.posed(Props.dressed("bather%d" % k, Palette.JACKETS[k + 2], Palette.JACKETS[k + 5], Color.WHITE, Color.WHITE, true), k * 1.5, true)
+			var bather := Props.posed(Props.dressed("bather%d" % k, Palette.JACKETS[k + 2], Palette.JACKETS[k + 5], Color.WHITE, Color.WHITE, true, false, 6 + k * 13), k * 1.5, true)
 			bather.position = Vector3(jetty_x + (k - 0.5) * 0.8, field.water_level(strip) + 0.75, -(strip.x + 5 + k * 1.2))
 			bather.rotation.y = PI * 0.5 * (k * 2 - 1)
 			chunk.add_child(bather)

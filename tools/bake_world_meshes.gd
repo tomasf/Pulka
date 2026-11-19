@@ -36,7 +36,7 @@ func _run() -> void:
 		Props.footbridge(span_width)
 	for variant in 2: SewerRat.body(variant)
 	for i in 8:
-		var rig := Props.person(i % Palette.JACKETS.size())
+		var rig := Props.person(i % Palette.JACKETS.size(), i)
 		Props.baked(rig, i * TAU / 8)
 		Props.crowd_mesh(rig, i * TAU / 8)
 	# Generate distance LODs offline. Keep the original near geometry and all

@@ -13,29 +13,29 @@ func _check(label: String, condition: bool) -> void:
 
 func _run() -> void:
 	for step in 8:
-		var a := Props.crowd_mesh(Props.person(0), step * TAU / 8)
-		var b := Props.crowd_mesh(Props.person(1), step * TAU / 8)
+		var a := Props.crowd_mesh(Props.person(0, 0), step * TAU / 8)
+		var b := Props.crowd_mesh(Props.person(1, 1), step * TAU / 8)
 		_check("pose %d shares one surface across outfits" % step, a == b and a.get_surface_count() == 1)
-		var original := Props.baked(Props.person(0), step * TAU / 8)
+		var original := Props.baked(Props.person(0, 0), step * TAU / 8)
 		var vertices := 0
 		var indices := 0
 		for surface in original.get_surface_count():
 			vertices += original.surface_get_array_len(surface)
 			indices += original.surface_get_array_index_len(surface)
 		_check("pose %d retains the original geometry" % step, a.surface_get_array_len(0) == vertices and a.surface_get_array_index_len(0) == indices and a.get_aabb().is_equal_approx(original.get_aabb()))
-	var key := Props._pose_key(Props.person(0), 0)
+	var key := Props._pose_key(Props.person(0, 0), 0)
 	Props._crowd.erase(key)
-	var pending := Props.crowd(Props.person(0), 0)
-	var blue := Props.crowd(Props.person(1), 0)
+	var pending := Props.crowd(Props.person(0, 0), 0)
+	var blue := Props.crowd(Props.person(1, 1), 0)
 	_check("crowd cache misses coalesce without work during scenery placement", pending.mesh == null and blue.mesh == null and Props._pose_order.size() == 1)
 	Props.prepare_poses(Time.get_ticks_usec())
 	_check("expired budget leaves the crowd queued", pending.mesh == null)
 	Props.prepare_poses(Time.get_ticks_usec() + 1000000)
-	_check("prepared crowd shares geometry and keeps separate colours", pending.mesh == blue.mesh and pending.get_instance_shader_parameter("jacket") == Props.person(0).colours.jacket and blue.get_instance_shader_parameter("jacket") == Props.person(1).colours.jacket)
+	_check("prepared crowd shares geometry and keeps separate colours", pending.mesh == blue.mesh and pending.get_instance_shader_parameter("jacket") == Props.person(0, 0).colours.jacket and blue.get_instance_shader_parameter("jacket") == Props.person(1, 1).colours.jacket)
 	pending.free()
 	blue.free()
 	Props._crowd.erase(key)
-	var removed := Props.crowd(Props.person(0), 0)
+	var removed := Props.crowd(Props.person(0, 0), 0)
 	removed.free()
 	Props.prepare_poses(Time.get_ticks_usec() + 1000000)
 	_check("removed chunks cancel pending crowd work", not Props._crowd.has(key) and Props._pose_order.is_empty())
@@ -78,8 +78,8 @@ func _compare() -> void:
 				camera.position = Vector3(-5.6, 2.2, -13.6)
 				camera.look_at(Vector3(0, 1, 0))
 		var phase := outfit * TAU / 8
-		var original := Props.posed(Props.person(outfit), phase)
-		var merged := Props.crowd(Props.person(outfit), phase)
+		var original := Props.posed(Props.person(outfit, outfit), phase)
+		var merged := Props.crowd(Props.person(outfit, outfit), phase)
 		Props.prepare_poses(Time.get_ticks_usec() + 1000000)
 		views[0].add_child(original)
 		views[1].add_child(merged)

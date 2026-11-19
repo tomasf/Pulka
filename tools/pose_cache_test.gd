@@ -5,8 +5,8 @@ func _initialize() -> void:
 	_run.call_deferred()
 
 func _run() -> void:
-	var red := Props.person(0)
-	var blue := Props.person(1)
+	var red := Props.person(0, 0)
+	var blue := Props.person(1, 30)
 	var a := Props.posed(red, 0.0) as MeshInstance3D
 	var b := Props.posed(blue, 0.0) as MeshInstance3D
 	assert(a.mesh == b.mesh, "Clothing variants must share skinned geometry")

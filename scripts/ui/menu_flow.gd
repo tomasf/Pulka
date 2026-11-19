@@ -384,7 +384,7 @@ func _preview(model: VehicleSpec.Model, count: int, rider: bool) -> TextureRect:
 		if rider:
 			var person := RiderRig.new()
 			person.set_ride(model)
-			person.dress(CORAL if i == 0 else ICE, Color("38548c") if i == 0 else CORAL)
+			person.dress(CORAL if i == 0 else ICE, Color("38548c") if i == 0 else CORAL, 13 if i == 0 else 26)
 			person.position.y = VehicleSpec.all()[int(model)].seat_height
 			body.add_child(person)
 	var camera := Camera3D.new()

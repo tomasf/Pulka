@@ -63,13 +63,14 @@ func set_ride(model: VehicleSpec.Model) -> void:
 
 
 ## Dresses the rider: jacket, hat (and mittens) and scarf; the trim, hat
-## cuff follow from them.
-func dress(jacket: Color, hat: Color) -> void:
+## cuff follow from them. `look` picks skin and hair (see Palette.look).
+func dress(jacket: Color, hat: Color, look := 1) -> void:
 	var scarf := jacket.lerp(Color(1, 1, 1), 0.15).inverted().lerp(hat, 0.5)
 	var colours := {
 		"jacket": jacket, "jacket_trim": jacket.lightened(0.35), "hat": hat,
 		"hat_cuff": hat.darkened(0.2), "scarf": scarf,
 	}
+	colours.merge(Palette.look(look))
 	for mesh in _meshes:
 		for surface in mesh.mesh.get_surface_count():
 			var original := mesh.mesh.surface_get_material(surface)

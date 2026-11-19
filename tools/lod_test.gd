@@ -22,7 +22,7 @@ func _run() -> void:
 					ready = ready and (part.mesh.surface_get_material(surface) as StandardMaterial3D).vertex_color_use_as_albedo
 		_check("%s paint is ready before the first CreatureRig is created" % kind, ready)
 		model.free()
-	for mesh: ArrayMesh in [Props.spruce(0), Props.spruce(1), Props.birch(), Props.house(0), Props.town_house(0), Props.crowd_mesh(Props.person(0), 0)]:
+	for mesh: ArrayMesh in [Props.spruce(0), Props.spruce(1), Props.birch(), Props.house(0), Props.town_house(0), Props.crowd_mesh(Props.person(0, 0), 0)]:
 		var importer := ImporterMesh.from_mesh(mesh)
 		var shadow := mesh.shadow_mesh
 		_check("exported mesh has lower-detail indices and welded depth geometry", importer.get_surface_lod_count(0) > 0 and shadow != null)

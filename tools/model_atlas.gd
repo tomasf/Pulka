@@ -109,11 +109,11 @@ func _registry() -> void:
 		if int(span.z) != TerrainField.Region.SLOPE and not spans.has(int(span.z)):
 			spans[int(span.z)] = span
 	for i in 8:
-		_add("person_%d" % i, "Vinterkläder %d · vinkar" % (i + 1), "Människor", func() -> Node3D: return _figure(Props.person(i), "wave", 0.2))
+		_add("person_%d" % i, "Vinterkläder %d · vinkar" % (i + 1), "Människor", func() -> Node3D: return _figure(Props.person(i, i), "wave", 0.2))
 	for clip in ["idle", "walk", "flail"]:
-		_add("person_" + clip, "Person · " + clip, "Människor", func() -> Node3D: return _figure(Props.person(0), clip))
+		_add("person_" + clip, "Person · " + clip, "Människor", func() -> Node3D: return _figure(Props.person(0, 0), clip))
 	_add("child", "Barn", "Människor", func() -> Node3D:
-		var child := _figure(Props.person(3), "wave")
+		var child := _figure(Props.person(3, 3), "wave")
 		child.scale = Vector3.ONE * 0.62
 		return child)
 	for i in 2:

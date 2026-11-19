@@ -32,10 +32,10 @@ static func _entries(group: String) -> Array:
 			["floe", func() -> Node3D: return _mesh(RegionProps.ice_floe(1))],
 		],
 		"people": [
-			["person0", func() -> Node3D: return Props.posed(Props.person(0), 0.8)],
-			["person1", func() -> Node3D: return Props.posed(Props.person(1), 2.0)],
-			["bather", func() -> Node3D: return Props.posed(Props.dressed("gal_bath", Color(0.2, 0.4, 0.9), Color(0.9, 0.2, 0.2), Color.WHITE, Color.BLACK, true), 0.5)],
-			["bandy", func() -> Node3D: return Props.posed(Props.dressed("gal_bandy", Color(0.9, 0.8, 0.1), Color(0.1, 0.2, 0.6), Color.WHITE, Color(0.1, 0.2, 0.6), false, true), 0.5)],
+			["person0", func() -> Node3D: return Props.posed(Props.person(0, 1), 0.8)],
+			["person1", func() -> Node3D: return Props.posed(Props.person(1, 13), 2.0)],
+			["bather", func() -> Node3D: return Props.posed(Props.dressed("gal_bath", Color(0.2, 0.4, 0.9), Color(0.9, 0.2, 0.2), Color.WHITE, Color.BLACK, true, false, 6), 0.5)],
+			["bandy", func() -> Node3D: return Props.posed(Props.dressed("gal_bandy", Color(0.9, 0.8, 0.1), Color(0.1, 0.2, 0.6), Color.WHITE, Color(0.1, 0.2, 0.6), false, true, 20), 0.5)],
 			["dog", func() -> Node3D: return Props.posed(Props.dog(), 0.8)],
 			["moose", func() -> Node3D: return Props.posed(Props.moose(), 0.8)],
 			["deer", func() -> Node3D: return Props.posed(Props.deer(), 0.8)],
@@ -108,6 +108,31 @@ static func _entries(group: String) -> Array:
 	for model in VehicleSpec.Model.values():
 		groups["rider3d"].append([VehicleSpec.Model.keys()[model].to_lower(), func() -> Node3D: return _ride3d(model)])
 	groups["rider3d"].append(["face", func() -> Node3D: return _face3d()])
+	# Skin tones and hair: people across the eight tones, the same as
+	# spectators (the crowd shader), and riders.
+	groups["looks"] = []
+	for i in 8:
+		groups["looks"].append(["person %d" % i, func() -> Node3D: return _viewed(Props.posed(Props.person(i, i + 8 * (i % 6)), 0.8), Vector3(0.2, 0.25, -1))])
+	for i in 8:
+		groups["looks"].append(["crowd %d" % i, func() -> Node3D:
+			var rig := Props.person((i + 3) % 8, 7 - i + 8 * ((i + 2) % 6))
+			var still := MeshInstance3D.new()
+			still.mesh = Props.crowd_mesh(rig, 0.0)
+			CrowdMesh.dress(still, rig.colours)
+			return _viewed(still, Vector3(0.2, 0.25, -1))])
+	for i in 4:
+		groups["looks"].append(["rider %d" % i, func() -> Node3D:
+			var ride := _ride3d(VehicleSpec.Model.PULKA)
+			(ride.get_child(0) as RiderRig).dress(Palette.JACKETS[i], Palette.JACKETS[i + 3], i * 2 + 8 * i)
+			return _viewed(ride, Vector3(0.3, 0.4, -1))])
+	groups["faces"] = []
+	for i in 8:
+		groups["faces"].append(["face %d" % i, func() -> Node3D:
+			var root := _ride3d(VehicleSpec.Model.PULKA)
+			(root.get_child(0) as RiderRig).dress(Palette.JACKETS[i], Palette.JACKETS[(i + 3) % 8], i + 8 * (i % 6))
+			root.set_meta("frame", AABB(Vector3(-0.2, 0.84, -0.2), Vector3(0.4, 0.5, 0.4)))
+			root.set_meta("front", true)
+			return root])
 	# Grab tricks (jump held in the air), from the side and from behind.
 	groups["grab"] = []
 	for direction in [Vector3(-1, 0.55, -1.15), Vector3(0.3, 0.6, 1)]:

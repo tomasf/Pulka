@@ -378,20 +378,28 @@ static func snowman() -> ArrayMesh:
 
 # --- People and animals ---
 
-static func person(variant: int) -> Rig:
+## One of eight outfits on one of Palette.LOOK_COUNT looks (skin and hair).
+static func person(variant: int, look: int) -> Rig:
 	var jacket: Color = Palette.JACKETS[variant % Palette.JACKETS.size()]
 	var hat: Color = Palette.JACKETS[(variant + 3) % Palette.JACKETS.size()]
 	var scarf: Color = Palette.JACKETS[(variant + 5) % Palette.JACKETS.size()]
 	var pants := Color(0.12, 0.14, 0.25) if variant % 2 == 0 else Color(0.25, 0.2, 0.18)
-	return dressed("person%d" % variant, jacket, hat, scarf, pants)
+	return dressed("person%d" % variant, jacket, hat, scarf, pants, false, false, look)
 
 
-## A person in the given clothes. `bathing` swaps the winter gear for bare
-## skin and trunks (in the jacket's colour); `stick` puts a bandy stick in
-## the right hand. Hat colour goes for the mittens too.
-static func dressed(key: String, jacket: Color, hat: Color, scarf: Color, pants: Color, bathing := false, stick := false) -> Rig:
-	return cached_rig(key, func() -> Rig:
-		var skin := Palette.SKIN
+## Any of the outfits and looks.
+static func random_person(rng: RandomNumberGenerator) -> Rig:
+	return person(rng.randi_range(0, 7), Palette.random_look(rng))
+
+
+## A person in the given clothes with `look`'s skin and hair. `bathing`
+## swaps the winter gear for bare skin and trunks (in the jacket's colour);
+## `stick` puts a bandy stick in the right hand. Hat colour goes for the
+## mittens too.
+static func dressed(key: String, jacket: Color, hat: Color, scarf: Color, pants: Color, bathing := false, stick := false, look := 1) -> Rig:
+	return cached_rig("%s_look%d" % [key, posmod(look, Palette.LOOK_COUNT)], func() -> Rig:
+		var features := Palette.look(look)
+		var skin: Color = features.skin
 		var colours := {
 			"jacket": jacket, "jacket_trim": jacket.lightened(0.35), "pants": pants, "trunks": pants,
 			"hat": hat, "hat_cuff": hat.darkened(0.2), "scarf": scarf,
@@ -401,6 +409,7 @@ static func dressed(key: String, jacket: Color, hat: Color, scarf: Color, pants:
 				"jacket": skin, "jacket_trim": skin, "pants": skin, "trunks": jacket, "boots": skin,
 				"sole": skin.darkened(0.15), "scarf": skin, "hat": hat, "hat_cuff": hat.darkened(0.2),
 			}
+		colours.merge(features)
 		var rig := Rig.creature("person", colours, 1.4)
 		rig.waves = not stick
 		if stick:
@@ -1142,7 +1151,7 @@ static func santa_sleigh() -> ArrayMesh:
 		kit.cylinder(0.465, 0.12, Vector3(0, 1.38, 0.45), Color(0.08, 0.06, 0.05), 16)
 		kit.box(Vector3(0.16, 0.14, 0.04), Vector3(0, 1.38, -0.02), gold)
 		kit.box(Vector3(0.1, 0.5, 0.04), Vector3(0, 1.6, 0.04), Color(1, 1, 1), Vector3(-0.35, 0, 0))
-		kit.sphere(0.24, Vector3(0, 2.08, 0.42), Palette.SKIN, Vector3.ONE, 14, 8)
+		kit.sphere(0.24, Vector3(0, 2.08, 0.42), Palette.SKINS[1], Vector3.ONE, 14, 8)
 		kit.ellipsoid(Vector3(0.24, 0.3, 0.18), Vector3(0, 1.9, 0.3), Color(1, 1, 1))
 		kit.ellipsoid(Vector3(0.14, 0.05, 0.06), Vector3(0, 2.0, 0.19), Color(1, 1, 1))
 		kit.sphere(0.055, Vector3(0, 2.07, 0.17), Color(1.0, 0.6, 0.55), Vector3.ONE, 8, 5)

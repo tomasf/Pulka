@@ -385,7 +385,7 @@ func rig_for(kind: Obstacle.Kind, region: TerrainField.Region, rng: RandomNumber
 	if region == TerrainField.Region.BANDY and kind == Obstacle.Kind.PERSON:
 		var red := rng.randf() < 0.5
 		var shirt := Color(0.85, 0.1, 0.12) if red else Color(0.1, 0.3, 0.8)
-		return Props.dressed("bandy_red" if red else "bandy_blue", shirt, shirt.darkened(0.3), Color(1, 1, 1), Color(0.1, 0.1, 0.12), false, true)
+		return Props.dressed("bandy_red" if red else "bandy_blue", shirt, shirt.darkened(0.3), Color(1, 1, 1), Color(0.1, 0.1, 0.12), false, true, Palette.random_look(rng))
 	return null
 
 
@@ -471,7 +471,7 @@ func _place_cliff(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, l
 			for k in 7:
 				var d := crowd + rng.randf_range(-14.0, 14.0)
 				var lx: float = side * (field.half_width(d) + rng.randf_range(2.0, 7.0))
-				var fan := Props.crowd(Props.person(rng.randi_range(0, 7)), rng.randf() * TAU)
+				var fan := Props.crowd(Props.random_person(rng), rng.randf() * TAU)
 				fan.transform = world.ground_xform(field.center_x(d) + lx, d, (-PI / 2.0 if side > 0.0 else PI / 2.0) - world.street_yaw(d))
 				chunk.add_child(fan)
 
@@ -953,7 +953,7 @@ func _place_bandy(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, l
 			world.add_decor(decor, RegionProps.bleachers(), stands)
 			for k in 5:
 				var row := rng.randi_range(0, 3)
-				var fan := Props.crowd(Props.person(rng.randi_range(0, 7)), rng.randf() * TAU)
+				var fan := Props.crowd(Props.random_person(rng), rng.randf() * TAU)
 				# Seated on the stand's steps, facing the ice.
 				fan.transform = stands * Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3(row * 1.0, 0.45 * (row + 1), rng.randf_range(-5.5, 5.5)))
 				chunk.add_child(fan)

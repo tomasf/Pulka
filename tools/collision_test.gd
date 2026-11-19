@@ -17,9 +17,9 @@ func _protection_matters(main: Node, sled: Sled) -> bool:
 	var specs := VehicleSpec.all()
 	var rng := RandomNumberGenerator.new()
 	sled.set_vehicle(specs[0], rng)
-	var pulka := await _try(main, sled, Obstacle.Kind.PERSON, Props.person(3), 0.0, true, false, 14.0)
+	var pulka := await _try(main, sled, Obstacle.Kind.PERSON, Props.person(3, 3), 0.0, true, false, 14.0)
 	sled.set_vehicle(specs[3], rng)
-	var tefat := await _try(main, sled, Obstacle.Kind.PERSON, Props.person(4), 0.0, true, false, 14.0)
+	var tefat := await _try(main, sled, Obstacle.Kind.PERSON, Props.person(4, 4), 0.0, true, false, 14.0)
 	sled.set_vehicle(specs[0], rng)
 	return not pulka and tefat
 
@@ -40,7 +40,7 @@ func _run() -> void:
 	await create_timer(4.5).timeout
 	var sled: Sled = main.get("_sled")
 	var no_crash := OS.get_cmdline_user_args().has("--no-crash")
-	_check("landing on a head is survived", await _try(main, sled, Obstacle.Kind.PERSON, Props.person(0), 1.75, false) == false)
+	_check("landing on a head is survived", await _try(main, sled, Obstacle.Kind.PERSON, Props.person(0, 0), 1.75, false) == false)
 	_check("landing on a head still bounces", not sled.on_ground and sled.velocity.y > 0.0)
 	_check("landing on a moose is survived", await _try(main, sled, Obstacle.Kind.MOOSE, Props.moose(), 2.6, false) == false)
 	for body in CarModels.BODY_NAMES.size():
@@ -48,9 +48,9 @@ func _run() -> void:
 		var roof := float(car.get_meta("roof_height"))
 		_check("landing on %s roof is survived" % CarModels.BODY_NAMES[body], not await _try(main, sled, Obstacle.Kind.CAR, Props.Rig.of(car), roof - 0.07, false))
 		_check("landing on the car roof still bounces", not sled.on_ground and sled.velocity.y > 0.0)
-	_check("ground collisions respect --no-crash", await _try(main, sled, Obstacle.Kind.PERSON, Props.person(1), 0.0, true, no_crash, 25.0) == not no_crash)
+	_check("ground collisions respect --no-crash", await _try(main, sled, Obstacle.Kind.PERSON, Props.person(1, 1), 0.0, true, no_crash, 25.0) == not no_crash)
 	if not no_crash:
-		_check("hitting a person at speed crashes", await _try(main, sled, Obstacle.Kind.PERSON, Props.person(2), 0.0, true, false, 25.0))
+		_check("hitting a person at speed crashes", await _try(main, sled, Obstacle.Kind.PERSON, Props.person(2, 2), 0.0, true, false, 25.0))
 		_check("a person you hit goes flying", _flew)
 		_check("nudging a dog slowly is just a bump", not await _try(main, sled, Obstacle.Kind.DOG, Props.dog(), 0.0, true, false, 4.0))
 		_check("a slow knock into a spruce is survived", not await _try(main, sled, Obstacle.Kind.TREE, Props.Rig.of(Props.spruce(0)), 0.0, true, false, 6.0))
