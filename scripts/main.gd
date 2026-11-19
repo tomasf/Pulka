@@ -132,6 +132,8 @@ var _start_vehicle := -1
 ## Testing aid: a kind of obstacle made common (Obstacle.Kind), or -1.
 var _spawn_kind := -1
 ## Everyone riding: one player alone, two in a split-screen race.
+## Seconds since the mouse last moved; while riding, a still mouse hides.
+var _mouse_still := 0.0
 var _players: Array[Player] = []
 ## Two-player mode is chosen on the menu; a race is on while it is set.
 var _two_players := false
@@ -304,6 +306,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _toggle_fullscreen() -> void:
+	if event is InputEventMouseMotion or event is InputEventMouseButton:
+		_mouse_still = 0.0
 	var fullscreen := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fullscreen else DisplayServer.WINDOW_MODE_FULLSCREEN)
 	_remember_fullscreen()
@@ -315,6 +319,21 @@ func _remember_fullscreen() -> void:
 		return
 	_save.fullscreen = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 	_save.store()
+
+
+## Hides the mouse pointer during a ride once the mouse has been still for a
+## moment; moving it brings it back (for the pause button), and menus always
+## show it.
+const CURSOR_HIDE_AFTER := 1.5
+
+
+func _update_cursor(delta: float) -> void:
+	_mouse_still += delta
+	var riding := state == State.COUNTDOWN or state == State.PLAYING
+	var hide := riding and _mouse_still > CURSOR_HIDE_AFTER and not _hud.settings_open
+	var mode := Input.MOUSE_MODE_HIDDEN if hide else Input.MOUSE_MODE_VISIBLE
+	if Input.mouse_mode != mode:
+		Input.mouse_mode = mode
 
 
 ## Desktop only: browsers refuse fullscreen without a click, phones always are.
@@ -350,6 +369,7 @@ func _process(delta: float) -> void:
 		var lead := _leader()
 		var playing := state == State.PLAYING and not lead.sled.crashed
 		_director.sled = lead.sled
+	_update_cursor(delta)
 		_director.update(delta, playing)
 		_update_atmospheres(delta)
 		_sound.set_motion(delta, lead.sled.speed(), lead.sled.on_ground, state == State.PLAYING and not lead.sled.crashed)
