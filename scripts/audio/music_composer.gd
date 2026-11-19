@@ -36,6 +36,8 @@ const HALF := 1024
 const RISE := 2048
 ## The part's last bar is the song's final chord.
 const END := 4096
+## Everything harder: busier drums, a driving bass (a climax).
+const BIG := 8192
 
 ## Root note (MIDI, bass octave) and whether the chord is minor, one per bar.
 const CHORDS := [
@@ -506,6 +508,150 @@ const PUDER_B := [
 ]
 
 
+## C parts: new themes that carry each song on towards three minutes.
+## Humppa: C G Am D | C G D G.
+const HUMPPA_C_CHORDS := [
+	[36, false], [43, false], [45, true], [38, false], [36, false], [43, false], [38, false], [43, false],
+]
+const HUMPPA_C := [
+	[72, 1], [76, 1], [79, 1], [84, 1], [83, 2], [79, 2],
+	[79, 1], [83, 1], [86, 1], [83, 1], [79, 2], [74, 2],
+	[76, 2], [81, 2], [84, 2], [81, 2],
+	[78, 1], [81, 1], [86, 1], [84, 1], [81, 2], [78, 2],
+	[76, 1], [79, 1], [84, 1], [88, 1], [86, 2], [84, 2],
+	[83, 1], [81, 1], [79, 1], [83, 1], [86, 2], [83, 2],
+	[81, 1], [78, 1], [74, 1], [78, 1], [81, 2], [84, 1], [81, 1],
+	[79, 4], [74, 2], [-1, 2],
+]
+
+## Polska: Am Em B Em | Am D G B.
+const POLSKA_C_CHORDS := [
+	[45, true], [40, true], [35, false], [40, true], [45, true], [38, false], [43, false], [35, false],
+]
+const POLSKA_C := [
+	[81, 2], [84, 1], [83, 1], [81, 1], [79, 1],
+	[79, 1], [76, 1], [71, 1], [76, 1], [79, 2],
+	[78, 1], [75, 1], [71, 1], [75, 1], [78, 1], [81, 1],
+	[79, 3], [78, 1], [76, 2],
+	[76, 1], [81, 1], [84, 2], [81, 1], [76, 1],
+	[78, 1], [81, 1], [86, 2], [84, 1], [81, 1],
+	[83, 2], [79, 1], [83, 1], [86, 2],
+	[87, 3], [-1, 1], [83, 1], [78, 1],
+]
+
+## Fartvind: G A F#m Bm | G A D D.
+const FARTVIND_C_CHORDS := [
+	[43, false], [45, false], [42, true], [35, true], [43, false], [45, false], [38, false], [38, false],
+]
+
+## Boogie riffs for the extra choruses.
+const BOOGIE_RIFF_E := [[12, 2], [16, 1], [19, 1], [21, 2], [19, 2]]
+const BOOGIE_RIFF_F := [[24, 1], [21, 1], [19, 1], [16, 1], [15, 1], [12, 1], [10, 2]]
+
+## Schottis: D G C G | Am D G G.
+const SCHOTTIS_C_CHORDS := [
+	[38, false], [43, false], [36, false], [43, false], [45, true], [38, false], [43, false], [43, false],
+]
+const SCHOTTIS_C := [
+	[78, 3], [81, 1], [86, 3], [81, 1], [78, 4], [74, 4],
+	[79, 3], [83, 1], [86, 3], [83, 1], [79, 8],
+	[76, 3], [79, 1], [84, 3], [79, 1], [76, 4], [72, 4],
+	[74, 3], [79, 1], [83, 3], [79, 1], [74, 8],
+	[72, 3], [76, 1], [81, 3], [84, 1], [83, 4], [81, 4],
+	[78, 3], [81, 1], [86, 3], [84, 1], [81, 4], [78, 4],
+	[79, 3], [83, 1], [86, 3], [91, 1], [88, 4], [86, 4],
+	[83, 8], [-1, 8],
+]
+
+## Waltz: G D Em A | G D A D.
+const WALTZ_C_CHORDS := [
+	[43, false], [38, false], [40, true], [45, false], [43, false], [38, false], [45, false], [38, false],
+]
+const WALTZ_C := [
+	[79, 2], [83, 2], [86, 2],
+	[86, 4], [81, 2],
+	[83, 2], [79, 2], [76, 2],
+	[81, 4], [76, 2],
+	[79, 2], [83, 2], [88, 2],
+	[86, 2], [85, 2], [81, 2],
+	[76, 2], [81, 2], [85, 2],
+	[86, 4], [-1, 2],
+]
+
+## Storm: Dm Am E Am | F G E E.
+const STORM_C_CHORDS := [
+	[38, true], [45, true], [40, false], [45, true], [41, false], [43, false], [40, false], [40, false],
+]
+const STORM_C := [
+	[77, 1], [74, 1], [69, 1], [74, 1], [77, 2], [81, 2],
+	[81, 1], [76, 1], [72, 1], [76, 1], [81, 2], [84, 2],
+	[83, 1], [80, 1], [76, 1], [80, 1], [83, 2], [88, 2],
+	[84, 4], [81, 2], [76, 2],
+	[77, 1], [81, 1], [84, 1], [89, 1], [88, 2], [84, 2],
+	[86, 1], [83, 1], [79, 1], [83, 1], [86, 2], [91, 2],
+	[88, 2], [83, 2], [80, 2], [76, 2],
+	[80, 4], [-1, 4],
+]
+
+## Nordljus: F G Em Am | F G Am Am.
+const NORDLJUS_C_CHORDS := [
+	[41, false], [43, false], [40, true], [45, true], [41, false], [43, false], [45, true], [45, true],
+]
+const NORDLJUS_C := [
+	[72, 4], [77, 4], [81, 8],
+	[79, 4], [83, 4], [86, 8],
+	[83, 6], [79, 2], [76, 8],
+	[76, 4], [72, 4], [69, 8],
+	[77, 4], [81, 4], [84, 4], [81, 4],
+	[83, 4], [86, 4], [91, 8],
+	[88, 12], [84, 4],
+	[81, 16],
+]
+
+## Pulkaraketen: Bb C Dm Dm | Bb C A A.
+const PULKA_C_CHORDS := [
+	[34, false], [36, false], [38, true], [38, true], [34, false], [36, false], [45, false], [45, false],
+]
+const PULKA_C := [
+	[77, 2], [82, 2], [86, 4], [84, 2], [82, 2], [81, 4],
+	[79, 2], [84, 2], [88, 4], [86, 2], [84, 2], [79, 4],
+	[81, 4], [77, 4], [74, 8],
+	[77, 2], [81, 2], [86, 4], [84, 8],
+	[82, 2], [86, 2], [89, 4], [86, 4], [82, 4],
+	[84, 2], [88, 2], [91, 4], [88, 4], [84, 4],
+	[85, 4], [88, 4], [81, 8],
+	[85, 16],
+]
+
+## Snöbollskrig: Am F C G | Am F G G.
+const SNO_C_CHORDS := [
+	[45, true], [41, false], [36, false], [43, false], [45, true], [41, false], [43, false], [43, false],
+]
+const SNO_C := [
+	[81, 2], [84, 2], [88, 2], [84, 2], [81, 2], [76, 2], [72, 2], [76, 2],
+	[77, 2], [81, 2], [84, 2], [81, 2], [89, 4], [84, 4],
+	[84, 2], [88, 2], [91, 2], [88, 2], [84, 4], [79, 4],
+	[83, 2], [86, 2], [91, 4], [86, 2], [83, 2], [79, 4],
+	[76, 1], [79, 1], [81, 1], [84, 1], [88, 4], [84, 2], [81, 2], [76, 4],
+	[77, 1], [81, 1], [84, 1], [89, 1], [88, 4], [84, 4], [81, 4],
+	[79, 1], [83, 1], [86, 1], [91, 1], [89, 4], [86, 4], [83, 4],
+	[86, 8], [-1, 4], [79, 2], [83, 2],
+]
+
+## Pudersnö: Dm Bb F C.
+const PUDER_C_CHORDS := [[38, true], [34, false], [41, false], [36, false]]
+const PUDER_C := [
+	[-1, 2], [81, 2], [-1, 1], [81, 1], [77, 2], [74, 2], [77, 2], [81, 4],
+	[-1, 2], [82, 2], [-1, 1], [82, 1], [77, 2], [74, 2], [77, 2], [82, 4],
+	[-1, 2], [84, 2], [-1, 1], [84, 1], [81, 2], [77, 2], [81, 2], [84, 4],
+	[84, 6], [79, 2], [84, 4], [88, 4],
+	[86, 4], [84, 2], [81, 2], [77, 4], [81, 4],
+	[82, 4], [81, 2], [77, 2], [74, 4], [77, 4],
+	[81, 4], [84, 2], [81, 2], [77, 4], [81, 4],
+	[79, 12], [-1, 4],
+]
+
+
 const SONG_COUNT := 11
 
 
@@ -879,6 +1025,10 @@ static func _humppa() -> AudioStreamWAV:
 		Part.new(8, HUMPPA_B_CHORDS, HUMPPA_B, full | LEAD | FILL),
 		Part.new(8, _stretch(CHORDS.slice(0, 4), 2), _augment(MELODY, 32, 2), PAD | BELLS | BASS | HALF | LEAD | FILL, 0, 2),
 		Part.new(16, CHORDS, MELODY, full | LEAD | HARMONY | CRASH, 2),
+		Part.new(8, HUMPPA_C_CHORDS, HUMPPA_C, full | LEAD | CRASH, 2),
+		Part.new(8, HUMPPA_C_CHORDS, HUMPPA_C, full | LEAD | HARMONY, 2, 1),
+		Part.new(8, HUMPPA_B_CHORDS, HUMPPA_B, full | LEAD | FILL, 2),
+		Part.new(16, CHORDS, MELODY, full | BIG | LEAD | HARMONY | CRASH, 2, 1),
 		Part.new(4, [[36, false], [38, false], [43, false], [43, false]], [], full | END, 2),
 	]
 	return _arrange(song, plan, func(s: Song, t: float, root: int, minor: bool, part: Part, _b: int) -> void:
@@ -902,6 +1052,9 @@ static func _humppa() -> AudioStreamWAV:
 					_snare(s.buffer, at, s.rng)
 			elif part.has(HALF) and beat == 0:
 				_kick(s.buffer, at)
+			if part.has(BIG):
+				_snare(s.buffer, at + e, s.rng, 0.3)
+				_note(s.buffer, at, e * 1.5, (root if beat % 2 == 0 else root + 7) + 12, 0.1, Voice.bass())
 			if part.has(BELLS):
 				_bells(s.buffer, at, 0.045, s.rng)
 				_bells(s.buffer, at + e, 0.025, s.rng)
@@ -925,6 +1078,12 @@ static func _polska() -> AudioStreamWAV:
 		Part.new(8, POLSKA_B_CHORDS, POLSKA_B, full | LEAD | FILL),
 		Part.new(8, _stretch(POLSKA_CHORDS.slice(0, 4), 2), _augment(POLSKA_MELODY, 24, 2), PAD | BELLS | BASS | HALF | LEAD | FILL, 0, 2),
 		Part.new(16, POLSKA_CHORDS, POLSKA_MELODY, full | LEAD | HARMONY | CRASH),
+		Part.new(8, POLSKA_C_CHORDS, POLSKA_C, full | LEAD | CRASH),
+		Part.new(8, POLSKA_C_CHORDS, POLSKA_C, full | LEAD | HARMONY, 0, 1),
+		Part.new(8, POLSKA_B_CHORDS, POLSKA_B, full | LEAD | FILL),
+		Part.new(16, POLSKA_CHORDS, POLSKA_MELODY, full | BIG | LEAD | HARMONY | CRASH),
+		Part.new(8, POLSKA_C_CHORDS, POLSKA_C, full | BIG | LEAD | HARMONY, 0, 1),
+		Part.new(16, POLSKA_CHORDS, POLSKA_MELODY, full | BIG | LEAD | CRASH, 0, 1),
 		Part.new(4, [[45, true], [35, false], [40, true], [40, true]], [], full | END),
 	]
 	return _arrange(song, plan, func(s: Song, t: float, root: int, minor: bool, part: Part, _b: int) -> void:
@@ -940,6 +1099,10 @@ static func _polska() -> AudioStreamWAV:
 			_snare(s.buffer, t + e * 4.0, s.rng)
 		elif part.has(HALF):
 			_kick(s.buffer, t)
+		if part.has(BIG):
+			_snare(s.buffer, t + e * 2.0, s.rng, 0.35)
+			_snare(s.buffer, t + e * 5.0, s.rng, 0.25)
+			_note(s.buffer, t + e * 3.0, e * 1.5, root + 7, 0.2, Voice.bass())
 		if part.has(COMP):
 			for beat in [1, 2]:
 				for interval in [12, 12 + third, 19]:
@@ -961,6 +1124,9 @@ static func _arpeggios() -> AudioStreamWAV:
 		Part.new(16, FARTVIND_B_CHORDS, [], all | LEAD | FILL, 0, 1),
 		Part.new(8, ARP_CHORDS, [], PAD | ARP | RISE),
 		Part.new(16, ARP_CHORDS, [], all | LEAD | HARMONY | CRASH),
+		Part.new(16, FARTVIND_C_CHORDS, [], all | LEAD | CRASH, 0, 1),
+		Part.new(8, ARP_CHORDS, [], PAD | ARP | RISE),
+		Part.new(16, ARP_CHORDS, [], all | BIG | LEAD | HARMONY | CRASH),
 		Part.new(4, [[43, false], [45, false], [38, false], [38, false]], [], all | END),
 	]
 	var pattern := [0, 7, 12, 16, 19, 16, 12, 7]
@@ -990,6 +1156,8 @@ static func _arpeggios() -> AudioStreamWAV:
 				_kick(s.buffer, at)
 			if part.has(BELLS) and step % 4 == 2:
 				_bells(s.buffer, at, 0.03, s.rng)
+			if part.has(BIG):
+				_hat(s.buffer, at, 0.045 if step % 4 == 2 else 0.018, step % 4 == 2, s.rng)
 		if part.has(LEAD):
 			var high := 12 if b % 16 >= 8 else 0
 			var lead_a := root + 36 + third + high
@@ -1022,6 +1190,10 @@ static func _boogie() -> AudioStreamWAV:
 		Part.new(12, chords, [], BASS | BELLS | COMP | HALF | FILL),
 		Part.new(12, chords, [], full | LEAD | CRASH, 2),
 		Part.new(12, chords, [], full | LEAD | FILL, 2, 1),
+		Part.new(12, chords, [], full | LEAD | CRASH, 2, 2),
+		Part.new(12, chords, [], full | BIG | LEAD, 2),
+		Part.new(12, chords, [], full | BIG | LEAD | CRASH, 2, 2),
+		Part.new(12, chords, [], full | BIG | LEAD | FILL, 2, 1),
 		Part.new(2, [[45, false]], [], full | END, 2),
 	]
 	var walk := [0, 4, 7, 9, 10, 9, 7, 4]
@@ -1048,8 +1220,12 @@ static func _boogie() -> AudioStreamWAV:
 					_snare(s.buffer, t + n * beat, s.rng)
 			elif part.has(HALF) and n == 0:
 				_kick(s.buffer, t)
+			if part.has(BIG):
+				_snare(s.buffer, t + n * beat + beat * 2.0 / 3.0, s.rng, 0.3)
+				for interval in [16, 19, 22]:
+					_note(s.buffer, t + n * beat + beat * 2.0 / 3.0, beat * 0.25, root + interval, 0.025, Voice.keys())
 		if part.has(LEAD):
-			var riffs := [riff_a, riff_b] if part.lead == 0 else [BOOGIE_RIFF_C, BOOGIE_RIFF_D]
+			var riffs: Array = [[riff_a, riff_b], [BOOGIE_RIFF_C, BOOGIE_RIFF_D], [BOOGIE_RIFF_E, BOOGIE_RIFF_F]][part.lead % 3]
 			var position := 0.0
 			for note: Array in riffs[b % 2]:
 				var length: int = note[1]
@@ -1076,6 +1252,9 @@ static func _schottis() -> AudioStreamWAV:
 		Part.new(8, SCHOTTIS_B_CHORDS, SCHOTTIS_B, full | LEAD | FILL),
 		Part.new(8, _stretch(SCHOTTIS_CHORDS.slice(0, 4), 2), _augment(SCHOTTIS_MELODY, 64, 2), PAD | BELLS | BASS | HALF | LEAD | FILL, 0, 2),
 		Part.new(16, SCHOTTIS_CHORDS, SCHOTTIS_MELODY, full | LEAD | HARMONY | CRASH, 2),
+		Part.new(8, SCHOTTIS_C_CHORDS, SCHOTTIS_C, full | LEAD | CRASH, 2),
+		Part.new(8, SCHOTTIS_C_CHORDS, SCHOTTIS_C, full | LEAD | HARMONY | FILL, 2, 1),
+		Part.new(16, SCHOTTIS_CHORDS, SCHOTTIS_MELODY, full | BIG | LEAD | HARMONY | CRASH, 2),
 		Part.new(4, [[36, false], [38, false], [43, false], [43, false]], [], full | END, 2),
 	]
 	return _arrange(song, plan, func(s: Song, t: float, root: int, minor: bool, part: Part, _b: int) -> void:
@@ -1097,6 +1276,10 @@ static func _schottis() -> AudioStreamWAV:
 						_note(s.buffer, at, sixteenth * 2.5, root + interval + 12, 0.05, Voice.stab())
 				if part.has(DRUMS):
 					_snare(s.buffer, at, s.rng)
+			if part.has(BIG):
+				_snare(s.buffer, at + sixteenth * 3.0, s.rng, 0.3)
+				if beat % 2 == 0:
+					_note(s.buffer, at, sixteenth * 3.0, (root if beat == 0 else root + 7) + 12, 0.1, Voice.bass())
 			if part.has(BELLS):
 				_bells(s.buffer, at, 0.03, s.rng)
 				_bells(s.buffer, at + sixteenth * 3.0, 0.02, s.rng)
@@ -1120,6 +1303,13 @@ static func _waltz() -> AudioStreamWAV:
 		Part.new(16, WALTZ_B_CHORDS, WALTZ_B + WALTZ_B, full | LEAD | FILL),
 		Part.new(8, _stretch(WALTZ_CHORDS.slice(0, 4), 2), _augment(WALTZ_MELODY, 24, 2), PAD | ARP | BASS | HALF | LEAD | FILL, 0, 2),
 		Part.new(16, WALTZ_CHORDS, WALTZ_MELODY, full | LEAD | HARMONY | CRASH, 2),
+		Part.new(8, WALTZ_C_CHORDS, WALTZ_C, full | LEAD | CRASH, 2),
+		Part.new(8, WALTZ_C_CHORDS, WALTZ_C, full | LEAD | HARMONY, 2, 1),
+		Part.new(16, WALTZ_B_CHORDS, WALTZ_B + WALTZ_B, full | LEAD | FILL, 2),
+		Part.new(16, WALTZ_CHORDS, WALTZ_MELODY, full | BIG | LEAD | HARMONY | CRASH, 2, 1),
+		Part.new(8, WALTZ_C_CHORDS, WALTZ_C, full | BIG | LEAD | HARMONY, 2),
+		Part.new(16, WALTZ_CHORDS, WALTZ_MELODY, full | BIG | LEAD | HARMONY | CRASH, 2),
+		Part.new(8, WALTZ_C_CHORDS, WALTZ_C, full | BIG | LEAD, 2, 1),
 		Part.new(4, [[43, false], [45, false], [38, false], [38, false]], [], full | END, 2),
 	]
 	return _arrange(song, plan, func(s: Song, t: float, root: int, minor: bool, part: Part, _b: int) -> void:
@@ -1132,6 +1322,10 @@ static func _waltz() -> AudioStreamWAV:
 			_note(s.buffer, t, e * 1.6, root, 0.15, Voice.sub())
 		if part.has(DRUMS) or part.has(HALF):
 			_kick(s.buffer, t)
+		if part.has(BIG):
+			for beat in [1, 2]:
+				_snare(s.buffer, t + beat * e * 2.0, s.rng, 0.35)
+			_note(s.buffer, t, e * 1.6, root + 12, 0.1, Voice.bass())
 		if part.has(COMP):
 			for beat in [1, 2]:
 				for interval in [12, 12 + third, 19]:
@@ -1161,6 +1355,11 @@ static func _storm() -> AudioStreamWAV:
 		Part.new(8, STORM_CHORDS, [], PAD | ARP | HALF | RISE),
 		Part.new(16, STORM_CHORDS, STORM_MELODY, full | LEAD | HARMONY | CRASH, 0, 1),
 		Part.new(8, STORM_B_CHORDS, STORM_B, full | LEAD | HARMONY),
+		Part.new(8, STORM_C_CHORDS, STORM_C, full | LEAD | CRASH),
+		Part.new(8, STORM_C_CHORDS, STORM_C, full | LEAD | HARMONY, 0, 1),
+		Part.new(8, STORM_CHORDS, [], PAD | ARP | HALF | RISE),
+		Part.new(16, STORM_CHORDS, STORM_MELODY, full | BIG | LEAD | HARMONY | CRASH),
+		Part.new(8, STORM_B_CHORDS, STORM_B, full | BIG | LEAD | HARMONY),
 		Part.new(4, [[41, false], [40, false], [45, true], [45, true]], [], full | END),
 	]
 	return _arrange(song, plan, func(s: Song, t: float, root: int, minor: bool, part: Part, _b: int) -> void:
@@ -1179,6 +1378,8 @@ static func _storm() -> AudioStreamWAV:
 					_snare(s.buffer, at, s.rng)
 			elif part.has(HALF) and k % 4 == 0:
 				_kick(s.buffer, at)
+			if part.has(BIG):
+				_hat(s.buffer, at, 0.045 if k % 2 == 1 else 0.02, k % 2 == 1, s.rng)
 			if part.has(BELLS):
 				_bells(s.buffer, at, 0.025, s.rng)
 			if part.has(ARP):
@@ -1206,6 +1407,10 @@ static func _nordljus() -> AudioStreamWAV:
 		Part.new(4, NORDLJUS_CHORDS, [], PAD | ARP | RISE),
 		Part.new(8, NORDLJUS_CHORDS, NORDLJUS_A, groove | LEAD | CRASH, 0, 1),
 		Part.new(8, NORDLJUS_CHORDS, NORDLJUS_A, groove | LEAD | HARMONY, 0, 1),
+		Part.new(8, NORDLJUS_C_CHORDS, NORDLJUS_C, groove | LEAD | CRASH, 0, 1),
+		Part.new(8, NORDLJUS_C_CHORDS, NORDLJUS_C, groove | LEAD | HARMONY | FILL, 0, 1),
+		Part.new(8, NORDLJUS_CHORDS, NORDLJUS_A, groove | BIG | LEAD | CRASH),
+		Part.new(8, NORDLJUS_CHORDS, NORDLJUS_A, groove | BIG | LEAD | HARMONY),
 		Part.new(4, NORDLJUS_CHORDS, [], PAD | ARP | BASS | END),
 	]
 	return _arrange(song, plan, func(s: Song, t: float, root: int, minor: bool, part: Part, _b: int) -> void:
@@ -1222,12 +1427,14 @@ static func _nordljus() -> AudioStreamWAV:
 				if k % 8 == 0:
 					_note(s.buffer, at, s.step * 7.0, root, 0.12, Voice.sub())
 			if part.has(DRUMS):
-				if k % 8 == 0:
+				if k % 8 == 0 or (part.has(BIG) and k % 4 == 0):
 					_thump(s, at)
 				if k % 8 == 4:
 					_gated_snare(s.buffer, at, 0.9, s.rng)
 				if k % 2 == 0:
 					_hat(s.buffer, at, 0.035, false, s.rng)
+				if part.has(BIG):
+					_hat(s.buffer, at, 0.045 if k % 4 == 2 else 0.015, k % 4 == 2, s.rng, -0.2)
 	, 0.34)
 
 
@@ -1248,6 +1455,13 @@ static func _pulkaraketen() -> AudioStreamWAV:
 		Part.new(8, PULKA_CHORDS, PULKA_A, PAD | ARP | HALF | LEAD | RISE),
 		Part.new(8, PULKA_CHORDS, PULKA_A, full | LEAD | CRASH, 0, 1),
 		Part.new(8, PULKA_CHORDS, PULKA_A, full | ARP | LEAD | HARMONY, 0, 1),
+		Part.new(8, PULKA_C_CHORDS, PULKA_C, full | LEAD | CRASH, 0, 1),
+		Part.new(8, PULKA_C_CHORDS, PULKA_C, full | BIG | LEAD | HARMONY, 0, 1),
+		Part.new(8, PULKA_B_CHORDS, PULKA_B, PAD | ARP | HALF | LEAD | RISE),
+		Part.new(8, PULKA_CHORDS, PULKA_A, full | BIG | LEAD | CRASH),
+		Part.new(8, PULKA_CHORDS, PULKA_A, full | BIG | ARP | LEAD | HARMONY),
+		Part.new(8, PULKA_B_CHORDS, PULKA_B, full | BIG | LEAD, 0, 1),
+		Part.new(8, PULKA_C_CHORDS, PULKA_C, full | BIG | LEAD | HARMONY | CRASH, 0, 1),
 		Part.new(4, PULKA_CHORDS, [], PAD | BASS | ARP | END),
 	]
 	return _arrange(song, plan, func(s: Song, t: float, root: int, minor: bool, part: Part, b: int) -> void:
@@ -1255,8 +1469,12 @@ static func _pulkaraketen() -> AudioStreamWAV:
 		if part.has(PAD):
 			_chord(s.buffer, t, s.bar, root + 24, minor, 0.03, Voice.wide())
 		if part.has(BASS):
-			_note(s.buffer, t, s.bar * 0.48, root, 0.13, Voice.reese())
-			_note(s.buffer, t + s.bar * 0.5, s.bar * 0.48, root + (7 if b % 2 == 1 else 0), 0.13, Voice.reese())
+			if part.has(BIG):
+				for q in 4:
+					_note(s.buffer, t + q * s.beat, s.beat * 0.9, root + [0, 12, 7, 12][q], 0.12, Voice.reese())
+			else:
+				_note(s.buffer, t, s.bar * 0.48, root, 0.13, Voice.reese())
+				_note(s.buffer, t + s.bar * 0.5, s.bar * 0.48, root + (7 if b % 2 == 1 else 0), 0.13, Voice.reese())
 			_note(s.buffer, t, s.bar * 0.95, root, 0.16, Voice.sub())
 		if part.has(ARP):
 			for k in 8:
@@ -1268,9 +1486,11 @@ static func _pulkaraketen() -> AudioStreamWAV:
 					_thump(s, at, 0.9)
 				if k == 4 or k == 12:
 					_snare(s.buffer, at, s.rng)
-				elif k == 7 or k == 15:
+				elif k == 7 or k == 15 or (part.has(BIG) and k in [2, 9, 14]):
 					_snare(s.buffer, at, s.rng, 0.3)
-				_hat(s.buffer, at, 0.03 if k % 2 == 0 else 0.012, false, s.rng)
+				_hat(s.buffer, at, 0.03 if k % 2 == 0 else (0.02 if part.has(BIG) else 0.012), false, s.rng)
+				if part.has(BIG) and k % 8 == 6:
+					_hat(s.buffer, at, 0.04, true, s.rng, -0.3)
 			elif part.has(HALF):
 				if k == 0:
 					_thump(s, at, 0.8)
@@ -1298,7 +1518,14 @@ static func _snowball() -> AudioStreamWAV:
 		Part.new(8, SNO_CHORDS, [], ARP | HALF | RISE),
 		Part.new(8, SNO_CHORDS, SNO_A, full | LEAD | CRASH, 2),
 		Part.new(8, SNO_CHORDS, SNO_A, full | LEAD | HARMONY, 2, 1),
-		Part.new(4, [[41, false], [43, false], [36, false], [36, false]], [], full | END, 2),
+		Part.new(8, SNO_C_CHORDS, SNO_C, full | BIG | LEAD | CRASH, 2),
+		Part.new(8, SNO_C_CHORDS, SNO_C, full | BIG | LEAD | HARMONY | FILL, 2, 1),
+		# And up another tone for the last stretch.
+		Part.new(8, SNO_CHORDS, SNO_A, full | BIG | LEAD | CRASH, 4),
+		Part.new(8, SNO_CHORDS, SNO_A, full | BIG | LEAD | HARMONY, 4, 1),
+		Part.new(8, SNO_B_CHORDS, SNO_B, full | BIG | LEAD | FILL, 4),
+		Part.new(8, SNO_CHORDS, SNO_A, full | BIG | LEAD | HARMONY | CRASH, 4),
+		Part.new(4, [[41, false], [43, false], [36, false], [36, false]], [], full | END, 4),
 	]
 	return _arrange(song, plan, func(s: Song, t: float, root: int, minor: bool, part: Part, _b: int) -> void:
 		var third := 3 if minor else 4
@@ -1306,8 +1533,8 @@ static func _snowball() -> AudioStreamWAV:
 			var at := t + k * s.step
 			if part.has(ARP):
 				_note(s.buffer, at, s.step * 0.9, root + 24 + [0, third, 7, 12][k % 4], 0.03, Voice.chip_arp(), -0.3 if k % 2 == 0 else 0.3)
-			if part.has(BASS) and k % 2 == 0:
-				_note(s.buffer, at, s.step * 1.7, root + (12 if k % 4 == 2 else 0), 0.24, Voice.chip_bass())
+			if part.has(BASS) and (k % 2 == 0 or part.has(BIG)):
+				_note(s.buffer, at, s.step * (0.9 if part.has(BIG) else 1.7), root + (12 if k % 4 == 2 or (part.has(BIG) and k % 2 == 1) else 0), 0.24, Voice.chip_bass())
 			if part.has(DRUMS):
 				if k % 8 == 0:
 					_kick(s.buffer, at)
@@ -1315,8 +1542,10 @@ static func _snowball() -> AudioStreamWAV:
 					_chip_noise(s.buffer, at, 0.12, 0.22, 25.0, s.rng)
 			elif part.has(HALF) and k == 0:
 				_kick(s.buffer, at)
-			if (part.has(DRUMS) or part.has(HALF)) and k % 2 == 0:
-				_chip_noise(s.buffer, at, 0.03, 0.05, 120.0, s.rng)
+			if (part.has(DRUMS) or part.has(HALF)) and (k % 2 == 0 or part.has(BIG)):
+				_chip_noise(s.buffer, at, 0.03, 0.05 if k % 2 == 0 else 0.03, 120.0, s.rng)
+			if part.has(BIG) and (k == 14 or k == 15 or k == 6):
+				_chip_noise(s.buffer, at, 0.1, 0.16, 25.0, s.rng)
 	, 0.18)
 
 
@@ -1338,6 +1567,11 @@ static func _powder() -> AudioStreamWAV:
 		Part.new(8, PUDER_CHORDS, PUDER_A, full | LEAD | CRASH),
 		Part.new(8, PUDER_CHORDS, PUDER_A, full | LEAD | HARMONY),
 		Part.new(8, PUDER_B_CHORDS, PUDER_B, full | LEAD | FILL, 0, 1),
+		Part.new(8, PUDER_C_CHORDS, PUDER_C, full | LEAD | CRASH),
+		Part.new(8, PUDER_C_CHORDS, PUDER_C, full | LEAD | HARMONY),
+		Part.new(4, PUDER_C_CHORDS, [], PAD | COMP | RISE),
+		Part.new(8, PUDER_CHORDS, PUDER_A, full | BIG | LEAD | CRASH),
+		Part.new(8, PUDER_CHORDS, PUDER_A, full | BIG | LEAD | HARMONY),
 		Part.new(4, PUDER_CHORDS, [], HALF | BASS | PAD | END),
 	]
 	return _arrange(song, plan, func(s: Song, t: float, root: int, minor: bool, part: Part, _b: int) -> void:
@@ -1352,6 +1586,9 @@ static func _powder() -> AudioStreamWAV:
 					_note(s.pumped, off, s.step * 1.6, root + 24 + interval, 0.04, Voice.keys())
 			if part.has(BASS):
 				_note(s.buffer, off, s.step * 1.7, root + 12, 0.2, Voice.saw_bass())
+				if part.has(BIG):
+					for k in [1, 3]:
+						_note(s.buffer, on + k * s.step, s.step * 0.8, root + (24 if k == 3 else 12), 0.12, Voice.saw_bass())
 			if part.has(DRUMS) or part.has(HALF):
 				_thump(s, on)
 				_hat(s.buffer, off, 0.045, true, s.rng)
@@ -1360,6 +1597,10 @@ static func _powder() -> AudioStreamWAV:
 					_clap(s.buffer, on, 0.3, s.rng)
 				for k in [1, 3]:
 					_hat(s.buffer, on + k * s.step, 0.018, false, s.rng)
+				if part.has(BIG):
+					_hat(s.buffer, on, 0.025, false, s.rng, -0.35)
+					if beat == 3:
+						_clap(s.buffer, on + s.step * 3.0, 0.18, s.rng)
 	, 0.26)
 
 
