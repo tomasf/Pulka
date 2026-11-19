@@ -679,7 +679,8 @@ static func _lead(song: Song, part: Part, start: float) -> void:
 		_melody(song.buffer, part.melody, start + delay * song.step, song.step, voice[1], voice[0], part.shift + int(voice[2]), voice[3])
 	if part.has(HARMONY):
 		var first: Array = voices[0]
-		_melody(song.buffer, _harmony(part.melody, song.key, song.minor), start, song.step, first[1] * 0.55, first[0], part.shift + int(first[2]), first[3])
+		var steps := roundi(song.bar / song.step)
+		_melody(song.buffer, _harmony(part.melody, song.key, song.minor, part.chords, steps), start, song.step, first[1] * 0.55, first[0], part.shift + int(first[2]), first[3])
 
 
 ## Mixes the pumped layers in, ducked after every kick.
@@ -726,18 +727,60 @@ static func _melody(buffer: PackedFloat32Array, notes: Array, start: float, step
 		position += length
 
 
-## A second voice a diatonic third below the melody (in the song's key).
-static func _harmony(notes: Array, key: int, minor: bool) -> Array:
-	var scale := [0, 2, 3, 5, 7, 8, 10] if minor else [0, 2, 4, 5, 7, 9, 11]
+## A second voice below the melody, like a choir's: under a chord tone it
+## takes the next chord tone down; under a passing note it goes two steps
+## down the key's scale as the bar's chord bends it (over B major in E minor
+## it sings D#, not D). `chords` are per bar of `steps` melody steps; without
+## them every note goes two steps down the plain key scale.
+static func _harmony(notes: Array, key: int, minor: bool, chords := [], steps := 0) -> Array:
+	var base := []
+	for degree in ([0, 2, 3, 5, 7, 8, 10] if minor else [0, 2, 4, 5, 7, 9, 11]):
+		base.append((key + degree) % 12)
 	var out := []
+	var position := 0
 	for note: Array in notes:
 		var pitch: int = note[0]
-		if pitch < 0:
+		if pitch >= 0:
+			var scale := base
+			var tones := []
+			if not chords.is_empty() and steps > 0:
+				var chord: Array = chords[(position / steps) % chords.size()]
+				var root: int = chord[0]
+				tones = [root % 12, (root + (3 if chord[1] else 4)) % 12, (root + 7) % 12]
+				scale = _bent_scale(base, chord)
+			var lower := pitch - 1
+			if tones.has(pitch % 12):
+				# On a chord tone: the next chord tone down, as a choir would.
+				while not tones.has(lower % 12):
+					lower -= 1
+			else:
+				# A passing note: two steps down the (bent) scale.
+				var found := 1 if scale.has(lower % 12) else 0
+				while found < 2:
+					lower -= 1
+					if scale.has(lower % 12):
+						found += 1
+			out.append([lower, note[1]])
+		else:
 			out.append(note)
-			continue
-		var lower := pitch - 3 if scale.has(posmod(pitch - 3 - key, 12)) else pitch - 4
-		out.append([lower, note[1]])
+		position += int(note[1])
 	return out
+
+
+## The scale's pitch classes with each of the chord's tones swapped in for
+## the scale note a semitone from it.
+static func _bent_scale(base: Array, chord: Array) -> Array:
+	var scale := base.duplicate()
+	var root: int = chord[0]
+	for tone in [root % 12, (root + (3 if chord[1] else 4)) % 12, (root + 7) % 12]:
+		if scale.has(tone):
+			continue
+		for neighbour in [(tone + 1) % 12, (tone + 11) % 12]:
+			var at := scale.find(neighbour)
+			if at >= 0:
+				scale[at] = tone
+				break
+	return scale
 
 
 ## The first `length` steps of a melody played `factor` times slower.
