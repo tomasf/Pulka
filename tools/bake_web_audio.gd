@@ -1,6 +1,7 @@
 extends SceneTree
 ## Prepares synthesized audio for the Web, Apple TV and macOS exports
-## (see SoundBank.uses_baked_audio).
+## (see SoundBank.uses_baked_audio). Run an import afterwards (the export
+## scripts do) so the songs get compressed.
 
 const OUTPUT := "res://generated/web_audio/"
 
@@ -17,9 +18,15 @@ func _initialize() -> void:
 		return
 	if not _save(Synth.wind(), "wind") or not _save(Synth.scrape(), "scrape"):
 		return
+	# Songs are written as WAV so the import step compresses them (QOA);
+	# uncompressed they would add tens of megabytes to the exports.
 	for i in MusicComposer.SONG_COUNT:
 		print("Preparing web audio: ", MusicComposer.title(i))
-		if not _save(MusicComposer.render(i), "song_%d" % i):
+		var path := OUTPUT + "song_%d.wav" % i
+		var saved := MusicComposer.render(i).save_to_wav(ProjectSettings.globalize_path(path))
+		if saved != OK:
+			push_error("Cannot save %s: %s" % [path, error_string(saved)])
+			quit(1)
 			return
 	quit()
 

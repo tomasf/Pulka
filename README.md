@@ -36,6 +36,12 @@ Menyn börjar med spelarval och sedan åkdon på den riktiga banan. Starten går
 vidare med en kamerarörelse och 3–2–1. Menylåten **Snödag** är separat från
 åkmusiken. [Menyflöde, musik och tester](tools/MENU_REVIEW.md).
 
+Åkmusiken är elva låtar, knappt 19 minuter: humppa, polska, schottis, vals,
+boogie och storm, plus synthwave, drum'n'bass, chiptune och house. De spelas
+en gång var i blandad ordning, och nästa åktur fortsätter där musiken var.
+Lyssna på dem utanför spelet med
+`godot --headless --path . --script res://tools/render_music.gd -- /tmp`.
+
 I delad skärm följer ljus, dimma och snö varje spelares egen region. Testa med
 `godot --headless --path . --script res://tools/split_atmosphere_test.gd -- --autopilot`.
 Kör utan `--headless` och lägg till `--capture` för spelbilder och en jämförelse

@@ -25,8 +25,11 @@ var _scrape_level := 0.0
 var _music_threads: Array[Thread] = []
 var _songs: Dictionary = {}
 var _song := -1
-var _song_plays := 0
+## The ride songs in a shuffled order, played one after another in a loop.
+var _order: Array[int] = []
 var _first_song := 0
+## Where the ride music was when the menu took over, to carry on from there.
+var _resume_at := 0.0
 var _menu_player: AudioStreamPlayer
 var _in_menu := false
 var _music_blend: Tween
@@ -43,7 +46,7 @@ static func uses_baked_audio() -> bool:
 		if not ResourceLoader.exists(WEB_AUDIO + name + ".res"):
 			return false
 	for i in MusicComposer.SONG_COUNT:
-		if not ResourceLoader.exists(WEB_AUDIO + "song_%d.res" % i):
+		if not ResourceLoader.exists(WEB_AUDIO + "song_%d.wav" % i):
 			return false
 	return true
 
@@ -78,13 +81,16 @@ func _ready() -> void:
 	_menu_player.volume_db = -60.0
 	_menu_player.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(_menu_player)
-	_first_song = randi() % MusicComposer.SONG_COUNT
+	for i in MusicComposer.SONG_COUNT:
+		_order.append(i)
+	_order.shuffle()
+	_first_song = _order[0]
 	if uses_baked_audio():
 		for i in MusicComposer.SONG_COUNT:
-			_songs[i] = load(WEB_AUDIO + "song_%d.res" % i)
+			_songs[i] = load(WEB_AUDIO + "song_%d.wav" % i)
 		return
-	for i in MusicComposer.SONG_COUNT:
-		var index := (_first_song + i) % MusicComposer.SONG_COUNT
+	# Rendered in the order they will play.
+	for index in _order:
 		var thread := Thread.new()
 		thread.start(func() -> AudioStreamWAV: return MusicComposer.render(index))
 		thread.set_meta(&"song", index)
@@ -108,24 +114,30 @@ func _process(_delta: float) -> void:
 			_start_song()
 
 
-## Each tune plays twice, then the next finished tune takes over.
+## Each song plays once, then the next finished one in the shuffled order.
 func _next_song() -> void:
 	if _in_menu:
 		return
-	_song_plays += 1
-	if _song_plays >= 2:
-		for step in range(1, MusicComposer.SONG_COUNT + 1):
-			var candidate := (_song + step) % MusicComposer.SONG_COUNT
-			if _songs.has(candidate):
-				_song = candidate
-				break
-		_song_plays = 0
+	var at := _order.find(_song)
+	for step in range(1, _order.size() + 1):
+		var candidate := _order[(at + step) % _order.size()]
+		if _songs.has(candidate):
+			_song = candidate
+			break
+	_resume_at = 0.0
 	_start_song()
 
 
 func _start_song() -> void:
 	music_player.stream = _songs[_song]
-	music_player.play()
+	music_player.play(_resume_at)
+
+
+## Stops the ride music, remembering where it was for the next ride.
+func _pause_ride_music() -> void:
+	if music_player.playing:
+		_resume_at = music_player.get_playback_position()
+	music_player.stop()
 
 
 func _loop(stream: AudioStream) -> AudioStreamPlayer:
@@ -218,4 +230,4 @@ func set_menu_music(enabled: bool) -> void:
 		_menu_player.volume_db = linear_to_db(maxf(0.0001, sqrt(lerpf(from_menu * from_menu, to_menu * to_menu, t))))
 		music_player.volume_db = linear_to_db(maxf(0.0001, sqrt(lerpf(from_ride * from_ride, to_ride * to_ride, t))))
 	, 0.0, 1.0, 0.9).set_trans(Tween.TRANS_SINE)
-	_music_blend.tween_callback(music_player.stop if enabled else _menu_player.stop)
+	_music_blend.tween_callback(_pause_ride_music if enabled else _menu_player.stop)
