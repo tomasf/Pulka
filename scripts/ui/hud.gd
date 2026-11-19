@@ -3,6 +3,11 @@ extends CanvasLayer
 ## All 2D interface: in-game readouts, pop-up callouts, menu, pause and the
 ## game-over screen. Built in code; no theme resources needed.
 
+## How long the result screens ignore confirm after appearing (a gamepad
+## sends no new press for a button that is just held, so this only has to
+## catch a press already on its way).
+const OVER_GUARD := 0.4
+
 const WARM := Color(1.0, 0.85, 0.3)
 const HOT := Color(1.0, 0.35, 0.2)
 const COOL := Color(0.6, 0.9, 1.0)
@@ -92,6 +97,8 @@ var _over_record: Label
 var _over_panel: Panel
 var _over_column: VBoxContainer
 var _over_buttons: Array[Button] = []
+## Until this time (seconds, engine clock) confirm doesn't press the focused button.
+var _confirm_guard_until := 0.0
 var _time := 0.0
 
 var _settings: Control
@@ -628,7 +635,7 @@ func show_race_result(title: String, rows: Array) -> void:
 	_set_over_rows(rows)
 	_over_record.visible = false
 	_layout_over()
-	show_screen("over", 0.8)
+	show_screen("over", OVER_GUARD)
 
 
 ## `cause` is the line from the final crash, shown above the title.
@@ -643,7 +650,7 @@ func show_game_over(title: String, cause: String, distance: float, score: int, b
 	])
 	_over_record.visible = record
 	_layout_over()
-	show_screen("over", 0.8)
+	show_screen("over", OVER_GUARD)
 
 
 # --- Settings ---
@@ -849,6 +856,11 @@ func records_cleared() -> void:
 
 
 ## True while one of the on-screen buttons has keyboard/controller focus.
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"ui_accept") and Time.get_ticks_msec() / 1000.0 < _confirm_guard_until:
+		get_viewport().set_input_as_handled()
+
+
 func owns_focus() -> bool:
 	return get_viewport().gui_get_focus_owner() != null
 
@@ -873,14 +885,13 @@ func _focus_current() -> void:
 	_release_focus()
 
 
-## Shows one of "menu", "game", "pause", "over" (or "" for nothing). Focus
-## arrives after `focus_delay` so a held button cannot fire straight away.
-func show_screen(screen: String, focus_delay := 0.0) -> void:
+## Shows one of "menu", "game", "pause", "over" (or "" for nothing). The
+## default button is focused (and shown focused) straight away, but ignores
+## confirm for `guard` seconds, so a press meant for the ride can't fire it.
+func show_screen(screen: String, guard := 0.0) -> void:
 	_release_focus()
-	if focus_delay > 0.0:
-		get_tree().create_timer(focus_delay, true).timeout.connect(_focus_current)
-	else:
-		_focus_current.call_deferred()
+	_focus_current.call_deferred()
+	_confirm_guard_until = Time.get_ticks_msec() / 1000.0 + guard
 	if screen == "countdown" and _menu.visible:
 		_menu.dismiss()
 	else:

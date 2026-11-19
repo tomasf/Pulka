@@ -1062,7 +1062,7 @@ func _end_race() -> void:
 		rows.append(["%d. Spelare %d" % [_place_of(p), p.index + 1], result, Player.COLORS[p.index]])
 	_hud.show_race_result("Spelare %d vinner!" % (winner.index + 1), rows)
 	_sound.set_music_ducked(true)
-	_input_cooldown = 0.8
+	_input_cooldown = Hud.OVER_GUARD
 
 
 ## A race time as minutes, seconds and tenths: 1:23,4.
@@ -1561,7 +1561,7 @@ func _game_over() -> void:
 		_save.store()
 	_hud.show_game_over(GAME_OVER_LINES[_rng.randi_range(0, GAME_OVER_LINES.size() - 1)], p.last_crash_line, p.run_distance, p.score(), _save.best_distance, record)
 	_sound.set_music_ducked(true)
-	_input_cooldown = 0.8
+	_input_cooldown = Hud.OVER_GUARD
 
 
 func _check_bounds(p: Player = null) -> void:

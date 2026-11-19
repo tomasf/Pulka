@@ -20,6 +20,9 @@ func _run() -> void:
 	main.set("_no_crash", true)
 	var hud: Hud = main.get("_hud")
 	await _tick(25)
+	# The menu appears on real time, which headless frames can outrun.
+	while not hud._menu.visible:
+		await _tick(1)
 	hud.open_settings(0.6, 0.4, 0.8)
 	await _tick(20)
 	_check("settings opens over the menu", hud.settings_open and not hud._menu.visible)

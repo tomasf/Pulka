@@ -122,6 +122,21 @@ func _run() -> void:
 	await _tap(JOY_BUTTON_DPAD_DOWN)
 	await _tap(JOY_BUTTON_A)
 	_check("Börja om restarts the run", int(main.get("state")) == 1 and not paused)
+	# Game over: the retry button is focused at once, so one press of A
+	# retries, but not a press that arrives right as the screen appears.
+	await create_timer(4.5).timeout
+	var rider: Player = main.get("_players")[0]
+	rider.lives = 1
+	main.call("_crash", "Test", rider)
+	while int(main.get("state")) != 4:
+		await _frames(1)
+	await _frames(3)
+	_check("game over focuses Åk igen straight away", _focused_text() == "Åk igen")
+	await _tap(JOY_BUTTON_A)
+	_check("A right as game over appears is ignored", int(main.get("state")) == 4)
+	await create_timer(Hud.OVER_GUARD).timeout
+	await _tap(JOY_BUTTON_A)
+	_check("one press of A then retries", int(main.get("state")) == 1)
 	print("controller menu test: %s" % ("all passed" if _failures == 0 else "%d failed" % _failures))
 	main.queue_free()
 	await process_frame
