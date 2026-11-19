@@ -39,6 +39,8 @@ vidare med en kamerarörelse och 3–2–1. Menylåten **Snödag** är separat f
 Åkmusiken är elva låtar, knappt 19 minuter: humppa, polska, schottis, vals,
 boogie och storm, plus synthwave, drum'n'bass, chiptune och house. De spelas
 en gång var i blandad ordning, och nästa åktur fortsätter där musiken var.
+Musiken renderas i 44,1 kHz stereo med bandbegränsade oscillatorer.
+Exportskripten bakar låtarna till Ogg Vorbis med `ffmpeg` (utan den blir de WAV).
 Lyssna på dem utanför spelet med
 `godot --headless --path . --script res://tools/render_music.gd -- /tmp`.
 

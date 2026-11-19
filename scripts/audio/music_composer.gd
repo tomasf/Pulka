@@ -9,7 +9,8 @@ extends RefCounted
 ## reverb, so the result sounds played rather than beeped. Runs on worker
 ## threads (and is pre-rendered for the exports).
 
-const RATE := 22050
+## Music renders at CD rate: the old 22 kHz cut off everything above 11 kHz.
+const RATE := 44100
 const BPM := 156.0
 ## Room after the last bar for the final chord and reverb to ring out.
 const TAIL := 2.5
@@ -78,8 +79,10 @@ class Voice:
 	## Second oscillator detuned by this ratio, for a chorused, wider tone.
 	var detune := 0.0
 	var vibrato := false
+	## How far apart in the stereo field the two detuned oscillators sit.
+	var spread := 0.0
 
-	func _init(shape: Wave, attack_time: float, decay_rate: float, sustain_level: float, release_time: float, cutoff_hz := 0.0, detune_ratio := 0.0, wobble := false) -> void:
+	func _init(shape: Wave, attack_time: float, decay_rate: float, sustain_level: float, release_time: float, cutoff_hz := 0.0, detune_ratio := 0.0, wobble := false, width := 0.0) -> void:
 		wave = shape
 		attack = attack_time
 		decay = decay_rate
@@ -88,22 +91,23 @@ class Voice:
 		cutoff = cutoff_hz
 		detune = detune_ratio
 		vibrato = wobble
+		spread = width
 
 	## Soft flute/organ-like lead with chorus and delayed vibrato.
 	static func lead() -> Voice:
-		return Voice.new(Wave.WARM, 0.02, 2.2, 0.55, 0.12, 0.0, 0.004, true)
+		return Voice.new(Wave.WARM, 0.02, 2.2, 0.55, 0.12, 0.0, 0.004, true, 0.15)
 
 	## Reedy accordion or harmonica: detuned saws through a soft filter.
 	static func reed(cutoff_hz := 2200.0) -> Voice:
-		return Voice.new(Wave.SAW, 0.015, 1.5, 0.7, 0.08, cutoff_hz, 0.006, true)
+		return Voice.new(Wave.SAW, 0.015, 1.5, 0.7, 0.08, cutoff_hz, 0.006, true, 0.25)
 
 	## Short accordion "pah" on the off-beat.
 	static func stab() -> Voice:
-		return Voice.new(Wave.SAW, 0.006, 7.0, 0.15, 0.05, 1600.0, 0.005)
+		return Voice.new(Wave.SAW, 0.006, 7.0, 0.15, 0.05, 1600.0, 0.005, false, 0.35)
 
 	## Slow, dark chord bed under everything.
 	static func pad() -> Voice:
-		return Voice.new(Wave.SAW, 0.3, 0.4, 0.75, 0.4, 750.0, 0.008)
+		return Voice.new(Wave.SAW, 0.3, 0.4, 0.75, 0.4, 750.0, 0.008, false, 0.55)
 
 	## Round plucked bass: triangle with a soft decay.
 	static func bass() -> Voice:
@@ -118,15 +122,15 @@ class Voice:
 
 	## Short bright pluck for arpeggios and house riffs.
 	static func pluck() -> Voice:
-		return Voice.new(Wave.SAW, 0.002, 8.0, 0.0, 0.12, 2400.0, 0.005)
+		return Voice.new(Wave.SAW, 0.002, 8.0, 0.0, 0.12, 2400.0, 0.005, false, 0.3)
 
 	## Wide detuned saw lead.
 	static func supersaw() -> Voice:
-		return Voice.new(Wave.SAW, 0.012, 1.0, 0.75, 0.25, 3400.0, 0.012)
+		return Voice.new(Wave.SAW, 0.012, 1.0, 0.75, 0.25, 3400.0, 0.012, false, 0.6)
 
 	## Slow, wide, airy pad.
 	static func wide() -> Voice:
-		return Voice.new(Wave.SAW, 0.45, 0.3, 0.8, 0.6, 1300.0, 0.014)
+		return Voice.new(Wave.SAW, 0.45, 0.3, 0.8, 0.6, 1300.0, 0.014, false, 0.75)
 
 	## Punchy filtered saw bass.
 	static func saw_bass() -> Voice:
@@ -134,11 +138,11 @@ class Voice:
 
 	## Growling, slowly beating drum'n'bass bass.
 	static func reese() -> Voice:
-		return Voice.new(Wave.SAW, 0.01, 0.2, 0.9, 0.08, 420.0, 0.012)
+		return Voice.new(Wave.SAW, 0.01, 0.2, 0.9, 0.08, 420.0, 0.012, false, 0.2)
 
 	## Electric piano.
 	static func keys() -> Voice:
-		return Voice.new(Wave.WARM, 0.003, 4.5, 0.18, 0.2, 3200.0, 0.003)
+		return Voice.new(Wave.WARM, 0.003, 4.5, 0.18, 0.2, 3200.0, 0.003, false, 0.15)
 
 	## Square-wave lead, like an old game console.
 	static func chip() -> Voice:
@@ -151,6 +155,19 @@ class Voice:
 	## Plain triangle bass.
 	static func chip_bass() -> Voice:
 		return Voice.new(Wave.TRIANGLE, 0.002, 1.5, 0.7, 0.02)
+
+
+## A stereo mix being rendered: one buffer per side.
+class Mix:
+	var left := PackedFloat32Array()
+	var right := PackedFloat32Array()
+
+	func _init(seconds: float) -> void:
+		left.resize(int(seconds * MusicComposer.RATE))
+		right.resize(left.size())
+
+	func size() -> int:
+		return left.size()
 
 
 ## One part of a song: how many bars, the chords (repeating if shorter), the
@@ -178,9 +195,9 @@ class Part:
 
 ## A song being rendered: its timing, key, lead sounds and buffers.
 class Song:
-	var buffer := PackedFloat32Array()
+	var buffer: Mix
 	## Layers ducked by every kick (sidechain pumping), mixed in at the end.
-	var pumped := PackedFloat32Array()
+	var pumped: Mix
 	var pumping := false
 	var kicks := PackedFloat32Array()
 	var beat := 0.0
@@ -554,7 +571,7 @@ static func render_menu() -> AudioStreamWAV:
 	var buffer := _buffer(bar * chords.size())
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1082026
-	var lead := Voice.new(Wave.WARM, 0.025, 3.8, 0.28, 0.18, 2400.0, 0.003)
+	var lead := Voice.new(Wave.WARM, 0.025, 3.8, 0.28, 0.18, 2400.0, 0.003, false, 0.1)
 	for i in chords.size():
 		var root: int = chords[i][0]
 		var minor: bool = chords[i][1]
@@ -572,25 +589,46 @@ static func render_menu() -> AudioStreamWAV:
 				_note(buffer, t + tick * eighth, note[1] * eighth * 0.88, note[0], 0.11, lead)
 				_note(buffer, t + tick * eighth, eighth * 0.8, note[0] + 12, 0.038, Voice.bell())
 			tick += note[1]
-	return _finish(buffer, 0.32)
+	return _finish(buffer, 0.32, true)
 
 
-static func _buffer(seconds: float) -> PackedFloat32Array:
-	var buffer := PackedFloat32Array()
-	buffer.resize(int(seconds * RATE))
-	return buffer
+static func _buffer(seconds: float) -> Mix:
+	return Mix.new(seconds)
 
 
-static func _finish(buffer: PackedFloat32Array, room := 0.22) -> AudioStreamWAV:
-	_reverb(buffer, room)
+## Adds the room, evens out the level and returns a stereo stream. `loop`
+## wraps the room's tail into the start (for a seamless loop).
+static func _finish(mix: Mix, room := 0.22, loop := false) -> AudioStreamWAV:
+	_reverb(mix, room, loop)
 	var peak := 0.001
-	for sample in buffer:
-		peak = maxf(peak, absf(sample))
+	for i in mix.size():
+		peak = maxf(peak, maxf(absf(mix.left[i]), absf(mix.right[i])))
 	var gain := 0.85 / peak
-	for i in buffer.size():
+	var curve := 1.0 / tanh(1.15)
+	var data := PackedByteArray()
+	data.resize(mix.size() * 4)
+	for i in mix.size():
 		# Gentle tape-style saturation keeps peaks round.
-		buffer[i] = tanh(buffer[i] * gain * 1.15) / tanh(1.15)
-	return Synth.to_stream(buffer)
+		data.encode_s16(i * 4, int(clampf(tanh(mix.left[i] * gain * 1.15) * curve, -1.0, 1.0) * 32767.0))
+		data.encode_s16(i * 4 + 2, int(clampf(tanh(mix.right[i] * gain * 1.15) * curve, -1.0, 1.0) * 32767.0))
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = RATE
+	stream.stereo = true
+	stream.data = data
+	return stream
+
+
+## Left and right gains for a pan from -1 (left) to 1 (right), equal power,
+## both 1 in the middle.
+static func _gains(pan: float) -> Vector2:
+	var angle := (clampf(pan, -1.0, 1.0) + 1.0) * PI * 0.25
+	return Vector2(cos(angle), sin(angle)) * sqrt(2.0)
+
+
+## A one-pole smoothing factor tuned at 22 kHz, for the same tone at RATE.
+static func _pole(factor: float) -> float:
+	return 1.0 - pow(1.0 - factor, 22050.0 / RATE)
 
 
 ## Plays `plan` part by part: `play_bar` renders one bar's backing
@@ -633,19 +671,21 @@ static func _arrange(song: Song, plan: Array, play_bar: Callable, room: float) -
 ## Brings parts that are much quieter than the rest (a breakdown with only a
 ## pad, a sparse intro) up towards the song's level, so they still sound
 ## calmer but don't vanish under the wind. Gains glide across part borders.
-static func _lift_quiet_parts(buffer: PackedFloat32Array, bounds: PackedFloat32Array) -> void:
+static func _lift_quiet_parts(mix: Mix, bounds: PackedFloat32Array) -> void:
+	var left := mix.left
+	var right := mix.right
 	var levels := PackedFloat32Array()
 	var peaks := PackedFloat32Array()
 	var loudest := 0.0001
 	for p in bounds.size() - 1:
 		var first := int(bounds[p] * RATE)
-		var last := mini(int(bounds[p + 1] * RATE), buffer.size())
+		var last := mini(int(bounds[p + 1] * RATE), left.size())
 		var sum := 0.0
 		var peak := 0.0001
 		for i in range(first, last, 4):
-			sum += buffer[i] * buffer[i]
-			peak = maxf(peak, absf(buffer[i]))
-		levels.append(sqrt(sum / maxf((last - first) / 4.0, 1.0)))
+			sum += left[i] * left[i] + right[i] * right[i]
+			peak = maxf(peak, maxf(absf(left[i]), absf(right[i])))
+		levels.append(sqrt(sum / maxf((last - first) / 2.0, 1.0)))
 		peaks.append(peak)
 		loudest = maxf(loudest, peak)
 	var sorted := levels.duplicate()
@@ -659,33 +699,38 @@ static func _lift_quiet_parts(buffer: PackedFloat32Array, bounds: PackedFloat32A
 	var glide := 0.4 * RATE
 	for p in levels.size():
 		var first := int(bounds[p] * RATE)
-		var last := mini(int(bounds[p + 1] * RATE), buffer.size())
+		var last := mini(int(bounds[p + 1] * RATE), left.size())
 		var before := minf(gains[p - 1] if p > 0 else gains[p], gains[p])
 		var after := minf(gains[p + 1] if p + 1 < levels.size() else gains[p], gains[p])
 		for i in range(first, last):
 			var gain := lerpf(before, gains[p], smoothstep(0.0, 1.0, (i - first) / glide))
 			gain = lerpf(after, gain, smoothstep(0.0, 1.0, (last - i) / glide))
-			buffer[i] *= gain
+			left[i] *= gain
+			right[i] *= gain
 	# The ending's tail keeps the last part's gain.
-	for i in range(mini(int(bounds[bounds.size() - 1] * RATE), buffer.size()), buffer.size()):
-		buffer[i] *= gains[levels.size() - 1]
+	for i in range(mini(int(bounds[bounds.size() - 1] * RATE), left.size()), left.size()):
+		left[i] *= gains[levels.size() - 1]
+		right[i] *= gains[levels.size() - 1]
 
 
 ## The part's melody on each of the song's voices for that lead variant.
 static func _lead(song: Song, part: Part, start: float) -> void:
 	var voices: Array = song.leads[part.lead % song.leads.size()]
-	for voice: Array in voices:
+	for v in voices.size():
+		var voice: Array = voices[v]
 		var delay: float = voice[4] if voice.size() > 4 else 0.0
-		_melody(song.buffer, part.melody, start + delay * song.step, song.step, voice[1], voice[0], part.shift + int(voice[2]), voice[3])
+		# The main voice in the middle, doubles to the right, echoes wider.
+		var pan := 0.0 if v == 0 else (0.5 if delay > 0.0 else 0.3)
+		_melody(song.buffer, part.melody, start + delay * song.step, song.step, voice[1], voice[0], part.shift + int(voice[2]), voice[3], pan)
 	if part.has(HARMONY):
 		var first: Array = voices[0]
 		var steps := roundi(song.bar / song.step)
-		_melody(song.buffer, _harmony(part.melody, song.key, song.minor, part.chords, steps), start, song.step, first[1] * 0.55, first[0], part.shift + int(first[2]), first[3])
+		_melody(song.buffer, _harmony(part.melody, song.key, song.minor, part.chords, steps), start, song.step, first[1] * 0.55, first[0], part.shift + int(first[2]), first[3], -0.3)
 
 
 ## Mixes the pumped layers in, ducked after every kick.
 static func _pump(song: Song) -> void:
-	if song.pumped.is_empty():
+	if song.pumped == null:
 		return
 	var size := song.buffer.size()
 	var gain := PackedFloat32Array()
@@ -697,8 +742,11 @@ static func _pump(song: Song) -> void:
 			var t := float(k) / RATE
 			var i := (first + k) % size
 			gain[i] = minf(gain[i], 1.0 - 0.7 * smoothstep(0.0, 0.004, t) * exp(-t * 9.0))
+	var left := song.buffer.left
+	var right := song.buffer.right
 	for i in size:
-		song.buffer[i] += song.pumped[i] * gain[i]
+		left[i] += song.pumped.left[i] * gain[i]
+		right[i] += song.pumped.right[i] * gain[i]
 
 
 ## The final chord: held, with a last hit and a cymbal.
@@ -717,13 +765,13 @@ static func _fill(song: Song, bar_start: float) -> void:
 		_snare(song.buffer, bar_start + song.bar - song.beat + i * song.beat / 4.0, song.rng, 0.45 + 0.2 * i)
 
 
-static func _melody(buffer: PackedFloat32Array, notes: Array, start: float, step: float, amp: float, voice: Voice, transpose := 0, legato := 0.95) -> void:
+static func _melody(buffer: Mix, notes: Array, start: float, step: float, amp: float, voice: Voice, transpose := 0, legato := 0.95, pan := 0.0) -> void:
 	var position := 0.0
 	for note: Array in notes:
 		var pitch: int = note[0]
 		var length: int = note[1]
 		if pitch >= 0:
-			_note(buffer, start + position * step, length * step * legato, pitch + transpose, amp, voice)
+			_note(buffer, start + position * step, length * step * legato, pitch + transpose, amp, voice, pan)
 		position += length
 
 
@@ -804,10 +852,13 @@ static func _stretch(chords: Array, factor: int) -> Array:
 	return out
 
 
-## Holds a chord for `length` seconds on the pad voice.
-static func _chord(buffer: PackedFloat32Array, start: float, length: float, root: int, minor: bool, amp: float, voice: Voice) -> void:
-	for interval in [0, 3 if minor else 4, 7]:
-		_note(buffer, start, length, root + interval, amp, voice)
+## Holds a chord for `length` seconds: root in the middle, third and fifth
+## to either side.
+static func _chord(buffer: Mix, start: float, length: float, root: int, minor: bool, amp: float, voice: Voice) -> void:
+	var intervals := [0, 3 if minor else 4, 7]
+	var pans := [0.0, -0.35, 0.35]
+	for i in 3:
+		_note(buffer, start, length, root + intervals[i], amp, voice, pans[i])
 
 
 ## Oom-pah bass, accordion stabs, a soft pad, sleigh bells and a flute lead.
@@ -924,7 +975,7 @@ static func _arpeggios() -> AudioStreamWAV:
 				var interval: int = pattern[step % pattern.size()]
 				if minor and interval == 16:
 					interval -= 1
-				_note(s.buffer, at, sixteenth * 1.6, root + 36 + interval, 0.06, Voice.bell())
+				_note(s.buffer, at, sixteenth * 1.6, root + 36 + interval, 0.06, Voice.bell(), -0.4 if step % 2 == 0 else 0.4)
 			if part.has(BASS):
 				if step % 2 == 0:
 					_note(s.buffer, at, sixteenth * 1.8, root + (12 if step % 4 == 2 else 0), 0.3, Voice.bass())
@@ -1088,7 +1139,7 @@ static func _waltz() -> AudioStreamWAV:
 		for k in 6:
 			if part.has(ARP):
 				var arp: int = [0, third, 7, 12, 7, third][k]
-				_note(s.buffer, t + k * e, e * 1.5, root + 36 + arp, 0.035, Voice.bell())
+				_note(s.buffer, t + k * e, e * 1.5, root + 36 + arp, 0.035, Voice.bell(), -0.3 if k % 2 == 0 else 0.3)
 			if part.has(BELLS):
 				_bells(s.buffer, t + k * e, 0.02, s.rng)
 	, 0.3)
@@ -1132,7 +1183,7 @@ static func _storm() -> AudioStreamWAV:
 				_bells(s.buffer, at, 0.025, s.rng)
 			if part.has(ARP):
 				var arp: int = [0, 7, 12, third + 12][k % 4]
-				_note(s.buffer, at, e * 0.8, root + 36 + arp, 0.03, Voice.bell())
+				_note(s.buffer, at, e * 0.8, root + 36 + arp, 0.03, Voice.bell(), -0.3 if k % 2 == 0 else 0.3)
 	, 0.28)
 
 
@@ -1165,7 +1216,7 @@ static func _nordljus() -> AudioStreamWAV:
 		for k in 16:
 			var at := t + k * s.step
 			if part.has(ARP):
-				_note(s.pumped, at, s.step * 1.5, root + 24 + arp[k % 8], 0.045, Voice.pluck())
+				_note(s.pumped, at, s.step * 1.5, root + 24 + arp[k % 8], 0.045, Voice.pluck(), -0.4 if k % 2 == 0 else 0.4)
 			if part.has(BASS) and k % 2 == 0:
 				_note(s.buffer, at, s.step * 1.6, root + (12 if k % 4 == 2 else 0), 0.2, Voice.saw_bass())
 				if k % 8 == 0:
@@ -1209,7 +1260,7 @@ static func _pulkaraketen() -> AudioStreamWAV:
 			_note(s.buffer, t, s.bar * 0.95, root, 0.16, Voice.sub())
 		if part.has(ARP):
 			for k in 8:
-				_note(s.buffer, t + k * s.step * 2.0, s.step * 1.8, root + 36 + [0, third, 7, 12, 7, third, 0, 7][k], 0.03, Voice.bell())
+				_note(s.buffer, t + k * s.step * 2.0, s.step * 1.8, root + 36 + [0, third, 7, 12, 7, third, 0, 7][k], 0.03, Voice.bell(), -0.45 if k % 2 == 0 else 0.45)
 		for k in 16:
 			var at := t + k * s.step
 			if part.has(DRUMS):
@@ -1254,7 +1305,7 @@ static func _snowball() -> AudioStreamWAV:
 		for k in 16:
 			var at := t + k * s.step
 			if part.has(ARP):
-				_note(s.buffer, at, s.step * 0.9, root + 24 + [0, third, 7, 12][k % 4], 0.03, Voice.chip_arp())
+				_note(s.buffer, at, s.step * 0.9, root + 24 + [0, third, 7, 12][k % 4], 0.03, Voice.chip_arp(), -0.3 if k % 2 == 0 else 0.3)
 			if part.has(BASS) and k % 2 == 0:
 				_note(s.buffer, at, s.step * 1.7, root + (12 if k % 4 == 2 else 0), 0.24, Voice.chip_bass())
 			if part.has(DRUMS):
@@ -1316,115 +1367,173 @@ static func _freq(midi: int) -> float:
 	return 440.0 * pow(2.0, (midi - 69) / 12.0)
 
 
-## Adds one note to the buffer (wrapping at the end, so loops stay seamless).
-static func _note(buffer: PackedFloat32Array, start: float, length: float, midi: int, amp: float, voice: Voice) -> void:
+## Adds one note at `pan` (the two detuned oscillators spread either side of
+## it), wrapping at the end so loops stay seamless.
+static func _note(mix: Mix, start: float, length: float, midi: int, amp: float, voice: Voice, pan := 0.0) -> void:
 	# A player is never machine-exact: nudge timing (±6 ms) and loudness (±12 %).
 	var jitter := hash(Vector2(start, midi))
 	start += ((jitter & 0xFF) / 255.0 - 0.5) * 0.012
 	amp *= 0.88 + (((jitter >> 8) & 0xFF) / 255.0) * 0.24
+	var left := mix.left
+	var right := mix.right
 	var first := maxi(int(start * RATE), 0)
 	var held := int(length * RATE)
 	var tail := int(voice.release * RATE)
-	var size := buffer.size()
+	var size := left.size()
 	var step := _freq(midi) / RATE
+	var detuned := voice.detune > 0.0
+	var gains_a := _gains(pan - voice.spread) * (0.5 if detuned else 1.0)
+	var gains_b := _gains(pan + voice.spread) * 0.5
 	var phase_a := 0.0
 	var phase_b := 0.37
-	var low := 0.0
+	var low_a := 0.0
+	var low_b := 0.0
 	var smoothing := 1.0 - exp(-TAU * voice.cutoff / RATE) if voice.cutoff > 0.0 else 1.0
 	var level := 0.0
+	var fade := 1.0 - 4.0 / maxf(tail, 1.0)
 	for k in held + tail:
 		var t := float(k) / RATE
 		if k < held:
 			level = minf(1.0, t / voice.attack) * (voice.sustain + (1.0 - voice.sustain) * exp(-t * voice.decay))
 		else:
-			level *= 1.0 - 1.0 / maxf(tail, 1.0) * 4.0 if level > 0.0001 else 0.0
+			level = level * fade if level > 0.0001 else 0.0
 		var wobble := 1.0 + 0.005 * sin(t * TAU * 5.2) * smoothstep(0.15, 0.4, t) if voice.vibrato else 1.0
-		var s := _oscillate(voice.wave, phase_a)
-		if voice.detune > 0.0:
-			s = (s + _oscillate(voice.wave, phase_b)) * 0.5
-			phase_b = fmod(phase_b + step * (1.0 + voice.detune) * wobble, 1.0)
-		phase_a = fmod(phase_a + step * wobble, 1.0)
-		low += smoothing * (s - low)
-		buffer[(first + k) % size] += low * level * amp
+		var step_a := step * wobble
+		low_a += smoothing * (_oscillate(voice.wave, phase_a, step_a) - low_a)
+		phase_a = fmod(phase_a + step_a, 1.0)
+		var i := (first + k) % size
+		var a := low_a * level * amp
+		left[i] += a * gains_a.x
+		right[i] += a * gains_a.y
+		if detuned:
+			var step_b := step * (1.0 + voice.detune) * wobble
+			low_b += smoothing * (_oscillate(voice.wave, phase_b, step_b) - low_b)
+			phase_b = fmod(phase_b + step_b, 1.0)
+			var b := low_b * level * amp
+			left[i] += b * gains_b.x
+			right[i] += b * gains_b.y
 
 
-static func _oscillate(wave: Wave, phase: float) -> float:
+## One sample of `wave` at `phase` (0..1) advancing `step` per sample. Saw
+## and square are band-limited (PolyBLEP): their jumps are smoothed so no
+## overtones fold back below the note as harsh, out-of-tune whine.
+static func _oscillate(wave: Wave, phase: float, step: float) -> float:
 	match wave:
 		Wave.TRIANGLE:
 			return 4.0 * absf(phase - 0.5) - 1.0
 		Wave.SQUARE:
-			return 1.0 if phase < 0.5 else -1.0
+			return (1.0 if phase < 0.5 else -1.0) + _blep(phase, step) - _blep(fmod(phase + 0.5, 1.0), step)
 		Wave.SAW:
-			return 2.0 * phase - 1.0
+			return 2.0 * phase - 1.0 - _blep(phase, step)
 		Wave.WARM:
 			var p := phase * TAU
 			return sin(p) + 0.32 * sin(2.0 * p) + 0.12 * sin(3.0 * p)
 	return sin(phase * TAU)
 
 
-## A small Schroeder room (four damped combs into two all-passes). The buffer
-## is processed twice so the tail wraps into the start and loops seamlessly.
-## All delay lines share one flat array (packed arrays copy on write).
-static func _reverb(buffer: PackedFloat32Array, wet: float) -> void:
-	var lengths := PackedInt32Array([557, 593, 641, 677, 277, 211])
-	var offsets := PackedInt32Array()
-	var total := 0
-	for length in lengths:
-		offsets.append(total)
-		total += length
-	var lines := PackedFloat32Array()
-	lines.resize(total)
-	var heads := PackedInt32Array([0, 0, 0, 0, 0, 0])
-	var damped := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
-	var dry := buffer.duplicate()
-	var size := buffer.size()
-	for round in 2:
-		for i in size:
-			var input := dry[i] * 0.25
-			var out := 0.0
-			for c in 4:
-				var at := offsets[c] + heads[c]
-				var delayed := lines[at]
-				damped[c] = delayed * 0.7 + damped[c] * 0.3
-				lines[at] = input + damped[c] * 0.8
-				heads[c] = (heads[c] + 1) % lengths[c]
-				out += delayed
-			for a in range(4, 6):
-				var at := offsets[a] + heads[a]
-				var delayed := lines[at]
-				lines[at] = out + delayed * 0.5
-				out = delayed - out * 0.5
-				heads[a] = (heads[a] + 1) % lengths[a]
-			if round == 1:
-				buffer[i] = dry[i] + out * wet
+## The PolyBLEP correction for a jump at phase 0, `step` wide.
+static func _blep(phase: float, step: float) -> float:
+	if phase < step:
+		var x := phase / step
+		return x + x - x * x - 1.0
+	if phase > 1.0 - step:
+		var x := (phase - 1.0) / step
+		return x * x + x + x + 1.0
+	return 0.0
 
 
-static func _kick(buffer: PackedFloat32Array, start: float) -> void:
+## A small Schroeder room per side (four damped combs into two all-passes,
+## the right side's tuned slightly apart, which makes the room wide).
+## `loop` runs it twice so the tail wraps into the start.
+static func _reverb(mix: Mix, wet: float, loop := false) -> void:
+	var scale := RATE / 22050.0
+	var spread := roundi(23 * scale)
+	var tunings: Array[PackedInt32Array] = []
+	for side in 2:
+		var lengths := PackedInt32Array()
+		for length in [557, 593, 641, 677, 277, 211]:
+			lengths.append(roundi(length * scale) + (spread if side == 1 and lengths.size() < 4 else 0))
+		tunings.append(lengths)
+	var damping := _pole(0.7)
+	var outputs := [mix.left, mix.right]
+	var dry_left := mix.left.duplicate()
+	var dry_right := mix.right.duplicate()
+	var size := mix.size()
+	for side in 2:
+		var lengths := tunings[side]
+		var offsets := PackedInt32Array()
+		var total := 0
+		for length in lengths:
+			offsets.append(total)
+			total += length
+		var lines := PackedFloat32Array()
+		lines.resize(total)
+		var heads := PackedInt32Array([0, 0, 0, 0, 0, 0])
+		var damped := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+		var out_buffer: PackedFloat32Array = outputs[side]
+		var dry_side := dry_left if side == 0 else dry_right
+		for round in (2 if loop else 1):
+			for i in size:
+				var input := (dry_left[i] + dry_right[i]) * 0.125
+				var out := 0.0
+				for c in 4:
+					var at := offsets[c] + heads[c]
+					var delayed := lines[at]
+					damped[c] += damping * (delayed - damped[c])
+					lines[at] = input + damped[c] * 0.8
+					heads[c] = (heads[c] + 1) % lengths[c]
+					out += delayed
+				for a in range(4, 6):
+					var at := offsets[a] + heads[a]
+					var delayed := lines[at]
+					lines[at] = out + delayed * 0.5
+					out = delayed - out * 0.5
+					heads[a] = (heads[a] + 1) % lengths[a]
+				if round == (1 if loop else 0):
+					out_buffer[i] = dry_side[i] + out * wet
+
+
+static func _kick(mix: Mix, start: float) -> void:
 	var first := int(start * RATE)
+	var size := mix.size()
 	var phase := 0.0
 	for k in int(0.22 * RATE):
 		var t := float(k) / RATE
 		phase += (48.0 + 110.0 * exp(-t * 35.0)) / RATE
-		buffer[(first + k) % buffer.size()] += sin(phase * TAU) * exp(-t * 11.0) * 0.5
+		var v := sin(phase * TAU) * exp(-t * 11.0) * 0.5
+		mix.left[(first + k) % size] += v
+		mix.right[(first + k) % size] += v
 
 
-static func _snare(buffer: PackedFloat32Array, start: float, rng: RandomNumberGenerator, amp := 1.0) -> void:
+static func _snare(mix: Mix, start: float, rng: RandomNumberGenerator, amp := 1.0) -> void:
 	var first := int(start * RATE)
-	var low := 0.0
+	var size := mix.size()
+	var smooth := _pole(0.4)
+	var low_l := 0.0
+	var low_r := 0.0
 	for k in int(0.16 * RATE):
 		var t := float(k) / RATE
-		var white := rng.randf_range(-1.0, 1.0)
-		low += 0.4 * (white - low)
-		buffer[(first + k) % buffer.size()] += ((white - low) * 0.3 + sin(t * TAU * 190.0) * 0.12) * exp(-t * 22.0) * amp
+		var white_l := rng.randf_range(-1.0, 1.0)
+		var white_r := lerpf(white_l, rng.randf_range(-1.0, 1.0), 0.4)
+		low_l += smooth * (white_l - low_l)
+		low_r += smooth * (white_r - low_r)
+		var tone := sin(t * TAU * 190.0) * 0.12
+		var envelope := exp(-t * 22.0) * amp
+		mix.left[(first + k) % size] += ((white_l - low_l) * 0.3 + tone) * envelope
+		mix.right[(first + k) % size] += ((white_r - low_r) * 0.3 + tone) * envelope
 
 
-static func _bells(buffer: PackedFloat32Array, start: float, amp: float, rng: RandomNumberGenerator) -> void:
-	var first := int((start + rng.randf_range(-0.004, 0.004)) * RATE)
+## Sleigh bells, each shake from a slightly different place.
+static func _bells(mix: Mix, start: float, amp: float, rng: RandomNumberGenerator) -> void:
+	var first := maxi(int((start + rng.randf_range(-0.004, 0.004)) * RATE), 0)
+	var gains := _gains(rng.randf_range(-0.5, 0.5))
+	var size := mix.size()
 	for k in int(0.11 * RATE):
 		var t := float(k) / RATE
 		var ring := sin(t * TAU * 2650.0) + sin(t * TAU * 3720.0) * 0.7 + sin(t * TAU * 5110.0) * 0.5
-		var jingle := ring * exp(-t * 28.0) + rng.randf_range(-1.0, 1.0) * exp(-t * 60.0) * 0.6
-		buffer[(maxi(first, 0) + k) % buffer.size()] += jingle * amp * 0.65
+		var jingle := (ring * exp(-t * 28.0) + rng.randf_range(-1.0, 1.0) * exp(-t * 60.0) * 0.6) * amp * 0.65
+		mix.left[(first + k) % size] += jingle * gains.x
+		mix.right[(first + k) % size] += jingle * gains.y
 
 ## Punchy electronic kick; also where the sidechained layers duck.
 static func _thump(song: Song, start: float, amp := 1.0) -> void:
@@ -1436,80 +1545,114 @@ static func _thump(song: Song, start: float, amp := 1.0) -> void:
 		var t := float(k) / RATE
 		phase += (44.0 + 160.0 * exp(-t * 28.0)) / RATE
 		var click := sin(t * TAU * 1800.0) * exp(-t * 300.0) * 0.12
-		song.buffer[(first + k) % size] += (sin(phase * TAU) * exp(-t * 7.5) * 0.62 + click) * amp
+		var v := (sin(phase * TAU) * exp(-t * 7.5) * 0.62 + click) * amp
+		song.buffer.left[(first + k) % size] += v
+		song.buffer.right[(first + k) % size] += v
 
 
-## Noise hi-hat, closed or open.
-static func _hat(buffer: PackedFloat32Array, start: float, amp: float, open: bool, rng: RandomNumberGenerator) -> void:
+## Noise hi-hat, closed or open, a little to the right, with partly
+## different noise on each side.
+static func _hat(mix: Mix, start: float, amp: float, open: bool, rng: RandomNumberGenerator, pan := 0.3) -> void:
 	var first := int(start * RATE)
-	var size := buffer.size()
-	var low := 0.0
+	var size := mix.size()
+	var gains := _gains(pan)
+	var smooth := _pole(0.6)
+	var low_l := 0.0
+	var low_r := 0.0
 	var fall := 14.0 if open else 70.0
 	for k in int((0.25 if open else 0.05) * RATE):
 		var t := float(k) / RATE
-		var white := rng.randf_range(-1.0, 1.0)
-		low += 0.6 * (white - low)
-		buffer[(first + k) % size] += (white - low) * exp(-t * fall) * amp
+		var white_l := rng.randf_range(-1.0, 1.0)
+		var white_r := lerpf(white_l, rng.randf_range(-1.0, 1.0), 0.6)
+		low_l += smooth * (white_l - low_l)
+		low_r += smooth * (white_r - low_r)
+		var envelope := exp(-t * fall) * amp
+		mix.left[(first + k) % size] += (white_l - low_l) * envelope * gains.x
+		mix.right[(first + k) % size] += (white_r - low_r) * envelope * gains.y
 
 
-## Hand clap: three quick noise bursts and a short tail.
-static func _clap(buffer: PackedFloat32Array, start: float, amp: float, rng: RandomNumberGenerator) -> void:
+## Hand clap: three quick noise bursts and a short tail, a roomful of hands.
+static func _clap(mix: Mix, start: float, amp: float, rng: RandomNumberGenerator) -> void:
 	var first := int(start * RATE)
-	var size := buffer.size()
-	var low := 0.0
-	var body := 0.0
+	var size := mix.size()
+	var smooth_low := _pole(0.3)
+	var smooth_body := _pole(0.5)
+	var lows := [0.0, 0.0]
+	var bodies := [0.0, 0.0]
 	for k in int(0.2 * RATE):
 		var t := float(k) / RATE
 		var burst := exp(-fmod(t, 0.011) * 350.0) if t < 0.033 else exp(-(t - 0.033) * 18.0)
-		var white := rng.randf_range(-1.0, 1.0)
-		low += 0.3 * (white - low)
-		body += 0.5 * ((white - low) - body)
-		buffer[(first + k) % size] += body * burst * amp
+		var shared := rng.randf_range(-1.0, 1.0)
+		for side in 2:
+			var white := lerpf(shared, rng.randf_range(-1.0, 1.0), 0.5)
+			lows[side] += smooth_low * (white - lows[side])
+			bodies[side] += smooth_body * ((white - lows[side]) - bodies[side])
+		mix.left[(first + k) % size] += bodies[0] * burst * amp
+		mix.right[(first + k) % size] += bodies[1] * burst * amp
 
 
-## Long, bright crash cymbal.
-static func _cymbal(buffer: PackedFloat32Array, start: float, amp: float, rng: RandomNumberGenerator) -> void:
+## Long, bright crash cymbal, as wide as the room.
+static func _cymbal(mix: Mix, start: float, amp: float, rng: RandomNumberGenerator) -> void:
 	var first := int(start * RATE)
-	var size := buffer.size()
-	var low := 0.0
+	var size := mix.size()
+	var smooth := _pole(0.7)
+	var low_l := 0.0
+	var low_r := 0.0
 	for k in int(1.6 * RATE):
 		var t := float(k) / RATE
-		var white := rng.randf_range(-1.0, 1.0)
-		low += 0.7 * (white - low)
-		buffer[(first + k) % size] += (white - low) * exp(-t * 2.6) * amp
+		var white_l := rng.randf_range(-1.0, 1.0)
+		var white_r := rng.randf_range(-1.0, 1.0)
+		low_l += smooth * (white_l - low_l)
+		low_r += smooth * (white_r - low_r)
+		var envelope := exp(-t * 2.6) * amp
+		mix.left[(first + k) % size] += (white_l - low_l) * envelope
+		mix.right[(first + k) % size] += (white_r - low_r) * envelope
 
 
 ## Noise that opens up and swells into the next part.
-static func _riser(buffer: PackedFloat32Array, start: float, length: float, amp: float, rng: RandomNumberGenerator) -> void:
+static func _riser(mix: Mix, start: float, length: float, amp: float, rng: RandomNumberGenerator) -> void:
 	var first := maxi(int(start * RATE), 0)
-	var size := buffer.size()
-	var low := 0.0
+	var size := mix.size()
+	var low_l := 0.0
+	var low_r := 0.0
 	for k in int(length * RATE):
 		var x := float(k) / (length * RATE)
-		low += lerpf(0.02, 0.6, x * x) * (rng.randf_range(-1.0, 1.0) - low)
-		buffer[(first + k) % size] += low * x * x * amp
+		var smooth := _pole(lerpf(0.02, 0.6, x * x))
+		low_l += smooth * (rng.randf_range(-1.0, 1.0) - low_l)
+		low_r += smooth * (rng.randf_range(-1.0, 1.0) - low_r)
+		mix.left[(first + k) % size] += low_l * x * x * amp
+		mix.right[(first + k) % size] += low_r * x * x * amp
 
 
 ## The big, abruptly cut snare of the eighties.
-static func _gated_snare(buffer: PackedFloat32Array, start: float, amp: float, rng: RandomNumberGenerator) -> void:
+static func _gated_snare(mix: Mix, start: float, amp: float, rng: RandomNumberGenerator) -> void:
 	var first := int(start * RATE)
-	var size := buffer.size()
-	var low := 0.0
+	var size := mix.size()
+	var smooth := _pole(0.35)
+	var low_l := 0.0
+	var low_r := 0.0
 	for k in int(0.28 * RATE):
 		var t := float(k) / RATE
-		var white := rng.randf_range(-1.0, 1.0)
-		low += 0.35 * (white - low)
+		var white_l := rng.randf_range(-1.0, 1.0)
+		var white_r := lerpf(white_l, rng.randf_range(-1.0, 1.0), 0.7)
+		low_l += smooth * (white_l - low_l)
+		low_r += smooth * (white_r - low_r)
 		var gate := 1.0 if t < 0.2 else exp(-(t - 0.2) * 60.0)
 		var tone := sin(t * TAU * 180.0) * exp(-t * 20.0) * 0.3
-		buffer[(first + k) % size] += ((white - low) * 0.35 * (0.6 + 0.4 * exp(-t * 8.0)) * gate + tone) * amp
+		var body := 0.35 * (0.6 + 0.4 * exp(-t * 8.0)) * gate
+		mix.left[(first + k) % size] += ((white_l - low_l) * body + tone) * amp
+		mix.right[(first + k) % size] += ((white_r - low_r) * body + tone) * amp
 
 
 ## Old-console noise drum: stepped random noise with a quick decay.
-static func _chip_noise(buffer: PackedFloat32Array, start: float, length: float, amp: float, fall: float, rng: RandomNumberGenerator) -> void:
+static func _chip_noise(mix: Mix, start: float, length: float, amp: float, fall: float, rng: RandomNumberGenerator) -> void:
 	var first := int(start * RATE)
-	var size := buffer.size()
+	var size := mix.size()
+	var hold := maxi(roundi(RATE / 7350.0), 1)
 	var held := 0.0
 	for k in int(length * RATE):
-		if k % 3 == 0:
+		if k % hold == 0:
 			held = rng.randf_range(-1.0, 1.0)
-		buffer[(first + k) % size] += held * exp(-float(k) / RATE * fall) * amp
+		var v := held * exp(-float(k) / RATE * fall) * amp
+		mix.left[(first + k) % size] += v
+		mix.right[(first + k) % size] += v

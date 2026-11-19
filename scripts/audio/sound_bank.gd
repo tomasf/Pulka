@@ -39,6 +39,16 @@ var _music_level := -8.0
 ## Prefer the same pre-rendered audio on desktop too: seven concurrent
 ## GDScript music renderers otherwise compete with streaming during play.
 ## Source checkouts without generated audio retain the synthesis fallback.
+## The baked song: Ogg Vorbis, or WAV when it was baked without ffmpeg ("" if
+## neither is there).
+static func song_path(index: int) -> String:
+	for extension in ["ogg", "wav"]:
+		var path := WEB_AUDIO + "song_%d.%s" % [index, extension]
+		if ResourceLoader.exists(path):
+			return path
+	return ""
+
+
 static func uses_baked_audio() -> bool:
 	if OS.has_feature("web") or Quality.is_tv():
 		return true
@@ -46,7 +56,7 @@ static func uses_baked_audio() -> bool:
 		if not ResourceLoader.exists(WEB_AUDIO + name + ".res"):
 			return false
 	for i in MusicComposer.SONG_COUNT:
-		if not ResourceLoader.exists(WEB_AUDIO + "song_%d.wav" % i):
+		if song_path(i) == "":
 			return false
 	return true
 
@@ -87,7 +97,7 @@ func _ready() -> void:
 	_first_song = _order[0]
 	if uses_baked_audio():
 		for i in MusicComposer.SONG_COUNT:
-			_songs[i] = load(WEB_AUDIO + "song_%d.wav" % i)
+			_songs[i] = load(song_path(i))
 		return
 	# Rendered in the order they will play.
 	for index in _order:
