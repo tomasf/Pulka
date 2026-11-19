@@ -5,7 +5,24 @@ two players get independent pickers in the shared world's split view. The
 selected rider, vehicle and terrain survive Start. The camera turns around the
 rider for 1.1 s, then the countdown shows 3, 2, 1 at 0.7 s per number and releases the riders.
 The complete camera/countdown sequence is 3.2 s.
-Only retries and returning to the opening menu create a new world.
+Retries and returning from a run create a new world. Back from ride selection
+keeps the preview world, rider and camera.
+
+The player-choice/ride-picker transition takes 0.72 s: the shared logo glides
+between header positions, the outgoing page recedes, and the detail panel,
+dock and ride cards arrive in stages. The winter backdrop eases forward with
+a brief snow drift while revealing the live preview. Reversing direction
+cancels the outgoing animation, including its delayed visibility callbacks.
+Two-player selection uses the same header and backdrop transition. Its two
+player panels arrive with a small stagger; shared confirm never focuses the
+Back button. Returning covers the split views before removing their cameras.
+
+New riders, picker entries and retries draw jacket colors from the shared
+clothing palette. Reopening selection changes the first rider's last color.
+Two-player selection excludes the first rider's color from the second's draw.
+Changing rides and starting from a preview preserve those colors; results
+follow the matching jacket color. Player numbers appear in the results rather
+than above the riders in the picker or race.
 
 `MenuFlow` fits a 1600×900 design canvas inside the safe-area viewport. Its
 vehicle and player illustrations render actual models once into small textures;

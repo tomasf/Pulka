@@ -20,7 +20,7 @@ func _run() -> void:
 	var second: Player = players[1]
 	_check("split-screen applies the platform shadow budget", first.atmosphere._sun.directional_shadow_mode == Quality.shadow_mode(true) and second.atmosphere._sun.directional_shadow_mode == Quality.shadow_mode(true))
 	for p: Player in players:
-		p.sled.set_vehicle(VehicleSpec.all()[0], RandomNumberGenerator.new(), Player.COLORS[p.index])
+		p.sled.set_vehicle(VehicleSpec.all()[0], RandomNumberGenerator.new(), p.color)
 		p.sled.frozen = true
 		p.camera.mode = ChaseCamera.Mode.CHASE
 	var field: TerrainField = main.get("_field")

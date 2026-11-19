@@ -141,6 +141,7 @@ var _spawn_kind := -1
 var _players: Array[Player] = []
 ## Two-player mode is chosen on the menu; a race is on while it is set.
 var _two_players := false
+var _menu_return_pending := false
 var _racing := false
 var _race_length := RACE_LENGTH
 var _race_time := 0.0
@@ -424,6 +425,7 @@ func _make_player(index: int, camera: ChaseCamera, controls: PlayerControls) -> 
 	sled.speed_multiplier = _speed_multiplier
 	_world_root.add_child(sled)
 	var p := Player.new(index, sled, camera, controls)
+	p.randomize_color(_rng, _players[0].color if not _players.is_empty() else Color.TRANSPARENT)
 	p.atmosphere = _atmosphere
 	if index > 0:
 		p.atmosphere = Atmosphere.new()
@@ -460,20 +462,33 @@ func _new_world() -> void:
 
 
 func _enter_menu() -> void:
+	# Cover both live views before dismantling the split-screen scene.
+	if state == State.LOBBY and not _menu_return_pending:
+		_menu_return_pending = true
+		_input_cooldown = MenuFlow.PAGE_SECONDS
+		for player in _players: player.race_hud.hide_lobby()
+		_hud.show_screen("players")
+		create_tween().tween_callback(_enter_menu).set_delay(0.38)
+		return
+	var covered_return := _menu_return_pending
+	_menu_return_pending = false
+	var from_picker := state == State.SELECT
 	get_tree().paused = false
 	_hud.close_settings()
 	_leave_split()
 	_two_players = false
 	state = State.MENU
-	_prepare_preview_world()
+	if not from_picker: _prepare_preview_world()
 	var p := _players[0]
-	p.sled.set_vehicle(_specs[_vehicle], _rng, Player.COLORS[0])
-	p.sled.frozen = true
-	p.sled.place_at(_start_d)
-	p.camera.mode = ChaseCamera.Mode.ORBIT
-	p.camera.centered = false
-	p.camera.update_camera(0.0)
-	_hud.show_screen("players")
+	if not from_picker:
+		p.randomize_color(_rng)
+		p.sled.set_vehicle(_specs[_vehicle], _rng, p.color)
+		p.sled.frozen = true
+		p.sled.place_at(_start_d)
+		p.camera.mode = ChaseCamera.Mode.ORBIT
+		p.camera.centered = false
+		p.camera.update_camera(0.0)
+	if not covered_return: _hud.show_screen("players")
 	_refresh_menu()
 	_sound.set_music_ducked(false)
 	_sound.set_menu_music(true)
@@ -492,6 +507,9 @@ func _prepare_preview_world() -> void:
 
 func _choose_solo() -> void:
 	_two_players = false
+	var p := _players[0]
+	p.randomize_color(_rng, p.color)
+	p.sled.set_vehicle(_specs[_vehicle], _rng, p.color)
 	state = State.SELECT
 	_hud.show_screen("menu")
 	_refresh_menu()
@@ -537,7 +555,7 @@ func _change_vehicle(step: int) -> void:
 	var p := _players[0]
 	_vehicle = (_vehicle + step + _specs.size()) % _specs.size()
 	p.vehicle = _vehicle
-	p.sled.set_vehicle(_specs[_vehicle], _rng, Player.COLORS[0])
+	p.sled.set_vehicle(_specs[_vehicle], _rng, p.color)
 	p.sled.place_at(_start_d)
 	_refresh_menu()
 	_sound.play("whoosh", -6.0, 1.4)
@@ -560,7 +578,8 @@ func _start_run() -> void:
 	var p := _players[0]
 	if state != State.SELECT:
 		_prepare_preview_world()
-		p.sled.set_vehicle(spec, _rng, Player.COLORS[0])
+		p.randomize_color(_rng)
+		p.sled.set_vehicle(spec, _rng, p.color)
 		p.sled.place_at(_start_d)
 		p.camera.reset_preview()
 	p.sled.frozen = true
@@ -761,7 +780,8 @@ func _enter_lobby() -> void:
 	state = State.LOBBY
 	_ready_flags = [false, false]
 	for p in _players:
-		p.sled.set_vehicle(_specs[p.vehicle], _rng, Player.COLORS[p.index])
+		p.randomize_color(_rng, _players[0].color if p.index > 0 else p.color)
+		p.sled.set_vehicle(_specs[p.vehicle], _rng, p.color)
 		p.sled.frozen = true
 		p.sled.place_at(_start_d, _lane(p))
 		p.camera.mode = ChaseCamera.Mode.ORBIT
@@ -818,7 +838,7 @@ func _back_to_solo() -> void:
 ## The next (or previous) ride this player has unlocked.
 func _pick(p: Player, step: int) -> void:
 	p.vehicle = _next_unlocked(p.vehicle, step)
-	p.sled.set_vehicle(_specs[p.vehicle], _rng, Player.COLORS[p.index])
+	p.sled.set_vehicle(_specs[p.vehicle], _rng, p.color)
 	p.sled.place_at(_start_d, _lane(p))
 	_show_lobby(p)
 	_sound.play("whoosh", -6.0, 1.4)
@@ -881,7 +901,7 @@ func _build_split() -> void:
 			p.camera.get_parent().remove_child(p.camera)
 		view.add_child(p.camera)
 		p.camera.current = true
-		p.race_hud = RaceHud.new().setup(p.index, Player.COLORS[p.index])
+		p.race_hud = RaceHud.new().setup(p.index)
 		p.race_hud.lobby_action.connect(_on_lobby_action.bind(p))
 		half.add_child(p.race_hud)
 		row.add_child(half)
@@ -930,7 +950,8 @@ func _start_race() -> void:
 		_prepare_preview_world()
 	for p in _players:
 		if not reuse_preview:
-			p.sled.set_vehicle(_specs[p.vehicle], _rng, Player.COLORS[p.index])
+			p.randomize_color(_rng, _players[0].color if p.index > 0 else Color.TRANSPARENT)
+			p.sled.set_vehicle(_specs[p.vehicle], _rng, p.color)
 			p.sled.place_at(_start_d, _lane(p))
 			p.camera.reset_preview(true)
 		p.sled.frozen = true
@@ -1090,7 +1111,7 @@ func _end_race() -> void:
 	var rows := []
 	for p: Player in order:
 		var result := _race_clock(p.finish_time) if p.finished() else "%s m kvar" % Hud.group_digits(int(goal - p.sled.distance()))
-		rows.append(["%d. Spelare %d" % [_place_of(p), p.index + 1], result, Player.COLORS[p.index]])
+		rows.append(["%d. Spelare %d" % [_place_of(p), p.index + 1], result, p.color])
 	_hud.show_race_result("Spelare %d vinner!" % (winner.index + 1), rows)
 	_sound.set_music_ducked(true)
 	_input_cooldown = Hud.OVER_GUARD
@@ -1196,6 +1217,7 @@ func _confirm_pressed() -> bool:
 # --- On-screen buttons and app lifecycle ---
 
 func _on_hud_pressed(action: StringName) -> void:
+	if _menu_return_pending: return
 	if String(action).begins_with("vehicle_") and state == State.SELECT:
 		var index := String(action).trim_prefix("vehicle_").to_int()
 		if index >= 0 and index < _specs.size():
@@ -1321,6 +1343,7 @@ func _update_go_back() -> void:
 # --- Settings ---
 
 func _update_settings_input() -> void:
+	if _menu_return_pending: return
 	if _hud.about_open:
 		if Input.is_action_just_pressed(&"back") or Input.is_action_just_pressed(&"pause"):
 			_hud.close_about()

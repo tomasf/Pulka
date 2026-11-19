@@ -13,6 +13,7 @@ const MUTED := Color("a2accb")
 const WHITE := Color("f6f8ff")
 const DESIGN := Vector2(1600, 900)
 const PICKER_SHADE := Color(0.04, 0.07, 0.15, 0.88)
+const PAGE_SECONDS := 0.72
 
 signal pressed(action: StringName)
 
@@ -23,6 +24,8 @@ static var _vehicle_textures := {}
 var canvas: Control
 var players: Control
 var picker: Control
+## The shared header; each player's actual picker lives in RaceHud.
+var lobby: Control
 var solo: Button
 var duo: Button
 var start: Button
@@ -43,22 +46,35 @@ var _background: WinterBackdrop
 var _picker_shade: TextureRect
 var _picker_fill: ColorRect
 var _transition: Tween
+var _current_page: Control
+var _dismissed := false
+var _brand: Label
+var _picker_details: Control
+var _picker_dock: Control
 var _thumb_views: Array[SubViewport] = []
 
 
 class WinterBackdrop extends Control:
 	var clock := 0.0
+	var rush := 0.0
+	var sky: GradientTexture2D
+	func _ready() -> void:
+		var gradient := Gradient.new()
+		gradient.colors = PackedColorArray([NIGHT, NIGHT.lerp(Color("29334e"), 0.85)])
+		sky = GradientTexture2D.new()
+		sky.width = 8
+		sky.height = 256
+		sky.fill_from = Vector2.ZERO
+		sky.fill_to = Vector2.DOWN
+		sky.gradient = gradient
 	func _process(delta: float) -> void:
 		if not is_visible_in_tree(): return
-		clock += delta
+		clock += delta * (1.0 + rush * 5.0)
 		queue_redraw()
 	func _draw() -> void:
 		var s := size
-		draw_rect(Rect2(Vector2.ZERO, s), Color("101329"))
-		# Wide, quiet bands of moonlight behind the snow-capped ridge.
-		for i in 28:
-			var t := i / 27.0
-			draw_rect(Rect2(0, s.y * t, s.x, s.y / 27.0 + 1), Color("101329").lerp(Color("29334e"), t * 0.85))
+		# One continuous gradient avoids dark seams while fading and zooming.
+		draw_texture_rect(sky, Rect2(Vector2.ZERO, s), false)
 		for layer in 3:
 			var ridge := PackedVector2Array([Vector2(0, s.y)])
 			for i in 18:
@@ -71,6 +87,8 @@ class WinterBackdrop extends Control:
 			var x := fposmod(i * 347.7 + clock * (3.0 + i % 3), s.x)
 			var y := fposmod(i * 179.3 + clock * (8.0 + i % 5), s.y)
 			draw_circle(Vector2(x, y), 1.0 + i % 3 * 0.5, Color(0.85, 0.94, 1, 0.12 + i % 4 * 0.04))
+			if rush > 0.01:
+				draw_line(Vector2(x, y), Vector2(x + rush * 8, y - rush * (12 + i % 4 * 5)), Color(0.85, 0.94, 1, rush * 0.16), 1.0, true)
 		# Two tracks curling down the far side of the hill.
 		for side in [-1.0, 1.0]:
 			var trail := PackedVector2Array()
@@ -216,8 +234,13 @@ func _ready() -> void:
 	add_child(canvas)
 	players = _page()
 	picker = _page()
+	lobby = _page()
 	_build_players()
 	_build_picker()
+	_brand = _text(canvas, "PULKA!", 44, Vector2(80, 42), WHITE, true)
+	_brand.add_theme_color_override("font_shadow_color", Color(NIGHT, 0.28))
+	_brand.add_theme_constant_override("shadow_offset_x", 0)
+	_brand.add_theme_constant_override("shadow_offset_y", 3)
 	settings = _button("⚙", &"settings", Vector2(1444, 42), Vector2(76, 64))
 	settings.tooltip_text = "Inställningar"
 	settings.accessibility_name = "Inställningar"
@@ -246,6 +269,7 @@ func _ready() -> void:
 func _page() -> Control:
 	var page := Control.new()
 	page.size = DESIGN
+	page.pivot_offset = DESIGN * 0.5
 	page.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(page)
 	return page
@@ -256,6 +280,7 @@ func _fit() -> void:
 	if fit <= 0.0: return
 	canvas.scale = Vector2.ONE * fit
 	canvas.position = (size - DESIGN * fit) * 0.5
+	_background.pivot_offset = size * 0.5
 	if is_instance_valid(_picker_shade):
 		# Keep the existing fade beside the text; continue its leftmost tint
 		# across the extra viewport space outside the fitted design canvas.
@@ -286,7 +311,6 @@ func _button(text: String, action: StringName, at: Vector2, dimensions: Vector2,
 
 
 func _build_players() -> void:
-	_text(players, "PULKA!", 44, Vector2(80, 42), WHITE, true)
 	var headline := _text(players, "UT I\nBACKEN.", 112, Vector2(120, 230), WHITE, true)
 	headline.add_theme_constant_override("line_spacing", -30)
 	_text(players, "Snö i nacken. Ett åk till.", 26, Vector2(126, 521), ICE)
@@ -337,32 +361,39 @@ func _build_picker() -> void:
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	picker.add_child(shade)
 	back = _button("‹  Spelare", &"players", Vector2(80, 42), Vector2(190, 64))
-	picker.add_child(back)
-	_text(picker, "PULKA!", 44, Vector2(702, 44), WHITE, true)
-	_text(picker, "DITT ÅK BÖRJAR HÄR", 16, Vector2(84, 198), LIME)
-	_name = _text(picker, "Pulka", 76, Vector2(80, 228), WHITE, true)
-	_tagline = _text(picker, "Den röda klassikern.", 25, Vector2(84, 332), ICE)
+	canvas.add_child(back)
+	_picker_details = Control.new()
+	_picker_details.size = DESIGN
+	_picker_details.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	picker.add_child(_picker_details)
+	_text(_picker_details, "DITT ÅK BÖRJAR HÄR", 16, Vector2(84, 198), LIME)
+	_name = _text(_picker_details, "Pulka", 76, Vector2(80, 228), WHITE, true)
+	_tagline = _text(_picker_details, "Den röda klassikern.", 25, Vector2(84, 332), ICE)
 	for i in 3:
-		_text(picker, ["Fart", "Styrning", "Grepp"][i], 18, Vector2(86, 408 + i * 38), WHITE)
+		_text(_picker_details, ["Fart", "Styrning", "Grepp"][i], 18, Vector2(86, 408 + i * 38), WHITE)
 		var stat := Stat.new()
 		stat.position = Vector2(214, 417 + i * 38)
 		stat.size = Vector2(170, 12)
 		stat.tint = [CORAL, ICE, LIME][i]
-		picker.add_child(stat)
+		_picker_details.add_child(stat)
 		_stats.append(stat)
-	_locked = _text(picker, "", 20, Vector2(84, 550), CORAL)
-	_controls_hint = _text(picker, "", 17, Vector2(84, 596), WHITE)
+	_locked = _text(_picker_details, "", 20, Vector2(84, 550), CORAL)
+	_controls_hint = _text(_picker_details, "", 17, Vector2(84, 596), WHITE)
+	_picker_dock = Control.new()
+	_picker_dock.size = DESIGN
+	_picker_dock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	picker.add_child(_picker_dock)
 	var dock := Panel.new()
 	dock.position = Vector2(60, 666)
 	dock.size = Vector2(1480, 170)
 	dock.add_theme_stylebox_override("panel", style(Color(0.055, 0.07, 0.15, 0.95), Color(1, 1, 1, 0.15), 26))
-	picker.add_child(dock)
+	_picker_dock.add_child(dock)
 	var specs := VehicleSpec.all()
 	for i in specs.size():
 		var button := _button("", StringName("vehicle_%d" % i), Vector2(82 + i * 192, 684), Vector2(176, 134))
 		button.tooltip_text = specs[i].title
 		button.accessibility_name = specs[i].title
-		picker.add_child(button)
+		_picker_dock.add_child(button)
 		var preview := _preview(specs[i].model, 1, false)
 		preview.position = Vector2(7, 4)
 		preview.size = Vector2(162, 88)
@@ -373,9 +404,9 @@ func _build_picker() -> void:
 		cards.append(button)
 	start = _button("NU ÅKER VI  →", &"start", Vector2(1100, 702), Vector2(412, 98), true)
 	start.add_theme_font_size_override("font_size", 28)
-	picker.add_child(start)
-	_picker_hint = _text(picker, "", 16, Vector2(84, 851), WHITE)
-	_start_hint = _text(picker, "", 16, Vector2(1320, 851), WHITE)
+	_picker_dock.add_child(start)
+	_picker_hint = _text(_picker_dock, "", 16, Vector2(84, 851), WHITE)
+	_start_hint = _text(_picker_dock, "", 16, Vector2(1320, 851), WHITE)
 	set_touch_mode(false)
 	for i in cards.size():
 		# Horizontal navigation picks a ride in Main; keep native focus on
@@ -459,19 +490,21 @@ func set_covered(covered: bool) -> void:
 
 
 func show_players() -> void:
-	players.visible = true
-	picker.visible = false
 	_enter(players)
 
 
 func show_picker() -> void:
-	players.visible = false
-	picker.visible = true
 	_enter(picker)
+
+
+func show_lobby() -> void:
+	_enter(lobby)
 
 
 func dismiss() -> void:
 	if _transition != null: _transition.kill()
+	_dismissed = true
+	_background.rush = 0.0
 	_transition = create_tween()
 	_transition.tween_property(self, "modulate:a", 0.0, 0.28)
 	_transition.tween_callback(hide)
@@ -479,14 +512,81 @@ func dismiss() -> void:
 
 func _enter(page: Control) -> void:
 	if _transition != null: _transition.kill()
+	var changing := _current_page != null and _current_page != page and not _dismissed
+	var continuing := changing and page.visible
+	_current_page = page
+	_dismissed = false
 	modulate.a = 1.0
-	page.modulate.a = 0.0
-	if not _background.visible: _background.modulate.a = 0.0
+	canvas.show()
+	page.show()
+	back.focus_mode = Control.FOCUS_NONE if page == lobby else Control.FOCUS_ALL
+	settings.focus_mode = back.focus_mode
+	if not continuing:
+		page.position = Vector2.ZERO
+		page.scale = Vector2.ONE
+		page.modulate.a = 1.0
 	_background.show()
 	_transition = create_tween().set_parallel(true)
-	_transition.tween_property(page, "modulate:a", 1.0, 0.3).set_trans(Tween.TRANS_SINE)
-	_transition.tween_property(_background, "modulate:a", 1.0 if page == players else 0.0, 0.35).set_trans(Tween.TRANS_SINE)
-	if page == picker: _transition.chain().tween_callback(_background.hide)
+	_transition.tween_property(_brand, "position", Vector2(80, 42) if page == players else Vector2(702, 44), 0.62 if changing else 0.0).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_transition.tween_method(func(t: float) -> void: _background.rush = sin(t * PI) * (0.8 if page != players else 0.4), 0.0, 1.0, PAGE_SECONDS)
+	if page != players:
+		back.show()
+		_transition.tween_property(page, "modulate:a", 1.0, 0.2)
+		if changing:
+			_transition.tween_property(players, "position", Vector2(-64, 0), 0.24).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+			_transition.tween_property(players, "scale", Vector2.ONE * 0.98, 0.24).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+			_transition.tween_property(players, "modulate:a", 0.0, 0.2).set_trans(Tween.TRANS_SINE)
+			_transition.tween_callback(players.hide).set_delay(0.24)
+		else:
+			players.hide()
+		_arrive(back, Vector2(-18, 0), 0.16, 0.36, continuing)
+		if page == picker:
+			_arrive(_picker_details, Vector2(-36, 0), 0.18, 0.5, continuing)
+			_arrive(_picker_dock, Vector2(0, 72), 0.14, 0.52, continuing)
+			for i in cards.size():
+				_slide_in(cards[i], Vector2(0, 22), 0.2 + i * 0.025, 0.42, continuing)
+		else:
+			picker.hide()
+		_transition.tween_property(_background, "scale", Vector2.ONE * 1.045, 0.62).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		_transition.tween_property(_background, "modulate:a", 0.0, 0.52).set_delay(0.1).set_trans(Tween.TRANS_SINE)
+	else:
+		_transition.tween_property(back, "modulate:a", 0.0, 0.16)
+		_transition.tween_callback(back.hide).set_delay(0.2)
+		if changing:
+			_transition.tween_property(_picker_details, "position", Vector2(-28, 0), 0.18).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+			_transition.tween_property(_picker_dock, "position", Vector2(0, 64), 0.2).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+			_transition.tween_property(picker, "modulate:a", 0.0, 0.18)
+			_transition.tween_callback(picker.hide).set_delay(0.2)
+		else:
+			picker.hide()
+			_background.modulate.a = 1.0
+		_arrive(players, Vector2(48, 0), 0.14 if changing else 0.0, 0.48, continuing)
+		_transition.tween_property(players, "scale", Vector2.ONE, 0.48).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+		_transition.tween_property(_background, "scale", Vector2.ONE, 0.6).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		_transition.tween_property(_background, "modulate:a", 1.0, 0.36).set_trans(Tween.TRANS_SINE)
+	_transition.finished.connect(_settle_page.bind(page))
+
+
+## Animate parents' opacity so locked cards keep their own dimming.
+func _arrive(control: Control, offset: Vector2, delay: float, duration: float, continuing := false) -> void:
+	_slide_in(control, offset, delay, duration, continuing)
+	if not continuing: control.modulate.a = 0.0
+	_transition.tween_property(control, "modulate:a", 1.0, duration * 0.75).set_delay(delay).set_trans(Tween.TRANS_SINE)
+
+
+func _slide_in(control: Control, offset: Vector2, delay: float, duration: float, continuing := false) -> void:
+	var rest: Vector2 = control.get_meta(&"rest_position", control.position)
+	control.set_meta(&"rest_position", rest)
+	if not continuing: control.position = rest + offset
+	_transition.tween_property(control, "position", rest, duration).set_delay(delay).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+
+
+func _settle_page(page: Control) -> void:
+	players.visible = page == players
+	picker.visible = page == picker
+	lobby.visible = page == lobby
+	_background.rush = 0.0
+	_background.visible = page == players
 
 
 func update_vehicle(spec: VehicleSpec, unlocked: bool, best_distance: float, best_score: int, unlocked_distance := -1.0) -> void:
@@ -520,4 +620,5 @@ func set_touch_mode(touch: bool) -> void:
 
 
 func default_focus() -> Button:
-	return solo if players.visible else (start if not start.disabled else back)
+	if _current_page == lobby: return null
+	return solo if _current_page == players else (start if not start.disabled else back)

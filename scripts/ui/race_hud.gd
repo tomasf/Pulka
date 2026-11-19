@@ -1,6 +1,6 @@
 class_name RaceHud
 extends Control
-## One player's half of a split-screen race: who they are, their place,
+## One player's half of a split-screen race: their place,
 ## how far is left to the finish and how fast they go, with their own
 ## call-outs, splats and flashes.
 
@@ -9,15 +9,16 @@ const ROW_HEIGHT := 44.0
 const ROW_TOP := 150.0
 const HOLD := 1.6
 
-var _tag: Label
 var _place: Label
 var _left: Label
 var _speed: Label
 var _center: CountdownDisplay
 ## The ride picker shown on this half before a race.
 var _lobby: Control
+var _lobby_content: Control
+var _lobby_intro: Tween
+var _lobby_delay := 0.18
 var _lobby_ride: Label
-var _lobby_who: Label
 var _lobby_bars: Array[MenuFlow.Stat] = []
 var _lobby_preview: TextureRect
 var _ready_button: Button
@@ -29,7 +30,8 @@ var _notes: Array[Label] = []
 var _shown_place := 0
 
 
-func setup(index: int, color: Color) -> RaceHud:
+func setup(index: int) -> RaceHud:
+	_lobby_delay = 0.18 + index * 0.06
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_flash = ColorRect.new()
@@ -37,9 +39,6 @@ func setup(index: int, color: Color) -> RaceHud:
 	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_flash.color = Color(1, 1, 1, 0)
 	add_child(_flash)
-	_tag = Hud.label("Spelare %d" % (index + 1), 30, color, 8)
-	_tag.position = Vector2(28, 18)
-	add_child(_tag)
 	_place = Hud.label("", 64, Hud.WARM, 14)
 	_place.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	_place.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -83,24 +82,20 @@ func _build_lobby() -> void:
 		canvas.position = (size - Vector2(800, 900) * factor) * 0.5
 	resized.connect(fit)
 	fit.call_deferred()
-	var badge := Panel.new()
-	badge.position = Vector2(34, 108)
-	badge.size = Vector2(180, 42)
-	badge.add_theme_stylebox_override("panel", MenuFlow.style(Color(0.055, 0.07, 0.15, 0.88), Color.TRANSPARENT, 14))
-	canvas.add_child(badge)
-	_lobby_who = MenuFlow.caption(_tag.text.to_upper(), 20, _tag.get_theme_color("font_color"))
-	_lobby_who.position = Vector2(48, 116)
-	canvas.add_child(_lobby_who)
+	_lobby_content = Control.new()
+	_lobby_content.size = Vector2(800, 900)
+	_lobby_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(_lobby_content)
 	var panel := Panel.new()
 	panel.position = Vector2(34, 654)
 	panel.size = Vector2(732, 218)
 	panel.add_theme_stylebox_override("panel", MenuFlow.style(Color(0.055, 0.07, 0.15, 0.94), Color(1, 1, 1, 0.18), 24))
-	canvas.add_child(panel)
+	_lobby_content.add_child(panel)
 	_lobby_ride = MenuFlow.caption("", 38, Color.WHITE, true)
 	_lobby_ride.position = Vector2(120, 682)
 	_lobby_ride.size.x = 340
 	_lobby_ride.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	canvas.add_child(_lobby_ride)
+	_lobby_content.add_child(_lobby_ride)
 	for side in [-1, 1]:
 		var arrow := Button.new()
 		arrow.text = "‹" if side < 0 else "›"
@@ -110,23 +105,23 @@ func _build_lobby() -> void:
 		arrow.focus_mode = Control.FOCUS_NONE
 		var action := &"previous" if side < 0 else &"next"
 		arrow.pressed.connect(func() -> void: lobby_action.emit(action))
-		canvas.add_child(arrow)
+		_lobby_content.add_child(arrow)
 	_lobby_preview = TextureRect.new()
 	_lobby_preview.position = Vector2(540, 664)
 	_lobby_preview.size = Vector2(210, 112)
 	_lobby_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_lobby_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_lobby_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	canvas.add_child(_lobby_preview)
+	_lobby_content.add_child(_lobby_preview)
 	for i in 3:
 		var name_label := MenuFlow.caption(["Fart", "Styrning", "Grepp"][i], 16, MenuFlow.MUTED)
 		name_label.position = Vector2(64, 750 + i * 28)
-		canvas.add_child(name_label)
+		_lobby_content.add_child(name_label)
 		var bar := MenuFlow.Stat.new()
 		bar.position = Vector2(174, 756 + i * 28)
 		bar.size = Vector2(170, 12)
 		bar.tint = [MenuFlow.CORAL, MenuFlow.ICE, MenuFlow.LIME][i]
-		canvas.add_child(bar)
+		_lobby_content.add_child(bar)
 		_lobby_bars.append(bar)
 	_ready_button = Button.new()
 	_ready_button.text = "KLAR"
@@ -135,19 +130,20 @@ func _build_lobby() -> void:
 	_ready_button.focus_mode = Control.FOCUS_NONE
 	MenuFlow.skin(_ready_button, true)
 	_ready_button.pressed.connect(func() -> void: lobby_action.emit(&"ready"))
-	canvas.add_child(_ready_button)
+	_lobby_content.add_child(_ready_button)
 	_lobby_controls = MenuFlow.caption("", 15, MenuFlow.MUTED)
 	_lobby_controls.position = Vector2(64, 843)
-	canvas.add_child(_lobby_controls)
+	_lobby_content.add_child(_lobby_controls)
 	_lobby_status = MenuFlow.caption("Väntar…", 26, MenuFlow.ICE)
 	_lobby_status.position = _ready_button.position
 	_lobby_status.size = _ready_button.size
 	_lobby_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_lobby_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	canvas.add_child(_lobby_status)
+	_lobby_content.add_child(_lobby_status)
 
 
 func show_lobby(spec: VehicleSpec, controls: String, ready: bool) -> void:
+	var entering := not _lobby.visible
 	_lobby.modulate.a = 1.0
 	_lobby_ride.text = spec.title
 	_lobby_preview.texture = MenuFlow.vehicle_texture(spec.model)
@@ -159,24 +155,30 @@ func show_lobby(spec: VehicleSpec, controls: String, ready: bool) -> void:
 	_lobby_status.visible = ready
 	_ready_button.visible = not ready
 	_lobby.visible = true
-	_tag.visible = false
+	if entering:
+		if _lobby_intro != null: _lobby_intro.kill()
+		_lobby_content.position = Vector2(0, 42)
+		_lobby_content.modulate.a = 0.0
+		_lobby_intro = create_tween().set_parallel(true)
+		_lobby_intro.tween_property(_lobby_content, "position", Vector2.ZERO, 0.5).set_delay(_lobby_delay).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+		_lobby_intro.tween_property(_lobby_content, "modulate:a", 1.0, 0.36).set_delay(_lobby_delay).set_trans(Tween.TRANS_SINE)
 	_left.visible = false
 	_speed.visible = false
 	_place.visible = false
 
 
 func hide_lobby() -> void:
+	if _lobby_intro != null: _lobby_intro.kill()
 	var fade := create_tween()
 	fade.tween_property(_lobby, "modulate:a", 0.0, 0.25)
 	fade.tween_callback(_lobby.hide)
-	_tag.visible = false
 	_left.visible = false
 	_speed.visible = false
 	_place.visible = false
 
 
 func show_race() -> void:
-	for readout in [_tag, _left, _speed, _place]: readout.visible = true
+	for readout in [_left, _speed, _place]: readout.visible = true
 
 
 ## `left` is metres still to go; `place` is 1 or 2.

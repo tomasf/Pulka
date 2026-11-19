@@ -124,8 +124,6 @@ var reset_pending: bool:
 	get: return _reset_confirm.visible
 ## Full-screen backgrounds that must bleed past the safe area.
 var _backdrops: Array[Control] = []
-## Over the split-screen menu: the players choice and how to go back.
-var _lobby_bar: Control
 ## In a split-screen race each player has their own HUD; this one only
 ## shows menus, pause and results.
 var racing := false
@@ -166,7 +164,6 @@ func _ready() -> void:
 	_build_menu()
 	_build_pause()
 	_build_game_over()
-	_build_lobby_bar()
 	_build_settings()
 	_build_about()
 	if OS.has_feature("web"):
@@ -434,34 +431,6 @@ func _build_menu() -> void:
 	_menu = MenuFlow.new()
 	add_child(_menu)
 	_menu.pressed.connect(func(action: StringName) -> void: pressed.emit(action))
-
-
-func _build_lobby_bar() -> void:
-	_lobby_bar = _full_rect()
-	var back := _button("‹  Spelare", &"players", 26)
-	back.position = Vector2(30, 24)
-	_lobby_bar.add_child(back)
-	var title := MenuFlow.caption("PULKA!", 40, Color.WHITE, true)
-	title.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	title.offset_left = -100
-	title.offset_right = 100
-	title.offset_top = 24
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_lobby_bar.add_child(title)
-	var settings := _button("⚙", &"settings", 26)
-	settings.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	settings.offset_left = -110
-	settings.offset_right = -30
-	settings.offset_top = 24
-	settings.offset_bottom = 80
-	settings.tooltip_text = "Inställningar"
-	settings.accessibility_name = "Inställningar"
-	MenuFlow.gear_icon(settings)
-	_lobby_bar.add_child(settings)
-	# Each rider's A/Space readies their own side; this bar has no default
-	# focus so a shared ui_accept cannot also activate Back.
-	back.focus_mode = Control.FOCUS_NONE
-	settings.focus_mode = Control.FOCUS_NONE
 
 
 func update_menu(spec: VehicleSpec, unlocked: bool, best_distance: float, best_score: int, unlocked_distance := -1.0) -> void:
@@ -954,7 +923,7 @@ func open_settings(master: float, music: float, effects: float) -> void:
 		var amount := _sliders[i].get_parent().get_child(2) as Label
 		amount.text = "%d %%" % int(_sliders[i].value)
 	_covered.clear()
-	for screen in [_menu, _pause, _lobby_bar]:
+	for screen in [_menu, _pause]:
 		if screen.visible:
 			if screen == _menu:
 				_menu.set_covered(true)
@@ -1033,7 +1002,9 @@ func _focus_current() -> void:
 		_about_done.grab_focus()
 		return
 	if _menu.visible:
-		_menu.default_focus().grab_focus()
+		var button := _menu.default_focus()
+		if button: button.grab_focus()
+		else: _release_focus()
 		return
 	for screen: Control in _default_focus:
 		if screen.visible:
@@ -1052,11 +1023,11 @@ func show_screen(screen: String, guard := 0.0) -> void:
 	if screen == "countdown" and _menu.visible:
 		_menu.dismiss()
 	else:
-		_menu.visible = screen == "menu" or screen == "players"
+		_menu.visible = screen in ["menu", "players", "lobby"]
 		if screen == "menu": _menu.show_picker()
 		elif screen == "players": _menu.show_players()
+		elif screen == "lobby": _menu.show_lobby()
 	_game.visible = (screen == "game" or screen == "pause") and not racing
-	_lobby_bar.visible = screen == "lobby"
 	_popups.visible = screen == "game"
 	_pause.visible = screen == "pause"
 	if screen == "pause": _animate_dialog(_pause)

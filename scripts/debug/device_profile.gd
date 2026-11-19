@@ -110,7 +110,7 @@ func _case(name: String, count: int) -> void:
 	else: _main.call("_force_event")
 	for p: Player in players:
 		var d := start - (65 if p.index == 1 else 0)
-		p.sled.set_vehicle(VehicleSpec.all()[0], RandomNumberGenerator.new(), Player.COLORS[p.index])
+		p.sled.set_vehicle(VehicleSpec.all()[0], RandomNumberGenerator.new(), p.color)
 		p.sled.place_at(d, -1.6 if p.index == 0 else 1.6, 32)
 		p.sled.frozen = false
 		p.sled.invulnerable_time = 1000

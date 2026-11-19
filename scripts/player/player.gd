@@ -4,9 +4,9 @@ extends RefCounted
 ## how their run is going (lives, points, crashes). Alone, a player shares
 ## the full-screen HUD; in a split-screen race each has a half of their own.
 
-const COLORS := [Color(1.0, 0.55, 0.2), Color(0.45, 0.8, 1.0)]
-
 var index := 0
+## The rider's jacket and matching result color, stable while choosing a ride.
+var color := Color.WHITE
 var sled: Sled
 var camera: ChaseCamera
 var controls: PlayerControls
@@ -46,6 +46,12 @@ func _init(number: int, ride: Sled, view: ChaseCamera, input: PlayerControls) ->
 
 func score() -> int:
 	return int(run_distance) + bonus
+
+
+func randomize_color(rng: RandomNumberGenerator, other := Color.TRANSPARENT) -> void:
+	var choices := Palette.JACKETS.duplicate()
+	choices.erase(other)
+	color = Palette.pick(choices, rng)
 
 
 func finished() -> bool:

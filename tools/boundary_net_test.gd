@@ -80,7 +80,7 @@ func _run() -> void:
 	main.call("_build_split")
 	var players: Array = main.get("_players")
 	for rider: Player in players:
-		rider.sled.set_vehicle(VehicleSpec.all()[0], RandomNumberGenerator.new(), Player.COLORS[rider.index])
+		rider.sled.set_vehicle(VehicleSpec.all()[0], RandomNumberGenerator.new(), rider.color)
 		rider.sled.place_at(d, edge - 2 if rider.index == 0 else 0)
 	main.call("_update_atmospheres", 1.0)
 	_check("only the player near the boundary sees a net", players[0].boundary_net.visible and not players[1].boundary_net.visible)

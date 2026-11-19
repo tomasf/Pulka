@@ -38,10 +38,15 @@ func _run() -> void:
 		quit(1)
 		return
 	_check("the players start on different rides", players[0].vehicle != players[1].vehicle)
+	_check("jackets use distinct palette colors", players[0].color != players[1].color and Palette.JACKETS.has(players[0].color) and Palette.JACKETS.has(players[1].color))
+	_check("both visible jackets match their players", _matches_player_color(players[0]) and _matches_player_color(players[1]))
+	var first_color: Color = players[0].color
+	var second_color: Color = players[1].color
 	await create_timer(0.5).timeout
 	var before: int = players[0].vehicle
 	await _key(KEY_D)
 	_check("D picks the first player's next ride", players[0].vehicle != before)
+	_check("changing rides preserves both jacket colors", players[0].color == first_color and players[1].color == second_color and _matches_player_color(players[0]))
 	before = players[1].vehicle
 	await _key(KEY_D)
 	_check("D leaves the second player's ride alone", players[1].vehicle == before)
@@ -49,6 +54,7 @@ func _run() -> void:
 	_check("Space readies the first player", main.get("_ready_flags")[0] and int(main.get("state")) == 5)
 	await _key(KEY_ENTER)
 	_check("both ready starts the countdown", int(main.get("state")) == 1)
+	_check("starting keeps the chosen jacket colors", players[0].color == first_color and players[1].color == second_color)
 	await create_timer(4.5).timeout
 	_check("the race is on", int(main.get("state")) == 2)
 	var field: TerrainField = main.get("_field")
@@ -74,6 +80,8 @@ func _run() -> void:
 	await _frames(30)
 	_check("both home ends the race", int(main.get("state")) == 4)
 	_check("the first home is first", main.call("_place_of", players[0]) == 1)
+	main.call("_start_run")
+	_check("race retries keep jackets distinct and match their players", players[0].color != players[1].color and _matches_player_color(players[0]) and _matches_player_color(players[1]))
 	main.call("_enter_menu")
 	await _frames(3)
 	_check("menu after a race returns to player choice", int(main.get("state")) == 0)
@@ -81,6 +89,7 @@ func _run() -> void:
 	await _frames(3)
 	await create_timer(0.5).timeout
 	await _key(KEY_ESCAPE)
+	await create_timer(0.45).timeout
 	_check("back to one player", (main.get("_players") as Array).size() == 1 and main.get("_split") == null)
 	var camera: Camera3D = main.get("_camera")
 	_check("the first camera is back on the whole screen", camera.get_viewport() == root and camera.current)
@@ -93,6 +102,14 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	quit(_failures)
+
+
+func _matches_player_color(player: Player) -> bool:
+	for mesh in player.sled._rider._meshes:
+		for surface in mesh.mesh.get_surface_count():
+			if mesh.mesh.surface_get_material(surface).resource_name == "jacket":
+				return mesh.get_surface_override_material(surface).albedo_color == player.color
+	return false
 
 
 func _key(code: Key) -> void:
