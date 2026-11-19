@@ -108,6 +108,16 @@ static func _entries(group: String) -> Array:
 	for model in VehicleSpec.Model.values():
 		groups["rider3d"].append([VehicleSpec.Model.keys()[model].to_lower(), func() -> Node3D: return _ride3d(model)])
 	groups["rider3d"].append(["face", func() -> Node3D: return _face3d()])
+	# Grab tricks (jump held in the air), from the side and from behind.
+	groups["grab"] = []
+	for direction in [Vector3(-1, 0.55, -1.15), Vector3(0.3, 0.6, 1)]:
+		for model in VehicleSpec.Model.values():
+			groups["grab"].append([GrabTrick.for_model(model).title, func() -> Node3D: return _viewed(_grab3d(model), direction)])
+	# Easing into each grab, a quarter at a time, seen from the side.
+	groups["grab_steps"] = []
+	for model in VehicleSpec.Model.values():
+		for blend in [0.25, 0.5, 0.75, 1.0]:
+			groups["grab_steps"].append(["%s %d%%" % [GrabTrick.for_model(model).title, blend * 100], func() -> Node3D: return _viewed(_grab3d(model, blend), Vector3(-1, 0.3, -0.25))])
 	groups["riderside"] = [
 		["still side", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA), Vector3(-1, 0.15, 0))],
 		["steer right back", func() -> Node3D: return _viewed(_ride3d(VehicleSpec.Model.PULKA, 1.0), Vector3(0, 0.3, 1))],
@@ -285,6 +295,26 @@ static func _ride3d(model: VehicleSpec.Model, steer := 0.0, air := false, flail 
 				rider.flail(1.0 / 60.0)
 			else:
 				rider.animate(1.0 / 60.0, steer, air))
+	return node
+
+
+## The rider in their ride's grab trick, `blend` of the way into it.
+static func _grab3d(model: VehicleSpec.Model, blend := 1.0) -> Node3D:
+	var node := Node3D.new()
+	var ride := _mesh(RideModels.vehicle(model))
+	node.add_child(ride)
+	var rider := RiderRig.new()
+	rider.set_ride(model)
+	rider.dress(Color(0.9, 0.3, 0.6), Color(0.95, 0.8, 0.1))
+	node.add_child(rider)
+	var spec: VehicleSpec = VehicleSpec.all()[model]
+	var trick := GrabTrick.for_model(model)
+	node.set_meta("after_add", func() -> void:
+		for i in 60:
+			rider.transform = Transform3D(Basis.IDENTITY, Vector3(0, spec.seat_height, 0.05))
+			trick.place_rider(rider, blend)
+			rider.animate(1.0 / 60.0, 0.0, true, blend, trick)
+			trick.hold(rider, ride, blend))
 	return node
 
 

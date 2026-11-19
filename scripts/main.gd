@@ -19,6 +19,19 @@ const FINISH_GRACE := 20.0
 const DRAFT_RANGE := 30.0
 const DRAFT_WIDTH := 3.5
 const DRAFT_PUSH := 3.0
+## Grab tricks: shortest grab that counts (fully in the pose), points per
+## second held, and the multiplier when a grab and a spin land together.
+const GRAB_MIN := 0.25
+const GRAB_POINTS := 250.0
+const GRAB_COMBO := 1.5
+## Spins count in half turns from a full turn up, when the ride gets within
+## SPIN_MARGIN of one. A full turn is worth SPIN_POINTS and more turns grow
+## faster than linearly (turns ^ SPIN_GROWTH), so four turns are worth
+## about six single ones.
+const SPIN_MARGIN := deg_to_rad(30.0)
+const SPIN_POINTS := 360.0
+const SPIN_GROWTH := 1.3
+const GRAB_CRASH_LINES := ["Glömde sätta sig!", "Landade mitt i tricket.", "Glömde landa först.", "Stel som en pinne. Landade som en."]
 
 const CRASH_LINES := {
 	Obstacle.Kind.TREE: ["Granen vann.", "Trädkramare!", "Barr i munnen.", "Granen stod där först."],
@@ -614,6 +627,7 @@ func _update_playing(delta: float) -> void:
 		before.append(p.sled.distance())
 		var steer := p.controls.steer()
 		var jump := p.controls.jump()
+		var grab := p.controls.jump_held()
 		if p.finished():
 			_coast_home(p, delta)
 			continue
@@ -624,7 +638,8 @@ func _update_playing(delta: float) -> void:
 			steer = _autopilot_steer(p)
 			var roof := _field.roof_at(p.sled.position.x, p.sled.distance())
 			jump = roof != null and roof.requires_jump and roof.finish - p.sled.distance() < 1.25 and p.sled.on_ground
-		p.sled.step(delta, steer, jump)
+			grab = false
+		p.sled.step(delta, steer, jump, grab)
 	_update_world(delta)
 	for i in _players.size():
 		_update_player(_players[i], before[i], delta)
@@ -1648,9 +1663,15 @@ func _on_jumped(_p: Player) -> void:
 	_sound.play("jump", -4.0)
 
 
-func _on_landed(air_time: float, impact: float, spin: float, p: Player) -> void:
+func _on_landed(air_time: float, impact: float, spin: float, grab: float, p: Player) -> void:
 	if state != State.PLAYING or p.sled.crashed:
 		return
+	# Landing before the rider is back in the seat: a stiff rider can't take it.
+	if p.sled.in_trick():
+		_crash(GRAB_CRASH_LINES[_rng.randi_range(0, GRAB_CRASH_LINES.size() - 1)], p)
+		return
+	var grab_points := int(grab * GRAB_POINTS) if grab >= GRAB_MIN else 0
+	var grab_title := GrabTrick.for_model(p.sled.spec.model).title
 	if impact > 4.0:
 		_sound.play("land", linear_to_db(clampf(impact / 14.0, 0.2, 1.0)))
 		p.camera.add_shake(clampf(impact * 0.04, 0.0, 0.8))
@@ -1658,19 +1679,28 @@ func _on_landed(air_time: float, impact: float, spin: float, p: Player) -> void:
 		p.rumble(0.3, clampf(impact / 20.0, 0.1, 0.8), 0.15)
 	if p.over_cliff:
 		p.over_cliff = false
-		var points := CLIFF_BONUS + int(air_time * 40.0)
+		var points := CLIFF_BONUS + int(air_time * 40.0) + grab_points
 		_add_bonus(p, points)
-		p.say("Du överlevde stupet! +%d" % points, Hud.WARM, 60, 2.0)
+		var cliff_line := "Du överlevde stupet!" if grab_points == 0 else "%s över stupet!" % grab_title
+		p.say("%s +%d" % [cliff_line, points], Hud.WARM, 60, 2.0)
 		_sound.play("trick")
 		p.camera.add_shake(0.8)
 		p.sled.puff()
 		p.rumble(0.6, 0.9, 0.35)
 		return
-	var turns := roundi(absf(spin) / PI)
-	if turns >= 2:
-		var degrees := turns * 180
-		_add_bonus(p, degrees)
-		p.say("%d°! +%d" % [degrees, degrees], Hud.HOT, 60)
+	var trick := _spin_trick(spin)
+	if trick.x > 0 and grab_points > 0:
+		var points := int((trick.y + grab_points) * GRAB_COMBO)
+		_add_bonus(p, points)
+		p.say("%s %d°! +%d" % [grab_title, trick.x, points], Hud.HOT, 60)
+		_sound.play("trick")
+	elif trick.x > 0:
+		_add_bonus(p, trick.y)
+		p.say("%d°! +%d" % [trick.x, trick.y], Hud.HOT, 60)
+		_sound.play("trick")
+	elif grab_points > 0:
+		_add_bonus(p, grab_points)
+		p.say("%s! +%d" % [grab_title, grab_points], Hud.HOT, 56)
 		_sound.play("trick")
 	elif air_time > 0.35 and _field.in_rooftops(p.sled.distance()):
 		_add_bonus(p, 50)
@@ -1682,6 +1712,16 @@ func _on_landed(air_time: float, impact: float, spin: float, p: Player) -> void:
 		_add_bonus(p, points)
 		if air_time >= 2.0:
 			p.say("Luftfärd! %s s +%d" % [("%.1f" % air_time).replace(".", ","), points], Hud.WARM)
+
+
+## A landed spin of `spin` radians: (degrees credited, points), or zero
+## when it is short of a full turn.
+static func _spin_trick(spin: float) -> Vector2i:
+	var halves := floori((absf(spin) + SPIN_MARGIN) / PI)
+	if halves < 2:
+		return Vector2i.ZERO
+	var points := SPIN_POINTS * pow(halves / 2.0, SPIN_GROWTH)
+	return Vector2i(halves * 180, roundi(points / 10.0) * 10)
 
 
 # --- Testing helpers ---

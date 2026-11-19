@@ -5,7 +5,8 @@ extends Node3D
 ## gravity can pull it down, and lands back on it.
 
 signal jumped
-signal landed(air_time: float, impact: float, spin: float)
+## `grab` is how long a grab was held in the flight (see `grabbing`).
+signal landed(air_time: float, impact: float, spin: float, grab: float)
 ## Skipped across open water like a flat stone.
 signal skimmed(speed: float)
 ## Too slow on open water: in you go.
@@ -20,6 +21,11 @@ const SKIM_SPEED := 12.0
 ## How far the nose may turn away from straight downhill. Sleds can't carve
 ## uphill, so holding a turn ends in a hard traverse instead of a U-turn.
 const MAX_TURN := deg_to_rad(75.0)
+## Seconds to get into a grab's pose, and back to the seat after letting go.
+const GRAB_IN := 0.55
+const GRAB_OUT := 0.45
+## How far into the pose (0..1) a rider can still land safely.
+const GRAB_SAFE := 0.15
 
 var spec: VehicleSpec
 var field: TerrainField
@@ -31,6 +37,10 @@ var on_ground := true
 var on_ice := false
 var air_time := 0.0
 var air_spin := 0.0
+## Holding a grab trick right now (jump pressed again and held in the air).
+var grabbing := false
+## Seconds of grab in the current flight.
+var grab_time := 0.0
 var boost_time := 0.0
 var invulnerable_time := 0.0
 var crashed := false
@@ -57,7 +67,18 @@ var _rider_spin := Vector3.ZERO
 var _spray: GPUParticles3D
 var _puff: GPUParticles3D
 var _trail: SnowTrail
-var _visual_spin := 0.0
+## Saucer and wok: which way the ride itself points (a heading like `yaw`)
+## and how fast it turns, in rad/s. Nothing keeps it turning evenly: speed,
+## steering, bumps and landings all push it about.
+var _spin_angle := 0.0
+var _spin_rate := 0.0
+## How fast steering was turning the ride in the air (carried into landing).
+var _air_rate := 0.0
+var _trick: GrabTrick
+## The jump button has been let go since take-off, so holding it now grabs.
+var _grab_armed := false
+## Eased 0..1: how far into the trick pose the rider is.
+var _grab_blend := 0.0
 ## How squashed the rider is from a landing; springs back to 0.
 var _squash := 0.0
 var _squash_speed := 0.0
@@ -97,6 +118,7 @@ func set_vehicle(new_spec: VehicleSpec, rng: RandomNumberGenerator, jacket := Co
 	spec = new_spec
 	_vehicle_mesh.mesh = RideModels.vehicle(spec.model)
 	_trail.set_model(spec.model)
+	_trick = GrabTrick.for_model(spec.model)
 	var coat := Palette.pick(Palette.JACKETS, rng) if jacket.a == 0.0 else jacket
 	_rider.set_ride(spec.model)
 	_rider.dress(coat, Palette.pick(Palette.JACKETS, rng))
@@ -140,8 +162,12 @@ func place_at(d: float, lateral := 0.0, start_speed := 0.0, keep_trail := false)
 	crashed = false
 	air_time = 0.0
 	air_spin = 0.0
+	grab_time = 0.0
 	boost_time = 0.0
 	_lean = 0.0
+	_spin_angle = yaw
+	_spin_rate = spec.visual_spin * 0.6 * (1.0 if randf() < 0.5 else -1.0) if spec else 0.0
+	_air_rate = 0.0
 	_ground_time = 1.0
 	_up = field.normal_world(position.x, position.z)
 	if keep_trail:
@@ -152,11 +178,13 @@ func place_at(d: float, lateral := 0.0, start_speed := 0.0, keep_trail := false)
 	_update_visual(1.0)
 
 
-func step(delta: float, steer: float, jump: bool) -> void:
+## `grab` is whether the jump button is held down (for grab tricks).
+func step(delta: float, steer: float, jump: bool, grab := false) -> void:
 	steer_visual = lerpf(steer_visual, steer, 1.0 - exp(-8.0 * delta))
 	if frozen:
 		_update_visual(delta)
 		return
+	_update_grab(delta, grab)
 	var remaining := delta
 	var first := true
 	while remaining > 0.0:
@@ -172,6 +200,34 @@ func step(delta: float, steer: float, jump: bool) -> void:
 	_update_visual(delta)
 	_update_particles()
 	_update_trail()
+
+
+## A grab starts when jump is pressed again in a real flight and lasts while
+## it is held; the press that jumped doesn't count, so holding it through
+## the take-off never grabs by accident. Getting into the pose and back to
+## the seat takes a while, and only time spent fully in it counts.
+func _update_grab(delta: float, held: bool) -> void:
+	if on_ground or crashed:
+		grabbing = false
+		_grab_armed = false
+	elif not held:
+		grabbing = false
+		_grab_armed = true
+	elif _grab_armed and _air_since > 0.2:
+		grabbing = true
+	_grab_blend = move_toward(_grab_blend, 1.0 if grabbing else 0.0, delta / (GRAB_IN if grabbing else GRAB_OUT))
+	if grabbing and _grab_blend >= 1.0:
+		grab_time += delta
+
+
+## Eased 0..1: how far into the trick pose the rider is.
+func grab_blend() -> float:
+	return _grab_blend
+
+
+## Still too far into a grab to land on the ride (a crash if it touches down).
+func in_trick() -> bool:
+	return _grab_blend > GRAB_SAFE
 
 
 func _step_physics(dt: float, steer: float, jump: bool) -> void:
@@ -201,6 +257,7 @@ func _step_physics(dt: float, steer: float, jump: bool) -> void:
 			# off the fall line, and letting go lets it drift back.
 			_lean = lerpf(_lean, steer * spec.steer, 1.0 - exp(-2.5 * dt * lerpf(0.3, 1.0, surface_grip)))
 			yaw = fall_yaw + _lean
+			_spin_on_snow(dt, steer, current, surface_grip)
 		else:
 			var off := wrapf(yaw - fall_yaw, -PI, PI)
 			if absf(off) >= MAX_TURN and signf(steer) == signf(off):
@@ -246,13 +303,17 @@ func _step_physics(dt: float, steer: float, jump: bool) -> void:
 			_air_since = 1.0
 			air_time = 0.0
 			air_spin = 0.0
+			grab_time = 0.0
 			jumped.emit()
 	else:
 		# Spins are for real jumps, not for hops over every little bump.
+		_air_rate = 0.0
 		if _air_since > 0.25:
 			var spin := steer * spec.air_spin * dt
 			yaw += spin
 			air_spin += spin
+			_spin_angle += spin
+			_air_rate = steer * spec.air_spin
 		velocity *= 1.0 - spec.drag * 0.5 * velocity.length() * dt
 		gravity *= spec.air_gravity
 	velocity.y -= gravity * dt
@@ -300,6 +361,7 @@ func _step_sewer(dt: float, steer: float, jump: bool) -> void:
 			# the normally gently-steering saucer and wok.
 			_lean = lerpf(_lean, steer * spec.steer * 2.5, 1 - exp(-2.5 * dt * lerpf(0.3, 1, grip)))
 			_sewer_heading = _lean
+			_spin_on_snow(dt, steer, current, grip)
 		else:
 			_sewer_heading = clampf(_sewer_heading + steer * turn_rate * dt, -MAX_TURN, MAX_TURN)
 			if current > 1.5:
@@ -333,10 +395,13 @@ func _step_sewer(dt: float, steer: float, jump: bool) -> void:
 	else:
 		_air_since += dt
 		air_time += dt
+		_air_rate = 0.0
 		if _air_since > 0.25:
 			var spin := steer * spec.air_spin * dt
 			_sewer_heading += spin
 			air_spin += spin
+			_spin_angle += spin
+			_air_rate = steer * spec.air_spin
 		velocity *= 1 - spec.drag * 0.5 * velocity.length() * dt
 		velocity.y -= GRAVITY * spec.air_gravity * dt
 	var was_grounded := on_ground
@@ -367,11 +432,38 @@ func _step_sewer(dt: float, steer: float, jump: bool) -> void:
 				_squash_speed -= clampf(maxf(-into, 0) * 0.12, 0.3, 2.2)
 				if absf(air_spin) > 0.3:
 					_sewer_heading = atan2(circum, velocity.dot(-next.z))
-				landed.emit(air_time, maxf(-into, 0), air_spin)
+				_spin_on_landing(maxf(-into, 0))
+				landed.emit(air_time, maxf(-into, 0), air_spin, grab_time)
 		frame = next
 	_sewer_up = frame.y
 	_sewer_forward = -frame.z * cos(_sewer_heading) + frame.x * sin(_sewer_heading)
 	yaw = atan2(_sewer_forward.x, -_sewer_forward.z)
+
+
+## Saucer and wok on snow: the spin drifts toward a pace set by speed but
+## keeps whichever way it is going, steering twists it (hard enough and it
+## turns the other way), and bumps nudge it at random, more the faster you
+## go. A slippery ride (low `spin_settle`) holds on to every push.
+func _spin_on_snow(dt: float, steer: float, current: float, grip: float) -> void:
+	var pace := clampf(current / 25.0, 0.0, 1.0)
+	var natural := spec.visual_spin * (0.3 + 0.9 * pace)
+	var way := 1.0 if _spin_rate >= 0.0 else -1.0
+	_spin_rate += (natural * way - _spin_rate) * (1.0 - exp(-spec.spin_settle * lerpf(0.4, 1.0, grip) * dt))
+	_spin_rate += steer * spec.spin_steer * dt
+	_spin_rate += randfn(0.0, 1.0) * spec.spin_jitter * pace * sqrt(dt)
+	var most := spec.visual_spin * 2.5
+	_spin_rate = clampf(_spin_rate, -most, most)
+	_spin_angle = wrapf(_spin_angle + _spin_rate * dt, -PI, PI)
+
+
+## Touching down: a spin steered in the air carries on along the snow, and a
+## hard landing knocks the ride round a bit either way.
+func _spin_on_landing(impact: float) -> void:
+	if spec.spins:
+		_spin_rate += _air_rate * 0.6 + randf_range(-1.0, 1.0) * minf(impact, 10.0) * 0.3
+		var most := spec.visual_spin * 2.5
+		_spin_rate = clampf(_spin_rate, -most, most)
+	_air_rate = 0.0
 
 
 func _sewer_takeoff() -> void:
@@ -380,6 +472,7 @@ func _sewer_takeoff() -> void:
 	_air_since = 1
 	air_time = 0
 	air_spin = 0
+	grab_time = 0.0
 
 
 ## The ground's normal and height under the ride, sampled once per spot.
@@ -424,11 +517,13 @@ func _resolve_ground() -> void:
 				yaw += wrapf(atan2(velocity.x, -velocity.z) - yaw, -PI, PI)
 			# The rider sinks into the landing, harder the harder it was.
 			_squash_speed -= clampf(maxf(-into, 0.0) * 0.12, 0.3, 2.2)
-			landed.emit(air_time, maxf(-into, 0.0), air_spin)
+			_spin_on_landing(maxf(-into, 0.0))
+			landed.emit(air_time, maxf(-into, 0.0), air_spin, grab_time)
 	elif on_ground:
 		on_ground = false
 		air_time = 0.0
 		air_spin = 0.0
+		grab_time = 0.0
 
 
 func _touch_water() -> void:
@@ -447,6 +542,7 @@ func _touch_water() -> void:
 	_ground_time = 0.0
 	air_time = 0.0
 	air_spin = 0.0
+	grab_time = 0.0
 	skimmed.emit(current)
 
 
@@ -470,6 +566,7 @@ func bounce(upward: float) -> void:
 	_ground_time = 0.0
 	air_time = 0.0
 	air_spin = 0.0
+	grab_time = 0.0
 	_puff.restart()
 
 
@@ -478,6 +575,9 @@ func crash() -> void:
 		return
 	var impact_velocity := travel_velocity()
 	crashed = true
+	grabbing = false
+	_grab_blend = 0.0
+	_vehicle_mesh.transform = Transform3D.IDENTITY
 	_rider.scale = Vector3.ONE
 	_squash = 0.0
 	_squash_speed = 0.0
@@ -543,16 +643,10 @@ func _update_visual(delta: float) -> void:
 	_body.rotation.z = -steer_visual * 0.22
 	_body.rotation.x = 0.0 if on_ground else clampf(velocity.y * 0.02, -0.3, 0.3)
 	# The ride's pose is rebuilt from scratch every frame so nothing a
-	# previous ride left behind can turn it. A saucer spins round with its
-	# rider, unevenly and faster the faster it goes, whichever way it travels.
-	var spinning := spec != null and spec.visual_spin > 0.0
-	if spinning:
-		var rate := spec.visual_spin * (0.7 + 0.5 * sin(_visual_spin * 0.37 + _wobble_time)) * (0.5 + clampf(speed() / 25.0, 0.0, 1.0))
-		_wobble_time += delta * 0.3
-		_visual_spin = wrapf(_visual_spin + rate * delta, 0.0, TAU)
-	else:
-		_visual_spin = 0.0
-	_body.rotation.y = _visual_spin
+	# previous ride left behind can turn it.
+	# The body is turned from the way the ride travels to the way it points.
+	var spinning := spec != null and spec.spins
+	_body.rotation.y = wrapf(yaw - _spin_angle, -PI, PI) if spinning else 0.0
 	_vehicle_mesh.transform = Transform3D.IDENTITY
 	if not crashed and _rider:
 		# A damped spring brings a squashed rider back up after a landing.
@@ -572,8 +666,14 @@ func _update_visual(delta: float) -> void:
 		_rider.rotation.z = -steer_visual * 0.12
 		_rider.rotation.x = pitch * 0.4
 		_rider.rotation.y = 0.0
+		var trick := _trick if _grab_blend > 0.0 else null
+		var shown := smoothstep(0.0, 1.0, _grab_blend)
+		if trick != null:
+			trick.place_rider(_rider, shown)
 		# The body bends into the turn and raises its arms in a long jump.
-		_rider.animate(delta, steer_visual, not on_ground)
+		_rider.animate(delta, steer_visual, not on_ground, shown, trick)
+		if trick != null:
+			trick.hold(_rider, _vehicle_mesh, shown)
 	_body.visible = invulnerable_time <= 0.0 or fmod(invulnerable_time, 0.2) < 0.12
 
 

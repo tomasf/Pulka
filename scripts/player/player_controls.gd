@@ -87,6 +87,13 @@ func jump() -> bool:
 	return _jumped
 
 
+## Whether jump is held down right now (grab tricks in the air).
+func jump_held() -> bool:
+	if keys == Keys.ALL:
+		return Input.is_action_pressed(&"jump")
+	return _jump_held
+
+
 ## Shakes this player's own pad (or every pad when they have them all).
 func rumble(weak: float, strong: float, duration: float) -> void:
 	if pad >= 0:

@@ -21,8 +21,14 @@ var jump := 6.0
 var self_align := 1.5
 ## Random yaw wobble, for rides that refuse to go straight.
 var wobble := 0.0
-## Visual spin of the whole ride (the saucer never stops turning).
+## Saucer and wok: how fast the whole ride likes to turn on the snow at
+## speed (rad/s), how quickly it drifts back to that after a push (per
+## second; low is slippery), how hard steering twists it (rad/s²), and how
+## much bumps knock it about.
 var visual_spin := 0.0
+var spin_settle := 1.0
+var spin_steer := 0.0
+var spin_jitter := 0.0
 ## Rides that just go down the fall line (saucer, wok): `steer` is then how
 ## far, in radians, steering can lean them off it.
 var spins := false
@@ -119,6 +125,9 @@ static func all() -> Array[VehicleSpec]:
 	saucer.friction = 0.018
 	saucer.jump = 5.5
 	saucer.visual_spin = 2.5
+	saucer.spin_settle = 0.8
+	saucer.spin_steer = 4.0
+	saucer.spin_jitter = 2.0
 	saucer.air_spin = 9.0
 	saucer.seat_height = 0.12
 	saucer.mass = 1.5
@@ -142,6 +151,9 @@ static func all() -> Array[VehicleSpec]:
 	wok.friction = 0.011
 	wok.jump = 5.0
 	wok.visual_spin = 3.6
+	wok.spin_settle = 0.3
+	wok.spin_steer = 7.0
+	wok.spin_jitter = 3.5
 	wok.air_spin = 10.0
 	wok.seat_height = 0.1
 	wok.mass = 2.5

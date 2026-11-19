@@ -9,6 +9,8 @@ extends Node3D
 const SCENE := preload("res://models/rider.glb")
 ## Pose names in the file, in VehicleSpec.Model order.
 const RIDES := ["pulka", "stjartlapp", "snowracer", "tefat", "wok"]
+## From the elbow joint to the middle of the mitten's grip.
+const HAND_REACH := 0.25
 
 ## Per ride: bone index -> rotation sitting on it. Read once from the file.
 static var _poses: Array = []
@@ -79,11 +81,13 @@ func dress(jacket: Color, hat: Color) -> void:
 
 
 ## Moves with the ride each frame. `steer` is -1..1;
-## `airborne` while the ride is off the ground.
-func animate(delta: float, steer: float, airborne: bool) -> void:
+## `airborne` while the ride is off the ground. `grab` (0..1) blends into
+## the stiff pose of a grab `trick`.
+func animate(delta: float, steer: float, airborne: bool, grab := 0.0, trick: GrabTrick = null) -> void:
 	_time += delta
 	_air_time = _air_time + delta if airborne else 0.0
-	_cheer = move_toward(_cheer, 1.0 if _air_time > 0.45 else 0.0, delta * (4.0 if _air_time > 0.45 else 6.0))
+	var cheering := _air_time > 0.45 and grab <= 0.0
+	_cheer = move_toward(_cheer, 1.0 if cheering else 0.0, delta * (4.0 if cheering else 6.0))
 	var extra := {}
 	# Lean into the turn, with the head held level against it.
 	_add(extra, "spine", Quaternion(Vector3.FORWARD, steer * 0.18))
@@ -99,6 +103,21 @@ func animate(delta: float, steer: float, airborne: bool) -> void:
 			_apply(extra)
 			_aim(extra, "forearm." + side[0], Vector3(out * 0.3, 1.0, -0.05), _cheer)
 		_apply(extra)
+	if trick != null and grab > 0.0:
+		for bone: Array in trick.pose:
+			if bone.size() > 2:
+				_aim_via(extra, bone[0], bone[2], bone[1], grab)
+			else:
+				_aim(extra, bone[0], bone[1], grab)
+			_apply(extra)
+
+
+## Where the right mitten holds on, in the rider's own space.
+func hand_position() -> Vector3:
+	var forearm: int = _bone["forearm.R"]
+	var pose := _skeleton.get_bone_global_pose(forearm)
+	var hand := pose.origin + pose.basis.y.normalized() * HAND_REACH
+	return _skeleton_from_rider().inverse() * hand
 
 
 ## A crash: limbs thrown about as the rider tumbles.
@@ -127,6 +146,22 @@ func _aim(extra: Dictionary, name: String, direction: Vector3, amount: float) ->
 	var turn := Quaternion(pointing.normalized(), (_skeleton_from_rider() * direction).normalized())
 	var wanted := parent_rotation.inverse() * turn * parent_rotation * local
 	extra[bone] = (local.inverse() * wanted).slerp(Quaternion.IDENTITY, 1.0 - amount)
+
+
+## Like `_aim`, but the bone swings from its sitting direction through `via`
+## (halfway, at `amount` 0.5) to `direction`, instead of the shortest way:
+## a limb that would cut through the ride goes round it.
+func _aim_via(extra: Dictionary, name: String, via: Vector3, direction: Vector3, amount: float) -> void:
+	if not _bone.has(name):
+		return
+	var bone: int = _bone[name]
+	var parent := _skeleton.get_bone_parent(bone)
+	var parent_rotation := _skeleton.get_bone_global_pose(parent).basis.get_rotation_quaternion() if parent >= 0 else Quaternion.IDENTITY
+	var local: Quaternion = _base.get(bone, _skeleton.get_bone_rest(bone).basis.get_rotation_quaternion())
+	var sitting := (_skeleton_from_rider().inverse() * ((parent_rotation * local) * _along(bone))).normalized()
+	var mid := via.normalized()
+	var toward := sitting.slerp(mid, amount * 2.0) if amount < 0.5 else mid.slerp(direction.normalized(), amount * 2.0 - 1.0)
+	_aim(extra, name, toward, 1.0)
 
 
 ## Turns directions in the rider's space into the skeleton's (the glTF
