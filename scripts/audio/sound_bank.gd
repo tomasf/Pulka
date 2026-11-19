@@ -124,6 +124,11 @@ func _process(_delta: float) -> void:
 			_start_song()
 
 
+## The ride song playing (or about to play), "" before any is ready.
+func song_title() -> String:
+	return MusicComposer.title(_song) if _song >= 0 else ""
+
+
 ## Each song plays once, then the next finished one in the shuffled order.
 func _next_song() -> void:
 	if _in_menu:

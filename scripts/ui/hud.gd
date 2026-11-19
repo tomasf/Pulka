@@ -87,6 +87,9 @@ var _notes: Array[PopupNote] = []
 var _menu: MenuFlow
 
 var _pause: Control
+## "Now playing" in the pause screen's top right corner.
+var _now_playing: PanelContainer
+var _now_playing_title: Label
 var _over: Control
 var _over_title: Label
 var _over_cause: Label
@@ -516,6 +519,7 @@ func _build_pause() -> void:
 	_dialog_panel(canvas, Rect2(450, 193, 700, 488))
 	_dialog_label(canvas, "PULKA!", 20, Vector2(490, 224), MenuFlow.LIME, true)
 	_dialog_label(canvas, "Paus", 76, Vector2(486, 260), MenuFlow.WHITE, true)
+	_build_now_playing()
 	var resume := _dialog_button(canvas, "Fortsätt", &"resume", Rect2(490, 385, 620, 84), true)
 	var retry := _dialog_button(canvas, "Börja om", &"retry", Rect2(490, 487, 300, 72))
 	var settings := _dialog_button(canvas, "Inställningar", &"settings", Rect2(810, 487, 300, 72))
@@ -527,6 +531,39 @@ func _build_pause() -> void:
 	# within the middle row; a wide button stays put sideways.
 	_link_grid([[resume], [retry, settings], [menu]])
 	_default_focus[_pause] = resume
+
+
+## A small card in the top right corner: the song playing.
+func _build_now_playing() -> void:
+	_now_playing = PanelContainer.new()
+	_now_playing.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_now_playing.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_now_playing.offset_right = -32
+	_now_playing.offset_top = 28
+	_now_playing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var card := MenuFlow.style(Color(0.055, 0.07, 0.15, 0.92), Color(1, 1, 1, 0.12), 18)
+	card.content_margin_left = 20
+	card.content_margin_right = 24
+	_now_playing.add_theme_stylebox_override("panel", card)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	_now_playing.add_child(row)
+	var note := MenuFlow.caption("♪", 34, MenuFlow.LIME)
+	note.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(note)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", -4)
+	row.add_child(column)
+	column.add_child(MenuFlow.caption("SPELAS NU", 14, MenuFlow.MUTED, true))
+	_now_playing_title = MenuFlow.caption("", 24, MenuFlow.WHITE, true)
+	column.add_child(_now_playing_title)
+	_pause.add_child(_now_playing)
+
+
+## Sets the song shown while paused ("" hides the card).
+func set_song(title: String) -> void:
+	_now_playing_title.text = title
+	_now_playing.visible = title != ""
 
 
 ## Wires focus for rows of buttons laid out top to bottom: up/down go to the

@@ -1149,6 +1149,8 @@ func _update_game_over(delta: float) -> void:
 		return
 	if _confirm_pressed():
 		_start_run()
+	if paused:
+		_hud.set_song(_sound.song_title())
 	elif Input.is_action_just_pressed(&"back"):
 		_enter_menu()
 
