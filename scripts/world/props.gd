@@ -1358,12 +1358,13 @@ static func finish_arch(width: int) -> ArrayMesh:
 
 # --- Pickups ---
 
-## A six-armed ice crystal facing -Z, with branches, glinting pale blue.
+## A six-armed ice crystal facing -Z, with branches, in clear icy blues so it
+## stands out against the snow.
 static func snowflake() -> ArrayMesh:
 	return cached_mesh("snowflake", func() -> ArrayMesh:
 		var kit := MeshKit.new()
-		var ice := Color(0.82, 0.94, 1.0)
-		var bright := Color(0.97, 1.0, 1.0)
+		var ice := Color(0.3, 0.58, 0.95)
+		var bright := Color(0.62, 0.82, 1.0)
 		kit.cylinder(0.065, 0.06, Vector3.ZERO, bright, 6, Vector3(PI / 2, 0, 0))
 		for arm in 6:
 			var angle := arm * TAU / 6.0
@@ -1378,19 +1379,21 @@ static func snowflake() -> ArrayMesh:
 		return kit.build())
 
 
-## A Swedish cinnamon bun standing on its edge, facing -Z: a spiral of pale
-## golden dough, domed in the middle, with cinnamon only in the grooves
-## between the turns and fine pearl sugar on top.
+## A Swedish cinnamon bun standing on its edge, facing -Z: a spiral of dough,
+## domed in the middle, its top baked golden brown and glazed, streaked with
+## cinnamon and dark in the grooves between the turns, pale only round its
+## sides, with fine pearl sugar on top.
 static func cinnamon_bun() -> ArrayMesh:
 	return cached_mesh("cinnamon_bun", func() -> ArrayMesh:
 		var kit := MeshKit.new()
-		var dough := Color(0.9, 0.66, 0.36)
-		var crust := Color(0.82, 0.55, 0.26)
-		var cinnamon := Color(0.45, 0.22, 0.09)
+		var side := Color(0.93, 0.76, 0.5)
+		var baked := Color(0.72, 0.42, 0.17)
+		var cinnamon := Color(0.36, 0.17, 0.07)
 		var sugar := Color(0.99, 0.98, 0.95)
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 7
-		kit.sphere(0.2, Vector3(0, 0, 0.01), crust, Vector3(1, 1, 0.4), 20, 10)
+		# The pale body shows round the edge and the back.
+		kit.sphere(0.2, Vector3(0, 0, 0.01), side, Vector3(1, 1, 0.42), 20, 10)
 		var turns := 3.0
 		var previous := Vector3.ZERO
 		var groove := Vector3.ZERO
@@ -1401,17 +1404,22 @@ static func cinnamon_bun() -> ArrayMesh:
 			# Thicker towards the middle, like a risen bun.
 			var depth := -0.04 - 0.07 * (1.0 - t) * (1.0 - t)
 			var point := Vector3(cos(angle) * radius, sin(angle) * radius, depth)
-			# The cinnamon line sits half a turn's spacing outside the dough.
 			var outside := radius + 0.178 / turns * 0.5
-			var line := Vector3(cos(angle) * outside, sin(angle) * outside, depth + 0.018)
+			var line := Vector3(cos(angle) * outside, sin(angle) * outside, depth + 0.012)
 			if k > 0:
 				# Only between turns: the outside of the roll is plain dough.
 				if outside < 0.168:
-					kit.capsule_between(groove, line, 0.008, cinnamon, 5)
-				kit.capsule_between(previous, point, 0.027, dough if k % 4 else dough.lightened(0.05), 8)
+					kit.capsule_between(groove, line, 0.011, cinnamon, 5)
+				# Browner where the oven caught it, a shade lighter on the edge.
+				var crust := baked.lerp(side, 0.35 * t * t) if k % 5 else baked.darkened(0.08)
+				kit.capsule_between(previous, point, 0.027, crust, 8)
+			# Cinnamon streaks over the top.
+			if rng.randf() < 0.3 and t < 0.9:
+				var smear := point + Vector3(rng.randf_range(-0.01, 0.01), rng.randf_range(-0.01, 0.01), -0.024)
+				kit.ellipsoid(Vector3(0.018, 0.009, 0.004), smear, cinnamon.lerp(baked, 0.35), Vector3(0, 0, angle + PI / 2))
 			for grain in 2:
 				if rng.randf() < 0.55:
-					var spot := point + Vector3(rng.randf_range(-0.014, 0.014), rng.randf_range(-0.014, 0.014), -0.025)
+					var spot := point + Vector3(rng.randf_range(-0.014, 0.014), rng.randf_range(-0.014, 0.014), -0.028)
 					kit.box(Vector3.ONE * rng.randf_range(0.008, 0.012), spot, sugar, Vector3(rng.randf(), rng.randf(), rng.randf()))
 			previous = point
 			groove = line
