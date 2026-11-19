@@ -15,7 +15,8 @@ const MASS := {
 	Kind.CART: 30.0, Kind.PLANT: 45.0, Kind.FOUNTAIN: INF, Kind.CONE: 2.0, Kind.TRAIN: INF,
 	Kind.PLANE: INF, Kind.TUG: 2500.0, Kind.GOAL: 70.0, Kind.TRUCK: 15000.0,
 	Kind.BEAR: 250.0, Kind.CHIMNEY: INF, Kind.ICE_PILLAR: INF, Kind.CONTAINER: INF, Kind.SEWER_DEBRIS: INF,
-	Kind.FOX: 6.0,
+	# A big winter fox: a solid knock, not far off a small dog.
+	Kind.FOX: 12.0,
 	Kind.CAT: 4.5,
 }
 ## Heavier than this and a hit does not move it.

@@ -1336,6 +1336,9 @@ const CRASH_SEVERITY := 7.5
 const CLIFF_BONUS := 500
 const WIPEOUT_LINES := ["Vurpa!", "Hoppla!", "Puh, klarade mig!", "Det där gjorde ont i stoltheten."]
 
+## Fastest an animal hit by the ride is thrown (m/s), and up at most.
+const CREATURE_THROW := 14.0
+const CREATURE_LIFT := 6.0
 
 func _check_collisions(p: Player = null) -> void:
 	if p == null:
@@ -1451,7 +1454,13 @@ func _impact(p: Player, obstacle: Obstacle, probe: Vector3) -> void:
 	var share := 1.0 if is_inf(obstacle.mass) else obstacle.mass / (obstacle.mass + rider)
 	if obstacle.movable():
 		var thrown := travel * 0.35 - normal * closing * rider / (obstacle.mass + rider) * 1.6
-		obstacle.launch(thrown + Vector3.UP * (2.0 + closing * 0.25))
+		var lift := 2.0 + closing * 0.25
+		# Animals have weight to them: however light, they tumble away
+		# rather than sail off like balloons.
+		if obstacle.is_creature():
+			thrown = thrown.limit_length(CREATURE_THROW)
+			lift = minf(lift, CREATURE_LIFT)
+		obstacle.launch(thrown + Vector3.UP * lift)
 	if obstacle.harmless:
 		_sound.play("poff", -6.0, 1.4)
 		return
