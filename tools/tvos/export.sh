@@ -59,6 +59,7 @@ icons/tvos_large_app_icon_back_layer="res://icons/tv_icon_back_1280x768.png"
 icons/tvos_large_app_icon_front_layer="res://icons/tv_icon_front_1280x768.png"
 icons/tvos_top_shelf="res://icons/top_shelf_1920x720.png"
 icons/tvos_top_shelf_wide="res://icons/top_shelf_wide_2320x720.png"
+storyboard/image_scale_mode=2
 EOF
 fi
 

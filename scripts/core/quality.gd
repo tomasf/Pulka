@@ -34,6 +34,11 @@ static func is_tv() -> bool:
 	return force_tv or OS.has_feature("tvos")
 
 
+## Native desktop apps can close themselves; browsers and mobile apps cannot.
+static func is_desktop() -> bool:
+	return not is_mobile() and not is_tv() and not OS.has_feature("web")
+
+
 static func reduced_effects() -> bool:
 	return is_mobile() or is_tv() or OS.has_feature("web")
 

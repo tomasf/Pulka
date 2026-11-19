@@ -616,7 +616,7 @@ func _build_game_over() -> void:
 	badge.content_margin_top = 4
 	badge.content_margin_bottom = 4
 	_over_record.add_theme_stylebox_override("normal", badge)
-	_over_record.size = Vector2(220, 40)
+	_over_record.size = Vector2(310, 40)
 	_over_record.pivot_offset = _over_record.size * 0.5
 	canvas.add_child(_over_record)
 	var again := _dialog_button(canvas, "Åk igen", &"retry", Rect2(490, 650, 380, 80), true)
@@ -637,12 +637,12 @@ func _layout_over() -> void:
 	_over_panel.position = Vector2(450, top)
 	_over_panel.size = Vector2(700, height)
 	_over_column.position = Vector2(490, top + 30.0)
-	_over_record.position = Vector2(890, top + 26.0)
+	_over_record.position = Vector2(800, top + 26.0)
 	for button in _over_buttons:
 		button.position.y = top + height - 40.0 - 80.0
 
 
-## Fills the result rows from [label, value, label colour] entries.
+## Fills the result rows from [label, value, label colour, optional record] entries.
 func _set_over_rows(rows: Array) -> void:
 	for child in _over_rows.get_children():
 		_over_rows.remove_child(child)
@@ -651,8 +651,11 @@ func _set_over_rows(rows: Array) -> void:
 		var panel := PanelContainer.new()
 		panel.custom_minimum_size = Vector2(620, 68)
 		panel.add_theme_stylebox_override("panel", MenuFlow.style(MenuFlow.PANEL, Color(1, 1, 1, 0.06), 16))
+		var column := VBoxContainer.new()
+		column.add_theme_constant_override("separation", 0)
+		panel.add_child(column)
 		var row := HBoxContainer.new()
-		panel.add_child(row)
+		column.add_child(row)
 		var name := MenuFlow.caption(entry[0], 26, entry[2] if entry.size() > 2 else MenuFlow.MUTED)
 		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -660,6 +663,10 @@ func _set_over_rows(rows: Array) -> void:
 		var value := MenuFlow.caption(entry[1], 30, MenuFlow.WHITE, true)
 		value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		row.add_child(value)
+		if entry.size() > 3:
+			var record := MenuFlow.caption(entry[3], 18, entry[2])
+			record.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			column.add_child(record)
 		_over_rows.add_child(panel)
 
 
@@ -676,16 +683,16 @@ func show_race_result(title: String, rows: Array) -> void:
 
 
 ## `cause` is the line from the final crash, shown above the title.
-func show_game_over(title: String, cause: String, distance: float, score: int, best_distance: float, record: bool) -> void:
+func show_game_over(title: String, cause: String, distance: float, score: int, best_distance: float, best_score: int, record: bool, score_record: bool) -> void:
 	_over_cause.text = cause
 	_over_cause.add_theme_color_override("font_color", MenuFlow.CORAL)
 	_over_title.text = title
 	_set_over_rows([
-		["Sträcka", "%s m" % group_digits(int(distance))],
-		["Poäng", group_digits(score)],
-		["Rekord", "%s m" % group_digits(int(best_distance))],
+		["Sträcka", "%s m" % group_digits(int(distance)), MenuFlow.LIME if record else MenuFlow.MUTED, "REKORD: %s m" % group_digits(int(best_distance))],
+		["Poäng", group_digits(score), MenuFlow.LIME if score_record else MenuFlow.MUTED, "REKORD: %s" % group_digits(best_score)],
 	])
-	_over_record.visible = record
+	_over_record.text = "NYA REKORD!" if record and score_record else ("NYTT POÄNGREKORD!" if score_record else "NYTT DISTANSREKORD!")
+	_over_record.visible = record or score_record
 	_layout_over()
 	show_screen("over", OVER_GUARD)
 
@@ -704,20 +711,22 @@ func _build_settings() -> void:
 	track.content_margin_top = 5
 	track.content_margin_bottom = 5
 	var fill := track.duplicate() as StyleBoxFlat
-	fill.bg_color = MenuFlow.LIME
+	fill.bg_color = MenuFlow.ICE
 	var focused_fill := track.duplicate() as StyleBoxFlat
-	focused_fill.bg_color = MenuFlow.ICE
-	var focus := MenuFlow.style(Color.TRANSPARENT, MenuFlow.LIME, 12)
-	focus.draw_center = false
-	focus.set_border_width_all(2)
-	focus.set_expand_margin_all(5)
+	focused_fill.bg_color = MenuFlow.LIME
 	var thumb := _slider_thumb(MenuFlow.WHITE)
-	var highlighted_thumb := _slider_thumb(MenuFlow.LIME)
+	var highlighted_thumb := _slider_thumb(MenuFlow.LIME, 36)
 	for channel in 3:
 		var panel := PanelContainer.new()
 		panel.position = Vector2(350, 272 + channel * 80)
 		panel.size = Vector2(900, 72)
-		panel.add_theme_stylebox_override("panel", MenuFlow.style(MenuFlow.PANEL, Color(1, 1, 1, 0.06), 16))
+		var surface := MenuFlow.style(MenuFlow.PANEL, Color(1, 1, 1, 0.06), 16)
+		var focused_surface := surface.duplicate() as StyleBoxFlat
+		focused_surface.bg_color = Color("303850")
+		focused_surface.border_color = MenuFlow.LIME
+		focused_surface.set_border_width_all(3)
+		focused_surface.set_expand_margin_all(3)
+		panel.add_theme_stylebox_override("panel", surface)
 		canvas.add_child(panel)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 24)
@@ -738,7 +747,6 @@ func _build_settings() -> void:
 		slider.add_theme_stylebox_override("slider", track)
 		slider.add_theme_stylebox_override("grabber_area", fill)
 		slider.add_theme_stylebox_override("grabber_area_highlight", focused_fill)
-		slider.add_theme_stylebox_override("focus", focus)
 		slider.add_theme_icon_override("grabber", thumb)
 		slider.add_theme_icon_override("grabber_highlight", highlighted_thumb)
 		row.add_child(slider)
@@ -751,8 +759,14 @@ func _build_settings() -> void:
 		slider.value_changed.connect(func(value: float) -> void:
 			amount.text = "%d %%" % int(value)
 			volume_changed.emit(index, value / 100.0))
-		slider.focus_entered.connect(func() -> void: caption.add_theme_color_override("font_color", MenuFlow.LIME))
-		slider.focus_exited.connect(func() -> void: caption.add_theme_color_override("font_color", MenuFlow.WHITE))
+		slider.focus_entered.connect(func() -> void:
+			panel.add_theme_stylebox_override("panel", focused_surface)
+			caption.add_theme_color_override("font_color", MenuFlow.LIME)
+			amount.add_theme_color_override("font_color", MenuFlow.LIME))
+		slider.focus_exited.connect(func() -> void:
+			panel.add_theme_stylebox_override("panel", surface)
+			caption.add_theme_color_override("font_color", MenuFlow.WHITE)
+			amount.add_theme_color_override("font_color", MenuFlow.ICE))
 		_sliders.append(slider)
 	var desktop := not Quality.is_mobile() and not Quality.is_tv()
 	if desktop:
@@ -792,13 +806,13 @@ func _build_settings() -> void:
 	_settings.visible = false
 
 
-func _slider_thumb(color: Color) -> Texture2D:
+func _slider_thumb(color: Color, size := 28) -> Texture2D:
 	var gradient := Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, 0.84, 1.0])
 	gradient.colors = PackedColorArray([color, color, Color(color, 0.0)])
 	var texture := GradientTexture2D.new()
-	texture.width = 28
-	texture.height = 28
+	texture.width = size
+	texture.height = size
 	texture.fill = GradientTexture2D.FILL_RADIAL
 	texture.fill_from = Vector2(0.5, 0.5)
 	texture.fill_to = Vector2(1.0, 0.5)
@@ -850,7 +864,10 @@ func open_settings(master: float, music: float, effects: float) -> void:
 	_covered.clear()
 	for screen in [_menu, _pause, _lobby_bar]:
 		if screen.visible:
-			screen.visible = false
+			if screen == _menu:
+				_menu.set_covered(true)
+			else:
+				screen.visible = false
 			_covered.append(screen)
 	_settings.visible = true
 	_animate_dialog(_settings)
@@ -862,7 +879,10 @@ func close_settings() -> void:
 	cancel_record_reset()
 	_settings.visible = false
 	for screen in _covered:
-		screen.visible = true
+		if screen == _menu:
+			_menu.set_covered(false)
+		else:
+			screen.visible = true
 		if screen == _pause: _animate_dialog(_pause)
 	_covered.clear()
 	_focus_current()

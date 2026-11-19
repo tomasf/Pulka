@@ -27,6 +27,7 @@ var solo: Button
 var duo: Button
 var start: Button
 var settings: Button
+var quit_button: Button
 var back: Button
 var cards: Array[Button] = []
 var _name: Label
@@ -203,6 +204,14 @@ func _ready() -> void:
 	settings.accessibility_name = "Inställningar"
 	gear_icon(settings)
 	canvas.add_child(settings)
+	if Quality.is_desktop():
+		quit_button = _button("Avsluta", &"quit", Vector2(1208, 42), Vector2(210, 64))
+		players.add_child(quit_button)
+		solo.focus_neighbor_top = quit_button.get_path()
+		duo.focus_neighbor_top = quit_button.get_path()
+		quit_button.focus_neighbor_bottom = duo.get_path()
+		quit_button.focus_neighbor_right = settings.get_path()
+		settings.focus_neighbor_left = quit_button.get_path()
 	resized.connect(_fit)
 	_fit()
 
@@ -251,7 +260,6 @@ func _button(text: String, action: StringName, at: Vector2, dimensions: Vector2,
 
 func _build_players() -> void:
 	_text(players, "PULKA!", 44, Vector2(80, 42), WHITE, true)
-	_text(players, "01  /  VÄLJ SPELARE", 16, Vector2(1120, 64), MUTED)
 	var headline := _text(players, "UT I\nBACKEN.", 112, Vector2(120, 230), WHITE, true)
 	headline.add_theme_constant_override("line_spacing", -30)
 	_text(players, "Snö i nacken. Ett åk till.", 26, Vector2(126, 521), ICE)
@@ -260,7 +268,6 @@ func _build_players() -> void:
 	duo.disabled = Quality.is_mobile()
 	duo.tooltip_text = "Två spelare på samma skärm" if not duo.disabled else "Två spelare kräver tangentbord eller handkontroller"
 	_record = _text(players, "", 19, Vector2(126, 736), MUTED)
-	_text(players, "♫  Snödag", 17, Vector2(126, 818), MUTED)
 	_text(players, "Välj ditt sällskap. Resten går utför.", 17, Vector2(948, 818), MUTED)
 	solo.focus_neighbor_right = duo.get_path()
 	duo.focus_neighbor_left = solo.get_path()
@@ -305,7 +312,6 @@ func _build_picker() -> void:
 	back = _button("‹  Spelare", &"players", Vector2(80, 42), Vector2(190, 64))
 	picker.add_child(back)
 	_text(picker, "PULKA!", 44, Vector2(702, 44), WHITE, true)
-	_text(picker, "02  /  VÄLJ ÅKDON", 16, Vector2(1120, 64), WHITE)
 	_text(picker, "DITT ÅK BÖRJAR HÄR", 16, Vector2(84, 198), LIME)
 	_name = _text(picker, "Pulka", 76, Vector2(80, 228), WHITE, true)
 	_tagline = _text(picker, "Den röda klassikern.", 25, Vector2(84, 332), ICE)
@@ -418,6 +424,11 @@ func _preview(model: VehicleSpec.Model, count: int, rider: bool) -> TextureRect:
 
 static func vehicle_texture(model: VehicleSpec.Model) -> Texture2D:
 	return _vehicle_textures.get(model)
+
+
+## Settings cover the controls while keeping the current menu background.
+func set_covered(covered: bool) -> void:
+	canvas.visible = not covered
 
 
 func show_players() -> void:

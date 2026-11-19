@@ -131,6 +131,9 @@ static func _entries(group: String) -> Array:
 	for direction in [Vector3(0.0, 0.12, -1.0), Vector3(-0.9, 0.35, -0.6)]:
 		groups["treats"].append(["snowflake", func() -> Node3D: return _viewed(_mesh(Props.snowflake()), direction)])
 		groups["treats"].append(["cinnamon bun", func() -> Node3D: return _viewed(_mesh(Props.cinnamon_bun()), direction)])
+	groups["bun_review"] = []
+	for direction in [Vector3(0, 0, -1), Vector3(-0.9, 0.35, -0.6), Vector3(-1, 0.1, 0), Vector3(-0.9, 0.35, 0.6), Vector3(0, 0, 1), Vector3(0.4, 0.7, -1)]:
+		groups["bun_review"].append(["cinnamon bun", func() -> Node3D: return _viewed(_mesh(Props.cinnamon_bun()), direction)])
 	groups["faces"] = []
 	for i in 8:
 		groups["faces"].append(["face %d" % i, func() -> Node3D:

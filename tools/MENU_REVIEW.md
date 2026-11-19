@@ -63,3 +63,10 @@ Settings and pause share the same fitted canvas, card surfaces, fonts and
 primary/focus colours as the opening menu. `tools/dialog_test.gd` checks volume
 initialisation and audio-bus changes, focus restoration and opening/closing
 settings while paused; add `--capture` for native review screenshots.
+
+Fullscreen preferences also save a desktop-only `user://pulka.window.cfg`
+override. Godot reads it before creating the first window, so the boot splash
+already uses the selected mode. Older saves migrate on their first normal
+launch. Mobile, TV, web and the editor do not load this desktop override.
+`godot --headless --path . --script res://tools/fullscreen_test.gd -- --native`
+checks isolated fullscreen and windowed launches before any scene loads.

@@ -7,6 +7,7 @@ var failures := 0
 func _initialize() -> void: _run.call_deferred()
 
 func _run() -> void:
+	root.size = Vector2i(960, 540) if OS.get_cmdline_user_args().has("--compact") else Vector2i(1600, 900)
 	# Legacy save has no separate unlock progress.
 	var legacy := ConfigFile.new()
 	legacy.set_value("records", "best_distance", 4300.0)
@@ -59,12 +60,50 @@ func _run() -> void:
 	await _back()
 	_check("next Back returns to pause", paused and hud._pause.visible and not hud.settings_open)
 	main.call("_on_hud_pressed", &"resume")
+	# A shorter run can beat the points record; a longer one can miss it.
+	data.best_distance = 4300.0
+	data.best_score = 7654
+	await _finish_run(1200.0, 8200)
+	reloaded = SaveData.load_saved(TEST_SAVE)
+	_check("shorter run persists a new points record independently", reloaded.best_distance == 4300.0 and reloaded.best_score == 8200)
+	_check("points record gets its own announcement", hud._over_record.visible and hud._over_record.text == "NYTT POÄNGREKORD!")
+	_check("results have two rows with the run's distance and points", hud._over_rows.get_child_count() == 2 and _result_value(hud, 0) == "1 200 m" and _result_value(hud, 1) == "8 200")
+	_check("each result shows its saved record underneath", _result_record(hud, 0) == "REKORD: 4 300 m" and _result_record(hud, 1) == "REKORD: 8 200")
+	if OS.get_cmdline_user_args().has("--capture"):
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_png("/tmp/pulka-score-record.png")
+	await _finish_run(1200.0, 8200)
+	_check("tying the points record does not announce a new one", not hud._over_record.visible)
+	await _finish_run(5000.0, 5000)
+	reloaded = SaveData.load_saved(TEST_SAVE)
+	_check("longer run preserves the higher points record", reloaded.best_distance == 5000.0 and reloaded.best_score == 8200)
+	_check("distance record gets its own announcement", hud._over_record.visible and hud._over_record.text == "NYTT DISTANSREKORD!")
+	await _finish_run(6000.0, 9000)
+	reloaded = SaveData.load_saved(TEST_SAVE)
+	_check("one run can beat both records", reloaded.best_distance == 6000.0 and reloaded.best_score == 9000 and hud._over_record.text == "NYA REKORD!")
 	main.queue_free()
 	await process_frame
 	await process_frame
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_SAVE))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(data.window_settings_path()))
 	print("records test: %s" % ("all passed" if failures == 0 else "%d failed" % failures))
 	quit(failures)
+
+func _finish_run(distance: float, score: int) -> void:
+	var player: Player = main.get("_players")[0]
+	player.run_distance = distance
+	player.bonus = score - int(distance)
+	# _save points to TEST_SAVE, so exercise the real persistence path.
+	main.set("_autopilot", false)
+	main.call("_game_over")
+	main.set("_autopilot", true)
+	await _tick(2)
+
+func _result_value(hud: Hud, row: int) -> String:
+	return hud._over_rows.get_child(row).get_child(0).get_child(0).get_child(1).text
+
+func _result_record(hud: Hud, row: int) -> String:
+	return hud._over_rows.get_child(row).get_child(0).get_child(1).text
 
 func _back() -> void:
 	await _tick(20)

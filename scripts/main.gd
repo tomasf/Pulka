@@ -340,10 +340,16 @@ func _remember_fullscreen() -> void:
 	_save.store()
 
 
-## Desktop only: browsers refuse fullscreen without a click, phones always are.
+## One-time migration for older saves. Subsequent launches get their mode
+## from the startup override, before the first window or splash is shown.
 func _restore_fullscreen() -> void:
-	if _save.fullscreen and not _autopilot and _screenshot_path == "" and not OS.has_feature("web") and not Quality.is_mobile():
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	if not Quality.is_desktop() or _autopilot or _screenshot_path != "":
+		return
+	if not FileAccess.file_exists(_save.window_settings_path()):
+		_save.store_window_mode()
+		var args := OS.get_cmdline_args()
+		if _save.fullscreen and not args.has("--windowed") and not args.has("-w"):
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 
 func _process(delta: float) -> void:
@@ -1196,6 +1202,10 @@ func _on_hud_pressed(action: StringName) -> void:
 			_change_vehicle(index - _vehicle)
 		return
 	match action:
+		&"quit":
+			if state == State.MENU and not _hud.settings_open and Quality.is_desktop():
+				_remember_fullscreen()
+				get_tree().quit()
 		&"fullscreen":
 			_toggle_fullscreen()
 		&"show_fps":
@@ -1589,13 +1599,14 @@ func _game_over() -> void:
 	state = State.GAME_OVER
 	_director.stop()
 	var record := p.run_distance > _save.best_distance
+	var score_record := p.score() > _save.best_score
 	if record:
 		_save.best_distance = p.run_distance
 	_save.best_score = maxi(_save.best_score, p.score())
 	_save.unlocked_distance = maxf(_save.unlocked_distance, p.run_distance)
 	if not _autopilot:
 		_save.store()
-	_hud.show_game_over(GAME_OVER_LINES[_rng.randi_range(0, GAME_OVER_LINES.size() - 1)], p.last_crash_line, p.run_distance, p.score(), _save.best_distance, record)
+	_hud.show_game_over(GAME_OVER_LINES[_rng.randi_range(0, GAME_OVER_LINES.size() - 1)], p.last_crash_line, p.run_distance, p.score(), _save.best_distance, _save.best_score, record, score_record)
 	_sound.set_music_ducked(true)
 	_input_cooldown = Hud.OVER_GUARD
 

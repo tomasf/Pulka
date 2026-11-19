@@ -1379,50 +1379,75 @@ static func snowflake() -> ArrayMesh:
 		return kit.build())
 
 
-## A Swedish cinnamon bun standing on its edge, facing -Z: a spiral of dough,
-## domed in the middle, its top baked golden brown and glazed, streaked with
-## cinnamon and dark in the grooves between the turns, pale only round its
-## sides, with fine pearl sugar on top.
+## A Swedish cinnamon bun facing -Z: one plump coil of baked dough, with
+## cinnamon in its folds and pearl sugar on the front. The coil forms the
+## full thickness, including the back; there is no separate base or lid.
 static func cinnamon_bun() -> ArrayMesh:
-	return cached_mesh("cinnamon_bun", func() -> ArrayMesh:
+	# A new key also replaces the old two-part bun in existing world archives.
+	return cached_mesh("cinnamon_bun_spiral", func() -> ArrayMesh:
 		var kit := MeshKit.new()
-		var side := Color(0.93, 0.76, 0.5)
-		var baked := Color(0.72, 0.42, 0.17)
-		var cinnamon := Color(0.36, 0.17, 0.07)
+		var golden := Color(0.79, 0.48, 0.21)
+		var baked := Color(0.67, 0.34, 0.12)
+		var cinnamon := Color(0.33, 0.13, 0.045)
 		var sugar := Color(0.99, 0.98, 0.95)
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 7
-		# The pale body shows round the edge and the back.
-		kit.sphere(0.2, Vector3(0, 0, 0.01), side, Vector3(1, 1, 0.42), 20, 10)
-		var turns := 3.0
-		var previous := Vector3.ZERO
-		var groove := Vector3.ZERO
-		for k in 110:
-			var t := k / 109.0
-			var angle := t * TAU * turns
-			var radius := 0.012 + 0.178 * t
-			# Thicker towards the middle, like a risen bun.
-			var depth := -0.04 - 0.07 * (1.0 - t) * (1.0 - t)
-			var point := Vector3(cos(angle) * radius, sin(angle) * radius, depth)
-			var outside := radius + 0.178 / turns * 0.5
-			var line := Vector3(cos(angle) * outside, sin(angle) * outside, depth + 0.012)
-			if k > 0:
-				# Only between turns: the outside of the roll is plain dough.
-				if outside < 0.168:
-					kit.capsule_between(groove, line, 0.011, cinnamon, 5)
-				# Browner where the oven caught it, a shade lighter on the edge.
-				var crust := baked.lerp(side, 0.35 * t * t) if k % 5 else baked.darkened(0.08)
-				kit.capsule_between(previous, point, 0.027, crust, 8)
-			# Cinnamon streaks over the top.
-			if rng.randf() < 0.3 and t < 0.9:
-				var smear := point + Vector3(rng.randf_range(-0.01, 0.01), rng.randf_range(-0.01, 0.01), -0.024)
-				kit.ellipsoid(Vector3(0.018, 0.009, 0.004), smear, cinnamon.lerp(baked, 0.35), Vector3(0, 0, angle + PI / 2))
-			for grain in 2:
-				if rng.randf() < 0.55:
-					var spot := point + Vector3(rng.randf_range(-0.014, 0.014), rng.randf_range(-0.014, 0.014), -0.028)
-					kit.box(Vector3.ONE * rng.randf_range(0.008, 0.012), spot, sugar, Vector3(rng.randf(), rng.randf(), rng.randf()))
-			previous = point
-			groove = line
+		var steps := 168
+		var sides := 16
+		var rings: Array[PackedVector3Array] = []
+		var outward := PackedFloat32Array()
+		var centres := PackedVector3Array()
+		var tangents := PackedVector3Array()
+		var grains := PackedVector3Array()
+		for k in steps + 1:
+			var t := k / float(steps)
+			var angle := -0.55 + t * TAU * 3.0
+			var tail := smoothstep(0.965, 1.0, t)
+			var radius := 0.008 + 0.172 * t - 0.014 * tail
+			var tangent := Vector3(0.172 * cos(angle) - radius * TAU * 3.0 * sin(angle), 0.172 * sin(angle) + radius * TAU * 3.0 * cos(angle), 0).normalized()
+			var across := Vector3(tangent.y, -tangent.x, 0)
+			var point := Vector3(cos(angle) * radius, sin(angle) * radius, -0.012 * (1.0 - t))
+			# Neighbouring turns touch all the way through the dough. A slight
+			# dome and a tucked-in tail keep it from looking like a flat disc.
+			var width := 0.0305 * (1.0 - 0.65 * tail)
+			var depth := 0.061 * (1.0 - 0.2 * t) * (1.0 - 0.4 * tail)
+			var ring := PackedVector3Array()
+			for j in sides:
+				var phi := j * TAU / sides
+				ring.append(point + across * cos(phi) * width + Vector3.FORWARD * sin(phi) * depth)
+			rings.append(ring)
+			outward.append(1.0)
+			centres.append(point)
+			tangents.append(tangent)
+			if k > 5 and k < steps - 3 and rng.randf() < 0.38:
+				var offset := rng.randf_range(-0.6, 0.6)
+				grains.append(point + across * offset * width + Vector3.FORWARD * (depth * sqrt(1.0 - offset * offset) + 0.002))
+		kit.loft(rings, outward, Transform3D.IDENTITY, golden)
+		# Toasted crowns grade into golden sides; a narrow cinnamon seam
+		# follows the inside shoulder of the same coil, front and back.
+		for k in steps + 1:
+			var t := k / float(steps)
+			for j in sides:
+				var phi := j * TAU / sides
+				var toast := maxf(sin(phi), 0.0)
+				var crust := golden.lerp(baked, toast * (0.75 + 0.15 * sin(t * TAU * 7.0)))
+				if cos(phi) < -0.65 and absf(sin(phi)) > 0.3:
+					crust = crust.lerp(cinnamon, 0.85)
+				kit._colors[k * sides + j] = crust.srgb_to_linear()
+		# Close both ends of the dough strip in their own tangent planes.
+		for end in [0, steps]:
+			var middle := kit._vertices.size()
+			kit._vertices.append(centres[end])
+			var normal: Vector3 = tangents[end] * (-1.0 if end == 0 else 1.0)
+			kit._normals.append(normal)
+			kit._colors.append(golden.srgb_to_linear())
+			for j in sides:
+				kit._triangle_facing(middle, end * sides + j, end * sides + (j + 1) % sides)
+		# The innermost curl rises into the centre, closing the tiny gap
+		# where the first turn folds over itself.
+		kit.ellipsoid(Vector3(0.023, 0.023, 0.06), Vector3(0, 0, -0.012), baked)
+		for spot in grains:
+			kit.box(Vector3(rng.randf_range(0.006, 0.01), rng.randf_range(0.006, 0.01), 0.006), spot, sugar, Vector3(rng.randf(), rng.randf(), rng.randf()))
 		return kit.build())
 
 

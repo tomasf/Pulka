@@ -51,4 +51,21 @@ func store() -> void:
 	config.set_value("audio", "master", master_volume)
 	config.set_value("audio", "music", music_volume)
 	config.set_value("audio", "effects", effects_volume)
-	config.save(_path)
+	if config.save(_path) == OK:
+		store_window_mode()
+
+
+func window_settings_path() -> String:
+	return _path.get_basename() + ".window.cfg"
+
+
+## Godot reads this override before creating its first window and splash.
+## Keep it separate from records/audio, and scoped to native desktop builds.
+func store_window_mode() -> void:
+	if not Quality.is_desktop():
+		return
+	var config := ConfigFile.new()
+	config.set_value("display", "window/size/mode.pc", DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
+	var error := config.save(window_settings_path())
+	if error != OK:
+		push_warning("Could not save startup window mode: " + error_string(error))

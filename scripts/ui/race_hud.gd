@@ -129,7 +129,7 @@ func _build_lobby() -> void:
 		canvas.add_child(bar)
 		_lobby_bars.append(bar)
 	_ready_button = Button.new()
-	_ready_button.text = "KLAR  ✓"
+	_ready_button.text = "KLAR"
 	_ready_button.position = Vector2(538, 783)
 	_ready_button.size = Vector2(206, 64)
 	_ready_button.focus_mode = Control.FOCUS_NONE
@@ -139,8 +139,11 @@ func _build_lobby() -> void:
 	_lobby_controls = MenuFlow.caption("", 15, MenuFlow.MUTED)
 	_lobby_controls.position = Vector2(64, 843)
 	canvas.add_child(_lobby_controls)
-	_lobby_status = MenuFlow.caption("", 16, MenuFlow.ICE)
-	_lobby_status.position = Vector2(378, 795)
+	_lobby_status = MenuFlow.caption("Väntar…", 26, MenuFlow.ICE)
+	_lobby_status.position = _ready_button.position
+	_lobby_status.size = _ready_button.size
+	_lobby_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lobby_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	canvas.add_child(_lobby_status)
 
 
@@ -153,8 +156,8 @@ func show_lobby(spec: VehicleSpec, controls: String, ready: bool) -> void:
 		_lobby_bars[i].value = values[i]
 		_lobby_bars[i].queue_redraw()
 	_lobby_controls.text = controls.replace("tangentbordet", "A/D, Space").replace("Styr med ", "")
-	_lobby_status.text = "Väntar…" if ready else ""
-	_ready_button.text = "✓  REDO" if ready else "KLAR  ✓"
+	_lobby_status.visible = ready
+	_ready_button.visible = not ready
 	_lobby.visible = true
 	_tag.visible = false
 	_left.visible = false

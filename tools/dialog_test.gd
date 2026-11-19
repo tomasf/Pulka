@@ -25,17 +25,28 @@ func _run() -> void:
 		await _tick(1)
 	hud.open_settings(0.6, 0.4, 0.8)
 	await _tick(20)
-	_check("settings opens over the menu", hud.settings_open and not hud._menu.visible)
+	_check("settings keeps the main menu background and hides its controls", hud.settings_open and hud._menu._background.is_visible_in_tree() and not hud._menu.canvas.visible)
 	_check("volume values initialise without emitting changes", hud._sliders[0].value == 60 and hud._sliders[1].value == 40 and hud._sliders[2].value == 80)
-	hud._sliders[1].value = 45
+	_check("settings initially focuses master volume", root.gui_get_focus_owner() == hud._sliders[0])
+	await _shot("settings-focus-master")
+	await _key(KEY_DOWN)
+	_check("Down moves focus to the music slider", root.gui_get_focus_owner() == hud._sliders[1])
+	await _key(KEY_RIGHT)
 	_check("slider updates its value label", hud._sliders[1].get_parent().get_child(2).text == "45 %")
 	_check("slider changes the audio bus", absf(AudioServer.get_bus_volume_db(AudioServer.get_bus_index(SoundBank.MUSIC_BUS)) - linear_to_db(0.45 * 0.45)) < 0.01)
 	await _shot("settings")
 	# Close through HUD to avoid writing test volume changes to the user's save.
 	hud.close_settings()
 	await _tick(2)
-	_check("closing settings returns to player choice", hud._menu.visible and not hud.settings_open)
+	_check("closing settings returns to player choice", hud._menu.visible and hud._menu.canvas.visible and not hud.settings_open)
 	main.call("_choose_solo")
+	# The ride picker uses the actual slope, so keep that background there.
+	await _tick(25)
+	await create_timer(0.4, true).timeout
+	hud.open_settings(0.6, 0.45, 0.8)
+	_check("picker settings preserve the slope background", hud.settings_open and not hud._menu._background.visible and not hud._menu.canvas.visible)
+	hud.close_settings()
+	_check("closing picker settings restores its controls", hud._menu.picker.visible and hud._menu.canvas.visible)
 	main.call("_start_run")
 	var frames := 0
 	while main.get("state") == 1 and frames < 240:
@@ -66,6 +77,15 @@ func _run() -> void:
 	await process_frame
 	print("dialog test: %s" % ("all passed" if failures == 0 else "%d failed" % failures))
 	quit(failures)
+
+func _key(code: Key) -> void:
+	for pressed in [true, false]:
+		var event := InputEventKey.new()
+		event.keycode = code
+		event.physical_keycode = code
+		event.pressed = pressed
+		Input.parse_input_event(event)
+		await _tick(2)
 
 func _tick(frames: int) -> void:
 	for frame in frames:
