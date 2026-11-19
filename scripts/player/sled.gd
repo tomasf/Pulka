@@ -24,8 +24,12 @@ const MAX_TURN := deg_to_rad(75.0)
 ## Seconds to get into a grab's pose, and back to the seat after letting go.
 const GRAB_IN := 0.55
 const GRAB_OUT := 0.45
-## How far into the pose (0..1) a rider can still land safely.
+## How far into the pose (0..1) a rider can still land safely, once the
+## trick has been fully pulled off in that flight.
 const GRAB_SAFE := 0.15
+## How long jump must be held before a grab starts, so a quick tap in the
+## air does nothing.
+const GRAB_COMMIT := 0.15
 
 var spec: VehicleSpec
 var field: TerrainField
@@ -77,6 +81,11 @@ var _air_rate := 0.0
 var _trick: GrabTrick
 ## The jump button has been let go since take-off, so holding it now grabs.
 var _grab_armed := false
+## How long jump has been held since it armed a grab.
+var _grab_hold := 0.0
+## The pose was fully reached in this flight: from then on, landing before
+## the rider is back in the seat is a crash.
+var _grab_done := false
 ## Eased 0..1: how far into the trick pose the rider is.
 var _grab_blend := 0.0
 ## How squashed the rider is from a landing; springs back to 0.
@@ -210,13 +219,20 @@ func _update_grab(delta: float, held: bool) -> void:
 	if on_ground or crashed:
 		grabbing = false
 		_grab_armed = false
+		_grab_hold = 0.0
+		_grab_done = false
 	elif not held:
 		grabbing = false
 		_grab_armed = true
+		_grab_hold = 0.0
 	elif _grab_armed and _air_since > 0.2:
-		grabbing = true
-	_grab_blend = move_toward(_grab_blend, 1.0 if grabbing else 0.0, delta / (GRAB_IN if grabbing else GRAB_OUT))
+		_grab_hold += delta
+		grabbing = grabbing or _grab_hold >= GRAB_COMMIT
+	# A trick cut short by the snow is dropped quickly.
+	var out := GRAB_OUT * (0.4 if on_ground else 1.0)
+	_grab_blend = move_toward(_grab_blend, 1.0 if grabbing else 0.0, delta / (GRAB_IN if grabbing else out))
 	if grabbing and _grab_blend >= 1.0:
+		_grab_done = true
 		grab_time += delta
 
 
@@ -225,9 +241,11 @@ func grab_blend() -> float:
 	return _grab_blend
 
 
-## Still too far into a grab to land on the ride (a crash if it touches down).
+## Too far into a finished grab to land on the ride (a crash if it touches
+## down). A grab that never got all the way in is just dropped on landing,
+## so a stray press of jump doesn't spoil a run.
 func in_trick() -> bool:
-	return _grab_blend > GRAB_SAFE
+	return _grab_done and _grab_blend > GRAB_SAFE
 
 
 func _step_physics(dt: float, steer: float, jump: bool) -> void:
@@ -577,6 +595,7 @@ func crash() -> void:
 	crashed = true
 	grabbing = false
 	_grab_blend = 0.0
+	_grab_done = false
 	_vehicle_mesh.transform = Transform3D.IDENTITY
 	_rider.scale = Vector3.ONE
 	_squash = 0.0

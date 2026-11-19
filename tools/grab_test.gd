@@ -1,7 +1,8 @@
 extends SceneTree
-## Grab tricks: holding jump through the take-off never grabs, pressing it
-## again in the air does, letting go in good time lands safely, and letting
-## go too late or not at all lands still in the trick. Every ride eases into
+## Grab tricks: holding jump through the take-off never grabs, quick taps
+## don't either, pressing and holding it again in the air does. Letting go in
+## good time lands safely, and so does a grab that never got all the way in;
+## letting go of a finished one too late, or not at all, lands in the trick. Every ride eases into
 ## and out of its pose.
 ## Godot --headless --path . --script res://tools/grab_test.gd
 
@@ -77,6 +78,30 @@ func _run() -> void:
 			if sled.on_ground:
 				break
 		_check("%s: letting go too late lands in the trick" % name, _landings.size() >= 1 and _landings[0][1])
+
+		# Quick taps of jump all through the flight never start a grab.
+		_launch(sled)
+		var tapped_blend := 0.0
+		for i in 240:
+			sled.step(DT, 0.0, false, i % 15 < 5)
+			tapped_blend = maxf(tapped_blend, sled.grab_blend())
+			if sled.on_ground:
+				break
+		_check("%s: quick taps in the air don't grab" % name, tapped_blend == 0.0)
+		_check("%s: quick taps in the air land safely" % name, _landings.size() >= 1 and not _landings[0][1])
+
+		# A grab started too late to get all the way in is dropped on landing.
+		_launch(sled)
+		var started_blend := 0.0
+		for i in 240:
+			var gap := sled.position.y - field.height_world(sled.position.x, sled.position.z)
+			var late := sled.velocity.y < 0.0 and gap < -sled.velocity.y * 0.45
+			sled.step(DT, 0.0, false, late)
+			started_blend = maxf(started_blend, sled.grab_blend())
+			if sled.on_ground:
+				break
+		_check("%s: a late grab gets under way" % name, started_blend > 0.2 and started_blend < 1.0)
+		_check("%s: an unfinished grab lands safely" % name, _landings.size() >= 1 and not _landings[0][1])
 
 		# Holding on until touchdown. Without steering, nothing turns the
 		# ride in the air (the saucer and wok only spin by themselves on snow).

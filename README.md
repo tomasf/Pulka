@@ -8,9 +8,11 @@ du spaken och A. Farten kommer automatiskt från backen.
 I luften ger ett nytt tryck på hoppknappen ett grepp så länge du håller den:
 Stålmannen på pulkan, Frihetsgudinnan med stjärtlappen, Flaggan på snowracern
 Karusellen med tefatet och Flygande Jakob med wokpannan. Det tar en stund
-att komma in i tricket och tillbaka i sätet, så släpp i god tid före
-landningen, annars kraschar du. Poäng räknas bara medan tricket är helt
-utfört, och grepp och snurr i samma hopp ger extra poäng.
+att komma in i tricket och tillbaka i sätet. Har du väl kommit hela vägen in
+måste du släppa i god tid före landningen, annars kraschar du. Korta tryck
+gör ingenting, och ett trick som inte hunnit bli klart avbryts utan krasch
+när du landar. Poäng räknas bara medan tricket är helt utfört, och grepp och
+snurr i samma hopp ger extra poäng.
 Testa med `godot --headless --path . --script res://tools/grab_test.gd`, och
 se poserna med `godot --path . --script res://tools/gallery.gd -- grab /tmp/pulka-grab.png 420`.
 
