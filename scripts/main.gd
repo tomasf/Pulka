@@ -511,7 +511,7 @@ func _is_unlocked(spec: VehicleSpec) -> bool:
 func _update_menu(delta: float) -> void:
 	_update_world(delta)
 	_players[0].sled.step(delta, 0.0, false)
-	if _input_cooldown > 0.0 or _hud.settings_open:
+	if _input_cooldown > 0.0 or _hud.modal_open:
 		return
 	if _confirm_pressed():
 		_choose_solo()
@@ -1202,8 +1202,15 @@ func _on_hud_pressed(action: StringName) -> void:
 			_change_vehicle(index - _vehicle)
 		return
 	match action:
+		&"about":
+			if state == State.MENU and not _hud.modal_open:
+				_hud.open_about()
+		&"about_licenses":
+			if _hud.about_open: _hud.show_about_licenses()
+		&"close_about":
+			_hud.close_about()
 		&"quit":
-			if state == State.MENU and not _hud.settings_open and Quality.is_desktop():
+			if state == State.MENU and not _hud.modal_open and Quality.is_desktop():
 				_remember_fullscreen()
 				get_tree().quit()
 		&"fullscreen":
@@ -1229,7 +1236,7 @@ func _on_hud_pressed(action: StringName) -> void:
 			if state == State.SELECT:
 				_change_vehicle(-1 if action == &"previous" else 1)
 		&"settings":
-			if state in [State.MENU, State.SELECT, State.PAUSED, State.LOBBY]:
+			if not _hud.about_open and state in [State.MENU, State.SELECT, State.PAUSED, State.LOBBY]:
 				_hud.open_settings(_save.master_volume, _save.music_volume, _save.effects_volume)
 		&"close_settings":
 			_close_settings()
@@ -1308,12 +1315,17 @@ func _go_back() -> void:
 ## Only the top level hands Menu back to the system.
 func _update_go_back() -> void:
 	if Quality.is_tv():
-		get_tree().quit_on_go_back = state == State.MENU and not _hud.settings_open
+		get_tree().quit_on_go_back = state == State.MENU and not _hud.modal_open
 
 
 # --- Settings ---
 
 func _update_settings_input() -> void:
+	if _hud.about_open:
+		if Input.is_action_just_pressed(&"back") or Input.is_action_just_pressed(&"pause"):
+			_hud.close_about()
+			_input_cooldown = 0.2
+		return
 	if _hud.settings_open:
 		if Input.is_action_just_pressed(&"back") or Input.is_action_just_pressed(&"pause") or Input.is_action_just_pressed(&"settings"):
 			if _hud.reset_pending:

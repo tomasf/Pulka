@@ -105,6 +105,13 @@ var _confirm_guard_until := 0.0
 var _time := 0.0
 
 var _settings: Control
+var _about: Control
+var _about_title: Label
+var _about_text: RichTextLabel
+var _about_done: Button
+var _about_license_button: Button
+var _about_licenses := false
+var _about_license_text := ""
 var _sliders: Array[HSlider] = []
 var _covered: Array[Control] = []
 var _reset_button: Button
@@ -145,6 +152,13 @@ var settings_open: bool:
 		return _settings.visible
 
 
+var about_open: bool:
+	get: return _about.visible
+
+var modal_open: bool:
+	get: return settings_open or about_open
+
+
 func _ready() -> void:
 	layer = 5
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -154,6 +168,7 @@ func _ready() -> void:
 	_build_game_over()
 	_build_lobby_bar()
 	_build_settings()
+	_build_about()
 	if OS.has_feature("web"):
 		_build_fullscreen_button()
 	_fps_meter = FpsMeter.new()
@@ -697,6 +712,83 @@ func show_game_over(title: String, cause: String, distance: float, score: int, b
 	show_screen("over", OVER_GUARD)
 
 
+# --- About ---
+
+func _build_about() -> void:
+	_about = _full_rect()
+	_dim(_about, 0.7)
+	var canvas := _dialog_canvas(_about)
+	_dialog_panel(canvas, Rect2(310, 100, 980, 700))
+	_dialog_label(canvas, "PULKA!", 20, Vector2(350, 130), MenuFlow.LIME, true)
+	var version := _dialog_label(canvas, "Version " + str(ProjectSettings.get_setting("application/config/version", "0.1")), 20, Vector2(1030, 130), MenuFlow.MUTED)
+	version.size.x = 220
+	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_about_title = _dialog_label(canvas, "Om Pulka!", 60, Vector2(346, 164), MenuFlow.WHITE, true)
+	_about_text = RichTextLabel.new()
+	_about_text.position = Vector2(350, 272)
+	_about_text.size = Vector2(900, 360)
+	_about_text.add_theme_font_override("normal_font", MenuFlow.font())
+	_about_text.add_theme_font_size_override("normal_font_size", 24)
+	_about_text.add_theme_color_override("default_color", MenuFlow.ICE)
+	_about_text.add_theme_constant_override("line_separation", 6)
+	_about_text.selection_enabled = true
+	canvas.add_child(_about_text)
+	_about_license_button = _dialog_button(canvas, "Licenser", &"about_licenses", Rect2(350, 680, 250, 76))
+	_about_done = _dialog_button(canvas, "Tillbaka", &"close_about", Rect2(990, 680, 260, 76), true)
+	_link_grid([[_about_license_button, _about_done]])
+	_about.visible = false
+
+
+func open_about() -> void:
+	_menu.set_covered(true)
+	_about.visible = true
+	_show_about_summary()
+	_animate_dialog(_about)
+
+
+func _show_about_summary() -> void:
+	_about_licenses = false
+	_about_title.text = "Om Pulka!"
+	_about_text.bbcode_enabled = true
+	_about_text.text = "En oändlig vinterbacke. Fem åkdon. Ett åk till.\nJaga rekord på egen hand eller utmana en kompis i duell.\n\n[font_size=16][color=#c9f36b]SKAPAT AV[/color][/font_size]\n[font_size=30][color=#f6f8ff]Tomas Wincent Franzén[/color][/font_size]\n\n[font_size=20][color=#a2accb]Byggt med Godot Engine (MIT).\nFugaz One av LatinoType · Nunito av The Nunito Project Authors.\nTypsnitten används under SIL Open Font License 1.1.[/color][/font_size]"
+	_about_text.scroll_to_line(0)
+	_about_license_button.show()
+	if not _touch_mode: _about_done.grab_focus()
+
+
+func show_about_licenses() -> void:
+	if _about_license_text.is_empty():
+		var sections := PackedStringArray(["GODOT ENGINE\n\n" + Engine.get_license_text()])
+		for font_name in ["FugazOne", "Nunito"]:
+			sections.append(font_name + "\n\n" + FileAccess.get_file_as_string("res://fonts/%s-OFL.txt" % font_name))
+		for component: Dictionary in Engine.get_copyright_info():
+			var notice := str(component.name)
+			for part: Dictionary in component.parts:
+				notice += "\n" + "\n".join(part.copyright) + "\nLicense: " + str(part.license)
+			sections.append(notice)
+		var licenses := Engine.get_license_info()
+		for name: String in licenses:
+			sections.append(name + "\n\n" + str(licenses[name]))
+		_about_license_text = "\n\n────────────────────\n\n".join(sections)
+	_about_licenses = true
+	_about_title.text = "Licenser"
+	_about_text.bbcode_enabled = false
+	_about_text.text = _about_license_text
+	_about_text.scroll_to_line(0)
+	_about_license_button.hide()
+	if not _touch_mode: _about_done.grab_focus()
+
+
+func close_about() -> void:
+	if not about_open: return
+	if _about_licenses:
+		_show_about_summary()
+		return
+	_about.hide()
+	_menu.set_covered(false)
+	if not _touch_mode: _menu.about_button.grab_focus()
+
+
 # --- Settings ---
 
 func _build_settings() -> void:
@@ -914,6 +1006,11 @@ func records_cleared() -> void:
 
 ## True while one of the on-screen buttons has keyboard/controller focus.
 func _input(event: InputEvent) -> void:
+	if about_open and _about_licenses:
+		var direction := int(event.is_action_pressed(&"ui_down", true)) - int(event.is_action_pressed(&"ui_up", true))
+		if direction != 0:
+			_about_text.get_v_scroll_bar().value += direction * 80
+			get_viewport().set_input_as_handled()
 	if event.is_action_pressed(&"ui_accept") and Time.get_ticks_msec() / 1000.0 < _confirm_guard_until:
 		get_viewport().set_input_as_handled()
 
@@ -931,6 +1028,9 @@ func _release_focus() -> void:
 ## Focuses the default button of the visible screen (not in touch mode).
 func _focus_current() -> void:
 	if _touch_mode or _settings.visible:
+		return
+	if about_open:
+		_about_done.grab_focus()
 		return
 	if _menu.visible:
 		_menu.default_focus().grab_focus()

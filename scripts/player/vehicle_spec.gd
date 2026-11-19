@@ -79,8 +79,8 @@ static func all() -> Array[VehicleSpec]:
 	lapp.drag = 0.0017
 	lapp.friction = 0.022
 	lapp.jump = 5.2
-	lapp.self_align = 0.4
-	lapp.wobble = 1.3
+	lapp.self_align = 0.9
+	lapp.wobble = 0.45
 	lapp.air_spin = 7.0
 	lapp.seat_height = 0.05
 	lapp.mass = 0.5

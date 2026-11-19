@@ -28,6 +28,7 @@ var duo: Button
 var start: Button
 var settings: Button
 var quit_button: Button
+var about_button: Button
 var back: Button
 var cards: Array[Button] = []
 var _name: Label
@@ -100,6 +101,17 @@ class Gear extends Control:
 			draw_line(center + direction * 8, center + direction * 12, WHITE, 3, true)
 		draw_arc(center, 8, 0, TAU, 32, WHITE, 3, true)
 		draw_circle(center, 3, WHITE)
+
+
+class Info extends Control:
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+	func _draw() -> void:
+		var center := size * 0.5
+		draw_arc(center, 12, 0, TAU, 48, WHITE, 2.5, true)
+		draw_circle(center + Vector2(0, -6), 1.8, WHITE)
+		draw_line(center + Vector2(0, -1), center + Vector2(0, 7), WHITE, 3, true)
+		draw_line(center + Vector2(-3, 7), center + Vector2(3, 7), WHITE, 2.5, true)
 
 
 static func font(display := false) -> Font:
@@ -184,6 +196,13 @@ static func gear_icon(button: Button) -> void:
 	button.add_child(icon)
 
 
+static func info_icon(button: Button) -> void:
+	button.text = ""
+	var icon := Info.new()
+	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	button.add_child(icon)
+
+
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -204,14 +223,22 @@ func _ready() -> void:
 	settings.accessibility_name = "Inställningar"
 	gear_icon(settings)
 	canvas.add_child(settings)
+	about_button = _button("Om spelet", &"about", Vector2(1344, 42), Vector2(76, 64))
+	about_button.tooltip_text = "Om spelet"
+	info_icon(about_button)
+	players.add_child(about_button)
+	solo.focus_neighbor_top = about_button.get_path()
+	duo.focus_neighbor_top = about_button.get_path()
+	about_button.focus_neighbor_bottom = solo.get_path()
+	about_button.focus_neighbor_right = settings.get_path()
+	settings.focus_neighbor_left = about_button.get_path()
 	if Quality.is_desktop():
-		quit_button = _button("Avsluta", &"quit", Vector2(1208, 42), Vector2(210, 64))
+		quit_button = _button("Avsluta", &"quit", Vector2(1108, 42), Vector2(210, 64))
 		players.add_child(quit_button)
 		solo.focus_neighbor_top = quit_button.get_path()
-		duo.focus_neighbor_top = quit_button.get_path()
 		quit_button.focus_neighbor_bottom = duo.get_path()
-		quit_button.focus_neighbor_right = settings.get_path()
-		settings.focus_neighbor_left = quit_button.get_path()
+		quit_button.focus_neighbor_right = about_button.get_path()
+		about_button.focus_neighbor_left = quit_button.get_path()
 	resized.connect(_fit)
 	_fit()
 

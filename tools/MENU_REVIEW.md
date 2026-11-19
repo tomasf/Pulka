@@ -70,3 +70,8 @@ already uses the selected mode. Older saves migrate on their first normal
 launch. Mobile, TV, web and the editor do not load this desktop override.
 `godot --headless --path . --script res://tools/fullscreen_test.gd -- --native`
 checks isolated fullscreen and windowed launches before any scene loads.
+
+The main menu's About button opens credits over the same winter backdrop.
+Its Licenses view includes Godot's runtime copyright/license notices and both
+bundled font licenses. Keyboard arrows, d-pad and stick scroll the notices;
+Back returns through credits to the menu and restores focus to About.
