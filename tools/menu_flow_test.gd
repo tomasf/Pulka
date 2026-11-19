@@ -45,7 +45,8 @@ func _run() -> void:
 	_check("solo opens ride selection", main.get("state") == 6 and hud._menu.picker.visible)
 	_check("selection keeps the preview world", main.get("_field") == field)
 	var first_preview_color: Color = main.get("_players")[0].color
-	_check("picker settles with its panels in place and background hidden", not hud._menu.players.visible and not hud._menu._background.visible and hud._menu._picker_details.position == Vector2.ZERO and hud._menu._picker_dock.position == Vector2.ZERO and hud._menu._brand.position == Vector2(702, 44))
+	_check("picker settles with its panels in place and background hidden", not hud._menu.players.visible and not hud._menu._background.visible and hud._menu._picker_details.position == Vector2.ZERO and hud._menu._picker_dock.position == Vector2.ZERO)
+	_check("solo logo is centered on the screen", is_equal_approx(hud._menu._brand.get_global_rect().get_center().x, hud._menu.get_global_rect().get_center().x))
 	var preview_pose: Transform3D = main.get("_camera").transform
 	main.call("_on_hud_pressed", &"players")
 	_check("Back preserves the preview world and camera", main.get("_field") == field and main.get("_camera").transform == preview_pose)
@@ -127,7 +128,8 @@ func _run() -> void:
 	var racers: Array = main.get("_players")
 	_check("two players choose rides in a split preview", main.get("state") == 5 and racers.size() == 2)
 	_check("duo selection uses the same world", main.get("_field") == field)
-	_check("duo shares the animated menu header", hud._menu.visible and hud._menu.lobby.visible and not hud._menu._background.visible and hud._menu._brand.position == Vector2(702, 44))
+	_check("duo shares the animated menu header", hud._menu.visible and hud._menu.lobby.visible and not hud._menu._background.visible)
+	_check("duo logo is centered on the screen divider", is_equal_approx(hud._menu._brand.get_global_rect().get_center().x, hud._menu.get_global_rect().get_center().x))
 	_check("both player panels settle in place", racers[0].race_hud._lobby_content.position == Vector2.ZERO and racers[1].race_hud._lobby_content.position == Vector2.ZERO)
 	_check("shared confirm has no focused lobby navigation button", root.gui_get_focus_owner() == null)
 	var old_split: CanvasLayer = main.get("_split")

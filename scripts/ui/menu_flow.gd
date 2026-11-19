@@ -314,8 +314,8 @@ func _build_players() -> void:
 	var headline := _text(players, "UT I\nBACKEN.", 112, Vector2(120, 230), WHITE, true)
 	headline.add_theme_constant_override("line_spacing", -30)
 	_text(players, "Snö i nacken. Ett åk till.", 26, Vector2(126, 521), ICE)
-	solo = _player_card(1, Vector2(756, 234), CORAL)
-	duo = _player_card(2, Vector2(1108, 278), ICE)
+	solo = _player_card(1, Vector2(756, 234))
+	duo = _player_card(2, Vector2(1108, 278))
 	duo.disabled = Quality.is_mobile()
 	duo.tooltip_text = "Två spelare på samma skärm" if not duo.disabled else "Två spelare kräver tangentbord eller handkontroller"
 	_record = _text(players, "", 19, Vector2(126, 736), MUTED)
@@ -324,13 +324,11 @@ func _build_players() -> void:
 	duo.focus_neighbor_left = solo.get_path()
 
 
-func _player_card(count: int, at: Vector2, tint: Color) -> Button:
+func _player_card(count: int, at: Vector2) -> Button:
 	var button := _button("", &"solo" if count == 1 else &"duo", at, Vector2(310, 390))
 	button.tooltip_text = "%d spelare" % count
 	button.accessibility_name = button.tooltip_text
 	players.add_child(button)
-	var number := _text(button, "0%d" % count, 18, Vector2(28, 24), tint)
-	number.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_text(button, "SOLO" if count == 1 else "DUELL", 14, Vector2(214, 28), MUTED)
 	var preview := _preview(VehicleSpec.Model.PULKA if count == 1 else VehicleSpec.Model.SNOWRACER, count, true)
 	preview.position = Vector2(-10, 60)
@@ -527,7 +525,8 @@ func _enter(page: Control) -> void:
 		page.modulate.a = 1.0
 	_background.show()
 	_transition = create_tween().set_parallel(true)
-	_transition.tween_property(_brand, "position", Vector2(80, 42) if page == players else Vector2(702, 44), 0.62 if changing else 0.0).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	var centered_brand := Vector2((DESIGN.x - _brand.get_minimum_size().x) * 0.5, 44)
+	_transition.tween_property(_brand, "position", Vector2(80, 42) if page == players else centered_brand, 0.62 if changing else 0.0).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	_transition.tween_method(func(t: float) -> void: _background.rush = sin(t * PI) * (0.8 if page != players else 0.4), 0.0, 1.0, PAGE_SECONDS)
 	if page != players:
 		back.show()
