@@ -73,9 +73,7 @@ func _input(event: InputEvent) -> void:
 		if not finger.swiped and rise > view.y * SWIPE_DISTANCE and _now() - finger.started_at < SWIPE_TIME:
 			finger.swiped = true
 			_jump_pending = true
-	elif event is InputEventKey or event is InputEventJoypadButton:
-		touch_mode = false
-	elif event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) > 0.5:
+	elif PlayerControls.prompt_kind(event) != PlayerControls.Prompt.NONE:
 		touch_mode = false
 	_update_steering(view)
 

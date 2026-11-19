@@ -7,12 +7,15 @@ extends RefCounted
 ## ALL is every key and pad through the input actions (one player);
 ## KEYBOARD is both halves of the keyboard but no pad.
 enum Keys { ALL, KEYBOARD, LEFT, RIGHT, NONE }
+enum Prompt { NONE, KEYBOARD, GAMEPAD }
 
 const DEADZONE := 0.18
 
 var keys := Keys.ALL
 ## Joypad device this player owns, or -1 for none of their own.
 var pad := -1
+## Each split-screen rider remembers their own last input family.
+var gamepad_hints := false
 var _jump_held := false
 var _jumped := false
 ## Keys and d-pad as -1/0/1, and the step they made this frame (menus).
@@ -38,7 +41,38 @@ static func for_two(index: int) -> PlayerControls:
 		controls.keys = Keys.KEYBOARD if index == 0 else Keys.NONE
 	else:
 		controls.keys = Keys.LEFT if index == 0 else Keys.RIGHT
+	controls.gamepad_hints = controls.pad >= 0
 	return controls
+
+
+## Ignore releases, key repeat, mouse movement and resting analog noise.
+static func prompt_kind(event: InputEvent) -> Prompt:
+	if event is InputEventKey and event.pressed and not event.echo:
+		return Prompt.KEYBOARD
+	if event is InputEventMouseButton and event.pressed and event.device != InputEvent.DEVICE_ID_EMULATION:
+		return Prompt.KEYBOARD
+	if event is InputEventJoypadButton and event.pressed:
+		return Prompt.GAMEPAD
+	if event is InputEventJoypadMotion and absf(event.axis_value) > 0.5:
+		return Prompt.GAMEPAD
+	return Prompt.NONE
+
+
+## Only this rider's assigned keys or pad may change their prompts.
+func note_prompt_input(event: InputEvent) -> bool:
+	var kind := prompt_kind(event)
+	if kind == Prompt.NONE: return false
+	if kind == Prompt.GAMEPAD:
+		if keys != Keys.ALL and (pad < 0 or event.device != pad): return false
+	else:
+		if not event is InputEventKey or keys == Keys.NONE: return false
+		var code: Key = event.physical_keycode if event.physical_keycode != 0 else event.keycode
+		if keys == Keys.LEFT and code not in [KEY_A, KEY_D, KEY_SPACE]: return false
+		if keys == Keys.RIGHT and code not in [KEY_LEFT, KEY_RIGHT, KEY_ENTER, KEY_KP_ENTER]: return false
+	var use_gamepad := kind == Prompt.GAMEPAD
+	if gamepad_hints == use_gamepad: return false
+	gamepad_hints = use_gamepad
+	return true
 
 
 ## How the controls are described on the start screen.

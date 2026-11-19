@@ -30,6 +30,14 @@ these extra scenes do not animate or render continuously during a run. Keyboard,
 controller, mouse and touch use the same actions, with separate ready controls
 for the two-player lobby.
 
+Control hints use outlined keycaps for keyboard input and round controller
+buttons. Solo hints follow the latest key/mouse click or deliberate pad input;
+each split-screen rider remembers their own assigned keys or pad independently.
+Releases, key repeat, mouse motion and stick drift below 0.5 do not switch hints.
+Touch instructions stay in plain language. Icons retain readable accessibility
+names, including Enter for the return-arrow keycap. Split-screen panels leave
+22 design pixels of padding below their control hints.
+
 `CountdownDisplay` owns one replaceable animation, so a delayed fade from the
 previous numeral cannot hide the next one. Both solo and split-screen use it.
 

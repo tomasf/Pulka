@@ -47,6 +47,8 @@ func _run() -> void:
 	var first_preview_color: Color = main.get("_players")[0].color
 	_check("picker settles with its panels in place and background hidden", not hud._menu.players.visible and not hud._menu._background.visible and hud._menu._picker_details.position == Vector2.ZERO and hud._menu._picker_dock.position == Vector2.ZERO)
 	_check("solo logo is centered on the screen", is_equal_approx(hud._menu._brand.get_global_rect().get_center().x, hud._menu.get_global_rect().get_center().x))
+	if not Quality.is_mobile():
+		await _prompt_switching(hud)
 	var preview_pose: Transform3D = main.get("_camera").transform
 	main.call("_on_hud_pressed", &"players")
 	_check("Back preserves the preview world and camera", main.get("_field") == field and main.get("_camera").transform == preview_pose)
@@ -111,7 +113,7 @@ func _run() -> void:
 	_check("old number cannot fade a new number", number.text == "2" and number.modulate.a > 0.99)
 	number.queue_free()
 	if Quality.is_mobile():
-		_check("phone shows touch instructions", hud._menu._controls_hint.text.contains("Svep"))
+		_check("phone shows touch instructions", hud._menu._controls_hint.accessibility_name.contains("Svep"))
 		main.queue_free()
 		await process_frame
 		print("menu flow mobile test: %s" % ("all passed" if failures == 0 else "%d failed" % failures))
@@ -142,6 +144,7 @@ func _run() -> void:
 	await _tick(50)
 	racers = main.get("_players")
 	_check("duo can reopen during the return animation", main.get("state") == 5 and hud._menu.lobby.visible and not hud._menu.players.visible and not hud._menu._background.visible and main.get("_field") == field)
+	await _split_prompts(racers)
 	var second_ride: int = racers[1].vehicle
 	main.call("_on_lobby_action", &"next", racers[0])
 	_check("each player's picker is independent", racers[1].vehicle == second_ride)
@@ -178,6 +181,95 @@ func _camera_angles_test(sled: Sled, camera: ChaseCamera) -> void:
 			var towards := (sled.position + Vector3.UP * 0.8 - camera.position).normalized()
 			smooth = smooth and position.distance_to(camera.position) < 0.4 and rotation.angle_to(camera.quaternion) < 0.15 and (-camera.basis.z).dot(towards) > 0.9
 		_check("camera keeps the rider framed from %.1f degrees" % rad_to_deg(phase), smooth)
+
+
+func _prompt_switching(hud: Hud) -> void:
+	var key := InputEventKey.new()
+	key.physical_keycode = KEY_SHIFT
+	key.pressed = true
+	await _send(key)
+	_check("keyboard prompts show Space and Enter without pad alternatives", hud._menu._controls_hint.accessibility_name == "← → Styr Space Hoppa" and hud._menu._start_hint.accessibility_name == "Enter Åk")
+	var pad := InputEventJoypadButton.new()
+	pad.button_index = JOY_BUTTON_LEFT_SHOULDER
+	pad.pressed = true
+	await _send(pad)
+	var pad_controls := "Svep / spak Styr Klick / A Hoppa" if Quality.is_tv() else "spak Styr A Hoppa"
+	_check("pad input switches every solo prompt", hud._menu._controls_hint.accessibility_name == pad_controls and hud._menu._picker_hint.accessibility_name == "spak Välj åkdon" and hud._menu._start_hint.accessibility_name == "A Åk")
+	await _shot("gamepad-hints")
+	key.pressed = false
+	await _send(key)
+	await _send(InputEventMouseMotion.new())
+	_check("key releases and mouse movement preserve pad prompts", hud._menu._start_hint.accessibility_name == "A Åk")
+	key.pressed = true
+	await _send(key)
+	var stick := InputEventJoypadMotion.new()
+	stick.axis = JOY_AXIS_RIGHT_X
+	stick.axis_value = 0.12
+	await _send(stick)
+	pad.pressed = false
+	await _send(pad)
+	_check("stick drift and pad releases preserve keyboard prompts", hud._menu._start_hint.accessibility_name == "Enter Åk")
+	stick.axis_value = 0.8
+	await _send(stick)
+	_check("deliberate stick movement selects pad prompts", hud._menu._start_hint.accessibility_name == "A Åk")
+	stick.axis_value = 0.0
+	await _send(stick)
+	var touch := InputEventScreenTouch.new()
+	touch.pressed = true
+	await _send(touch)
+	_check("touch replaces button prompts with gestures", hud._menu._controls_hint.accessibility_name.contains("Svep"))
+	touch.pressed = false
+	await _send(touch)
+	key.pressed = true
+	await _send(key)
+	_check("keyboard use restores keycaps after touch", hud._menu._start_hint.accessibility_name == "Enter Åk" and not hud._touch_mode)
+	key.pressed = false
+	await _send(key)
+
+
+func _split_prompts(racers: Array) -> void:
+	var original := [racers[0].controls, racers[1].controls]
+	# Synthetic pads make this independent of hardware on the test machine.
+	for i in 2:
+		var controls := PlayerControls.new()
+		controls.keys = PlayerControls.Keys.LEFT if i == 0 else PlayerControls.Keys.RIGHT
+		controls.pad = 6 + i
+		racers[i].controls = controls
+		racers[i].race_hud.update_control_hint(controls)
+	await _tick(2)
+	var first: MenuFlow.InputHint = racers[0].race_hud._lobby_controls
+	var second: MenuFlow.InputHint = racers[1].race_hud._lobby_controls
+	var panel: Panel = racers[0].race_hud._lobby_content.get_child(0)
+	_check("lobby control tips have bottom padding", panel.position.y + panel.size.y - first.position.y - first.size.y >= 18)
+	var pad := InputEventJoypadButton.new()
+	pad.device = 6
+	pad.button_index = JOY_BUTTON_LEFT_SHOULDER
+	pad.pressed = true
+	await _send(pad)
+	_check("first pad updates only its player's prompts", first.accessibility_name == "spak Styr A Hoppa" and second.accessibility_name == "← → Styr Enter Hoppa")
+	pad.device = 7
+	await _send(pad)
+	var key := InputEventKey.new()
+	key.physical_keycode = KEY_D
+	key.pressed = true
+	await _send(key)
+	_check("shared keyboard updates only the matching player's prompts", first.accessibility_name == "A D Styr Space Hoppa" and second.accessibility_name == "spak Styr A Hoppa")
+	key.pressed = false
+	await _send(key)
+	for device in [6, 7]:
+		pad.device = device
+		pad.pressed = false
+		await _send(pad)
+	for i in 2:
+		racers[i].controls = original[i]
+		racers[i].race_hud.update_control_hint(original[i])
+
+
+func _send(event: InputEvent) -> void:
+	Input.parse_input_event(event)
+	await process_frame
+	await process_frame
+
 
 func _tick(frames: int) -> void:
 	for frame in frames:

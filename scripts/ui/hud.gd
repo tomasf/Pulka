@@ -162,6 +162,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_game()
 	_build_menu()
+	_menu.set_gamepad_mode(Quality.is_tv())
 	_build_pause()
 	_build_game_over()
 	_build_settings()
@@ -975,6 +976,9 @@ func records_cleared() -> void:
 
 ## True while one of the on-screen buttons has keyboard/controller focus.
 func _input(event: InputEvent) -> void:
+	var kind := PlayerControls.prompt_kind(event)
+	if kind != PlayerControls.Prompt.NONE:
+		_menu.set_gamepad_mode(kind == PlayerControls.Prompt.GAMEPAD)
 	if about_open and _about_licenses:
 		var direction := int(event.is_action_pressed(&"ui_down", true)) - int(event.is_action_pressed(&"ui_up", true))
 		if direction != 0:

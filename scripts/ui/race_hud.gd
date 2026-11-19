@@ -23,7 +23,7 @@ var _lobby_bars: Array[MenuFlow.Stat] = []
 var _lobby_preview: TextureRect
 var _ready_button: Button
 signal lobby_action(action: StringName)
-var _lobby_controls: Label
+var _lobby_controls: MenuFlow.InputHint
 var _lobby_status: Label
 var _flash: ColorRect
 var _notes: Array[Label] = []
@@ -87,19 +87,19 @@ func _build_lobby() -> void:
 	_lobby_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(_lobby_content)
 	var panel := Panel.new()
-	panel.position = Vector2(34, 654)
-	panel.size = Vector2(732, 218)
+	panel.position = Vector2(34, 636)
+	panel.size = Vector2(732, 236)
 	panel.add_theme_stylebox_override("panel", MenuFlow.style(Color(0.055, 0.07, 0.15, 0.94), Color(1, 1, 1, 0.18), 24))
 	_lobby_content.add_child(panel)
 	_lobby_ride = MenuFlow.caption("", 38, Color.WHITE, true)
-	_lobby_ride.position = Vector2(120, 682)
+	_lobby_ride.position = Vector2(120, 664)
 	_lobby_ride.size.x = 340
 	_lobby_ride.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_lobby_content.add_child(_lobby_ride)
 	for side in [-1, 1]:
 		var arrow := Button.new()
 		arrow.text = "‹" if side < 0 else "›"
-		arrow.position = Vector2(52 if side < 0 else 466, 681)
+		arrow.position = Vector2(52 if side < 0 else 466, 663)
 		arrow.size = Vector2(56, 58)
 		MenuFlow.skin(arrow)
 		arrow.focus_mode = Control.FOCUS_NONE
@@ -107,7 +107,7 @@ func _build_lobby() -> void:
 		arrow.pressed.connect(func() -> void: lobby_action.emit(action))
 		_lobby_content.add_child(arrow)
 	_lobby_preview = TextureRect.new()
-	_lobby_preview.position = Vector2(540, 664)
+	_lobby_preview.position = Vector2(540, 646)
 	_lobby_preview.size = Vector2(210, 112)
 	_lobby_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_lobby_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -115,24 +115,24 @@ func _build_lobby() -> void:
 	_lobby_content.add_child(_lobby_preview)
 	for i in 3:
 		var name_label := MenuFlow.caption(["Fart", "Styrning", "Grepp"][i], 16, MenuFlow.MUTED)
-		name_label.position = Vector2(64, 750 + i * 28)
+		name_label.position = Vector2(64, 732 + i * 28)
 		_lobby_content.add_child(name_label)
 		var bar := MenuFlow.Stat.new()
-		bar.position = Vector2(174, 756 + i * 28)
+		bar.position = Vector2(174, 738 + i * 28)
 		bar.size = Vector2(170, 12)
 		bar.tint = [MenuFlow.CORAL, MenuFlow.ICE, MenuFlow.LIME][i]
 		_lobby_content.add_child(bar)
 		_lobby_bars.append(bar)
 	_ready_button = Button.new()
 	_ready_button.text = "KLAR"
-	_ready_button.position = Vector2(538, 783)
+	_ready_button.position = Vector2(538, 765)
 	_ready_button.size = Vector2(206, 64)
 	_ready_button.focus_mode = Control.FOCUS_NONE
 	MenuFlow.skin(_ready_button, true)
 	_ready_button.pressed.connect(func() -> void: lobby_action.emit(&"ready"))
 	_lobby_content.add_child(_ready_button)
-	_lobby_controls = MenuFlow.caption("", 15, MenuFlow.MUTED)
-	_lobby_controls.position = Vector2(64, 843)
+	_lobby_controls = MenuFlow.InputHint.new()
+	_lobby_controls.position = Vector2(64, 825)
 	_lobby_content.add_child(_lobby_controls)
 	_lobby_status = MenuFlow.caption("Väntar…", 26, MenuFlow.ICE)
 	_lobby_status.position = _ready_button.position
@@ -142,7 +142,7 @@ func _build_lobby() -> void:
 	_lobby_content.add_child(_lobby_status)
 
 
-func show_lobby(spec: VehicleSpec, controls: String, ready: bool) -> void:
+func show_lobby(spec: VehicleSpec, controls: PlayerControls, ready: bool) -> void:
 	var entering := not _lobby.visible
 	_lobby.modulate.a = 1.0
 	_lobby_ride.text = spec.title
@@ -151,7 +151,7 @@ func show_lobby(spec: VehicleSpec, controls: String, ready: bool) -> void:
 	for i in _lobby_bars.size():
 		_lobby_bars[i].value = values[i]
 		_lobby_bars[i].queue_redraw()
-	_lobby_controls.text = controls.replace("tangentbordet", "A/D, Space").replace("Styr med ", "")
+	update_control_hint(controls)
 	_lobby_status.visible = ready
 	_ready_button.visible = not ready
 	_lobby.visible = true
@@ -165,6 +165,10 @@ func show_lobby(spec: VehicleSpec, controls: String, ready: bool) -> void:
 	_left.visible = false
 	_speed.visible = false
 	_place.visible = false
+
+
+func update_control_hint(controls: PlayerControls) -> void:
+	_lobby_controls.set_player(controls)
 
 
 func hide_lobby() -> void:

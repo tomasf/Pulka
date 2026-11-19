@@ -305,6 +305,9 @@ func _parse_args() -> void:
 
 ## Browsers require fullscreen requests to run inside the input event itself.
 func _input(event: InputEvent) -> void:
+	for player in _players:
+		if player.controls.note_prompt_input(event) and player.race_hud != null:
+			player.race_hud.update_control_hint(player.controls)
 	if event is InputEventMouseMotion or event is InputEventMouseButton:
 		_mouse_still = 0.0
 	if event.is_action_pressed(&"fullscreen") and not event.is_echo():
@@ -854,7 +857,7 @@ func _next_unlocked(from: int, step: int) -> int:
 
 
 func _show_lobby(p: Player) -> void:
-	p.race_hud.show_lobby(_specs[p.vehicle], p.controls.describe(), _ready_flags[p.index])
+	p.race_hud.show_lobby(_specs[p.vehicle], p.controls, _ready_flags[p.index])
 
 
 ## Splits the screen in two, left for the first player and right for the
@@ -862,11 +865,13 @@ func _show_lobby(p: Player) -> void:
 func _build_split() -> void:
 	if _split != null:
 		return
+	var gamepad_hints := _players[0].controls.gamepad_hints
 	if _players.size() < 2:
 		var second := _make_player(1, ChaseCamera.new(), PlayerControls.for_two(1))
 		second.vehicle = _next_unlocked(_vehicle, 1)
 		second.hud = _hud
 	_players[0].controls = PlayerControls.for_two(0)
+	_players[0].controls.gamepad_hints = gamepad_hints and _players[0].controls.pad >= 0
 	_split = CanvasLayer.new()
 	_split.layer = 0
 	var backing := ColorRect.new()

@@ -39,9 +39,11 @@ var _tagline: Label
 var _locked: Label
 var _stats: Array[Control] = []
 var _record: Label
-var _picker_hint: Label
-var _start_hint: Label
-var _controls_hint: Label
+var _picker_hint: InputHint
+var _start_hint: InputHint
+var _controls_hint: InputHint
+var _touch_mode := false
+var _gamepad_mode := false
 var _background: WinterBackdrop
 var _picker_shade: TextureRect
 var _picker_fill: ColorRect
@@ -52,6 +54,82 @@ var _brand: Label
 var _picker_details: Control
 var _picker_dock: Control
 var _thumb_views: Array[SubViewport] = []
+
+
+## Keyboard keys have a raised edge; controller buttons are round.
+## Plain strings are action names, arrays are [kind, key], and null adds space.
+class InputHint extends HBoxContainer:
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_theme_constant_override("separation", 6)
+
+	func set_parts(parts: Array, points := 17) -> void:
+		for child in get_children():
+			remove_child(child)
+			child.queue_free()
+		var spoken: Array[String] = []
+		for part in parts:
+			if part == null:
+				var gap := Control.new()
+				gap.custom_minimum_size.x = points * 0.65
+				gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				add_child(gap)
+			elif part is String:
+				var word := MenuFlow.caption(part, points)
+				word.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+				add_child(word)
+				spoken.append(part)
+			else:
+				var kind: String = part[0]
+				var key: String = part[1]
+				var height := roundf(points * 1.65)
+				var cap := PanelContainer.new()
+				cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				cap.custom_minimum_size = Vector2(height, height)
+				var surface := StyleBoxFlat.new()
+				surface.bg_color = Color(1, 1, 1, 0.09)
+				surface.border_color = Color(1, 1, 1, 0.5)
+				surface.set_border_width_all(1)
+				surface.border_width_bottom = 2
+				surface.set_corner_radius_all(int(height * 0.5) if kind == "pad" else 5)
+				surface.content_margin_left = 7 if key.length() > 1 else 3
+				surface.content_margin_right = surface.content_margin_left
+				cap.add_theme_stylebox_override("panel", surface)
+				if kind == "stick":
+					cap.add_child(StickIcon.new())
+					spoken.append("spak")
+				else:
+					var glyph := MenuFlow.caption("↵" if key == "Enter" else key, points)
+					glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+					glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+					cap.add_child(glyph)
+					spoken.append(key)
+				add_child(cap)
+		accessibility_name = " ".join(spoken)
+
+	func set_player(controls: PlayerControls) -> void:
+		var parts: Array = []
+		if controls.gamepad_hints:
+			parts.append(["stick", ""])
+		else:
+			var letters := controls.keys in [PlayerControls.Keys.LEFT, PlayerControls.Keys.KEYBOARD]
+			parts.append_array([["key", "A" if letters else "←"], ["key", "D" if letters else "→"]])
+		parts.append_array(["Styr", null])
+		if controls.gamepad_hints:
+			parts.append(["pad", "A"])
+		else:
+			parts.append(["key", "Enter" if controls.keys == PlayerControls.Keys.RIGHT else "Space"])
+		parts.append("Hoppa")
+		set_parts(parts, 15)
+
+
+class StickIcon extends Control:
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+	func _draw() -> void:
+		var center := size * 0.5
+		draw_arc(center, 7, 0, TAU, 24, WHITE, 1.3, true)
+		draw_circle(center + Vector2(0, -2), 3.5, WHITE)
 
 
 class WinterBackdrop extends Control:
@@ -299,6 +377,13 @@ func _text(parent: Control, text: String, points: int, at: Vector2, tint := WHIT
 	return label
 
 
+func _input_hint(parent: Control, at: Vector2) -> InputHint:
+	var hint := InputHint.new()
+	hint.position = at
+	parent.add_child(hint)
+	return hint
+
+
 func _button(text: String, action: StringName, at: Vector2, dimensions: Vector2, accent := false) -> Button:
 	var button := Button.new()
 	button.text = text
@@ -376,7 +461,7 @@ func _build_picker() -> void:
 		_picker_details.add_child(stat)
 		_stats.append(stat)
 	_locked = _text(_picker_details, "", 20, Vector2(84, 550), CORAL)
-	_controls_hint = _text(_picker_details, "", 17, Vector2(84, 596), WHITE)
+	_controls_hint = _input_hint(_picker_details, Vector2(84, 596))
 	_picker_dock = Control.new()
 	_picker_dock.size = DESIGN
 	_picker_dock.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -403,8 +488,8 @@ func _build_picker() -> void:
 	start = _button("NU ÅKER VI  →", &"start", Vector2(1100, 702), Vector2(412, 98), true)
 	start.add_theme_font_size_override("font_size", 28)
 	_picker_dock.add_child(start)
-	_picker_hint = _text(_picker_dock, "", 16, Vector2(84, 851), WHITE)
-	_start_hint = _text(_picker_dock, "", 16, Vector2(1320, 851), WHITE)
+	_picker_hint = _input_hint(_picker_dock, Vector2(84, 851))
+	_start_hint = _input_hint(_picker_dock, Vector2(1320, 851))
 	set_touch_mode(false)
 	for i in cards.size():
 		# Horizontal navigation picks a ride in Main; keep native focus on
@@ -609,13 +694,31 @@ func update_vehicle(spec: VehicleSpec, unlocked: bool, best_distance: float, bes
 
 
 func set_touch_mode(touch: bool) -> void:
-	_picker_hint.text = "Tryck på ett åkdon" if touch else "←  →  Välj åkdon"
-	_start_hint.text = "Tryck för att åka" if touch else "Enter / A  Åk"
-	_controls_hint.text = "← →  Styr     Space / A  Hoppa"
-	if touch:
-		_controls_hint.text = "Tryck på sidorna  Styr     ↑ Svep  Hoppa"
-	elif Quality.is_tv():
-		_controls_hint.text = "Svep / spak  Styr     Klick / A  Hoppa"
+	_touch_mode = touch
+	_update_hints()
+
+
+func set_gamepad_mode(gamepad: bool) -> void:
+	if _gamepad_mode == gamepad: return
+	_gamepad_mode = gamepad
+	_update_hints()
+
+
+func _update_hints() -> void:
+	if _touch_mode:
+		_picker_hint.set_parts(["Tryck på ett åkdon"], 16)
+		_start_hint.set_parts(["Tryck för att åka"], 16)
+		_controls_hint.set_parts(["Tryck på sidorna  Styr", null, "↑ Svep  Hoppa"])
+	elif _gamepad_mode:
+		_picker_hint.set_parts([["stick", ""], "Välj åkdon"], 16)
+		_start_hint.set_parts([["pad", "A"], "Åk"], 16)
+		_controls_hint.set_parts([["stick", ""], "Styr", null, ["pad", "A"], "Hoppa"])
+		if Quality.is_tv():
+			_controls_hint.set_parts(["Svep /", ["stick", ""], "Styr", null, "Klick /", ["pad", "A"], "Hoppa"])
+	else:
+		_picker_hint.set_parts([["key", "←"], ["key", "→"], "Välj åkdon"], 16)
+		_start_hint.set_parts([["key", "Enter"], "Åk"], 16)
+		_controls_hint.set_parts([["key", "←"], ["key", "→"], "Styr", null, ["key", "Space"], "Hoppa"])
 
 
 func default_focus() -> Button:
