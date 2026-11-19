@@ -250,5 +250,5 @@ static func populate(world: SlopeWorld, chunk: Chunk, decor: Dictionary, lo: flo
 		d += 32
 	d = ceilf(lo / 7) * 7
 	while d < hi:
-		world._add_pickup(chunk, Pickup.Kind.GINGERBREAD, field.center_x(d) + sin(d * 0.022) * 1.2 + 5.2, d)
+		world._add_pickup(chunk, Pickup.Kind.SNOWFLAKE, field.center_x(d) + sin(d * 0.022) * 1.2 + 5.2, d)
 		d += 7

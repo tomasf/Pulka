@@ -19,6 +19,10 @@ const FINISH_GRACE := 20.0
 const DRAFT_RANGE := 30.0
 const DRAFT_WIDTH := 3.5
 const DRAFT_PUSH := 3.0
+## Snowflakes: points each (times the streak, up to six); a cinnamon bun is
+## worth BUN_FLAKES of them.
+const FLAKE_POINTS := 10
+const BUN_FLAKES := 5
 ## Grab tricks: shortest grab that counts (fully in the pose), points per
 ## second held, and the multiplier when a grab and a spin land together.
 const GRAB_MIN := 0.25
@@ -128,12 +132,12 @@ var _director: EventDirector
 var _touch: TouchControls
 ## Clean menu presses from the gamepad sticks.
 var _sticks: StickNavigator
+## Seconds since the mouse last moved; while riding, a still mouse hides.
+var _mouse_still := 0.0
 var _start_vehicle := -1
 ## Testing aid: a kind of obstacle made common (Obstacle.Kind), or -1.
 var _spawn_kind := -1
 ## Everyone riding: one player alone, two in a split-screen race.
-## Seconds since the mouse last moved; while riding, a still mouse hides.
-var _mouse_still := 0.0
 var _players: Array[Player] = []
 ## Two-player mode is chosen on the menu; a race is on while it is set.
 var _two_players := false
@@ -300,25 +304,17 @@ func _parse_args() -> void:
 
 ## Browsers require fullscreen requests to run inside the input event itself.
 func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion or event is InputEventMouseButton:
+		_mouse_still = 0.0
 	if event.is_action_pressed(&"fullscreen") and not event.is_echo():
 		_toggle_fullscreen()
 		get_viewport().set_input_as_handled()
 
 
 func _toggle_fullscreen() -> void:
-	if event is InputEventMouseMotion or event is InputEventMouseButton:
-		_mouse_still = 0.0
 	var fullscreen := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fullscreen else DisplayServer.WINDOW_MODE_FULLSCREEN)
 	_remember_fullscreen()
-
-
-## Stores the current window mode so the next launch starts the same way.
-func _remember_fullscreen() -> void:
-	if _autopilot or Quality.is_mobile():
-		return
-	_save.fullscreen = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
-	_save.store()
 
 
 ## Hides the mouse pointer during a ride once the mouse has been still for a
@@ -336,6 +332,14 @@ func _update_cursor(delta: float) -> void:
 		Input.mouse_mode = mode
 
 
+## Stores the current window mode so the next launch starts the same way.
+func _remember_fullscreen() -> void:
+	if _autopilot or Quality.is_mobile():
+		return
+	_save.fullscreen = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+	_save.store()
+
+
 ## Desktop only: browsers refuse fullscreen without a click, phones always are.
 func _restore_fullscreen() -> void:
 	if _save.fullscreen and not _autopilot and _screenshot_path == "" and not OS.has_feature("web") and not Quality.is_mobile():
@@ -346,6 +350,7 @@ func _process(delta: float) -> void:
 	var started := Time.get_ticks_usec()
 	_elapsed += delta
 	_input_cooldown = maxf(0.0, _input_cooldown - delta)
+	_update_cursor(delta)
 	for p in _players:
 		p.controls.poll()
 	_update_settings_input()
@@ -369,7 +374,6 @@ func _process(delta: float) -> void:
 		var lead := _leader()
 		var playing := state == State.PLAYING and not lead.sled.crashed
 		_director.sled = lead.sled
-	_update_cursor(delta)
 		_director.update(delta, playing)
 		_update_atmospheres(delta)
 		_sound.set_motion(delta, lead.sled.speed(), lead.sled.on_ground, state == State.PLAYING and not lead.sled.crashed)
@@ -582,8 +586,8 @@ func _reset_player(p: Player) -> void:
 	p.bonus = 0
 	p.bonus_fraction = 0.0
 	p.run_distance = 0.0
-	p.cookie_streak = 0
-	p.cookie_timer = 0.0
+	p.flake_streak = 0
+	p.flake_timer = 0.0
 	p.crash_timer = 0.0
 	p.finish_time = -1.0
 	p.sled.draft = 0.0
@@ -699,9 +703,9 @@ func _update_player(p: Player, before: float, delta: float) -> void:
 	if p.finished():
 		return
 	_check_cliff(p, before)
-	p.cookie_timer = maxf(0.0, p.cookie_timer - delta)
-	if p.cookie_timer == 0.0:
-		p.cookie_streak = 0
+	p.flake_timer = maxf(0.0, p.flake_timer - delta)
+	if p.flake_timer == 0.0:
+		p.flake_streak = 0
 	if p.sled.crashed:
 		p.crash_timer -= delta
 		if p.crash_timer <= 0.0:
@@ -1134,7 +1138,7 @@ func _on_gift_collected(sled: Sled) -> void:
 		_sound.play("cocoa", -2.0, 1.25)
 	elif roll < 0.92:
 		_add_bonus(p, 250)
-		p.say("En burk pepparkakor! +250", Hud.WARM)
+		p.say("En påse kanelbullar! +250", Hud.WARM)
 		_sound.play("coin", -2.0, 1.2)
 	else:
 		_add_bonus(p, 1)
@@ -1145,6 +1149,8 @@ func _on_gift_collected(sled: Sled) -> void:
 func _set_paused(paused: bool) -> void:
 	get_tree().paused = paused
 	state = State.PAUSED if paused else State.PLAYING
+	if paused:
+		_hud.set_song(_sound.song_title())
 	_hud.show_screen("pause" if paused else ("race" if _racing else "game"))
 	_sound.set_music_ducked(paused)
 
@@ -1169,8 +1175,6 @@ func _update_game_over(delta: float) -> void:
 		return
 	if _confirm_pressed():
 		_start_run()
-	if paused:
-		_hud.set_song(_sound.song_title())
 	elif Input.is_action_just_pressed(&"back"):
 		_enter_menu()
 
@@ -1332,13 +1336,13 @@ const WIPEOUT_SEVERITY := 3.5
 ## Height of the rider's chest above the collision probe.
 const RIDER_CHEST := 0.75
 const CRASH_SEVERITY := 7.5
+## Fastest an animal hit by the ride is thrown (m/s), and up at most.
+const CREATURE_THROW := 14.0
+const CREATURE_LIFT := 6.0
 ## Points for landing a cliff, on top of the air time.
 const CLIFF_BONUS := 500
 const WIPEOUT_LINES := ["Vurpa!", "Hoppla!", "Puh, klarade mig!", "Det där gjorde ont i stoltheten."]
 
-## Fastest an animal hit by the ride is thrown (m/s), and up at most.
-const CREATURE_THROW := 14.0
-const CREATURE_LIFT := 6.0
 
 func _check_collisions(p: Player = null) -> void:
 	if p == null:
@@ -1695,11 +1699,20 @@ func _check_pickups(p: Player = null) -> void:
 			continue
 		pickup.collect()
 		match pickup.kind:
-			Pickup.Kind.GINGERBREAD:
-				p.cookie_streak += 1
-				p.cookie_timer = 1.5
-				_add_bonus(p, 10 * mini(p.cookie_streak, 6))
-				_sound.play("coin", -4.0, 1.0 + 0.06 * mini(p.cookie_streak, 8))
+			Pickup.Kind.SNOWFLAKE:
+				p.flake_streak += 1
+				p.flake_timer = 1.5
+				_add_bonus(p, FLAKE_POINTS * mini(p.flake_streak, 6))
+				_sound.play("coin", -4.0, 1.0 + 0.06 * mini(p.flake_streak, 8))
+			Pickup.Kind.BUN:
+				# Worth five snowflakes, and it keeps a streak going.
+				p.flake_streak += 1
+				p.flake_timer = 1.5
+				var points := FLAKE_POINTS * BUN_FLAKES * mini(p.flake_streak, 6)
+				_add_bonus(p, points)
+				p.say("Kanelbulle! +%d" % points, Hud.WARM)
+				_sound.play("coin", 0.0, 0.8)
+				_sound.play("cocoa", -6.0)
 			Pickup.Kind.MITTEN:
 				if _racing:
 					# No lives in a race: warm hands go faster.

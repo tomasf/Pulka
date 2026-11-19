@@ -1358,51 +1358,64 @@ static func finish_arch(width: int) -> ArrayMesh:
 
 # --- Pickups ---
 
-## A gingerbread man facing -Z, piped with white icing: eyes, a smile,
-## buttons and zigzags at his wrists and ankles.
-static func gingerbread() -> ArrayMesh:
-	return cached_mesh("ginger", func() -> ArrayMesh:
+## A six-armed ice crystal facing -Z, with branches, glinting pale blue.
+static func snowflake() -> ArrayMesh:
+	return cached_mesh("snowflake", func() -> ArrayMesh:
 		var kit := MeshKit.new()
-		var dough := Color(0.72, 0.4, 0.16)
-		var icing := Color(1, 1, 1)
-		var flat := Vector3(1, 1, 0.4)
-		kit.sphere(0.13, Vector3(0, 0.2, 0), dough, flat, 14, 8)
-		kit.capsule(0.12, 0.3, Vector3(0, -0.02, 0), dough, Vector3.ZERO, flat)
-		for side in [-1.0, 1.0]:
-			kit.capsule(0.06, 0.26, Vector3(0.15 * side, 0.03, 0), dough, Vector3(0, 0, side * 1.1), flat)
-			kit.capsule(0.065, 0.28, Vector3(0.07 * side, -0.2, 0), dough, Vector3(0, 0, side * 0.35), flat)
-			# Icing: eyes, a zigzag at each wrist and ankle.
-			kit.sphere(0.017, _ginger_point(Vector2(0.045 * side, 0.23)), icing, Vector3(1, 1, 0.5), 8, 4)
-			for limb in [Vector3(0.15 * side, 0.03, side * 1.1), Vector3(0.07 * side, -0.2, side * 0.35)]:
-				var along := Vector2(-sin(limb.z), cos(limb.z))
-				var across := Vector2(cos(limb.z), sin(limb.z))
-				var center := Vector2(limb.x, limb.y) - along * 0.07
-				for k in 4:
-					var a: Vector2 = center + across * (-0.04 + k * 0.02) + along * (0.01 if k % 2 else 0)
-					var b: Vector2 = center + across * (-0.04 + (k + 1) * 0.02) + along * (0 if k % 2 else 0.01)
-					kit.capsule_between(_ginger_point(a), _ginger_point(b), 0.006, icing, 6)
-		for k in 5:
-			var t := (k - 2.0) / 2.0
-			kit.sphere(0.009, _ginger_point(Vector2(t * 0.045, 0.165 + t * t * 0.015)), icing, Vector3.ONE, 8, 4)
-		for k in 3:
-			kit.sphere(0.02, _ginger_point(Vector2(0, 0.07 - k * 0.07)), [Color(0.95, 0.15, 0.15), icing, Color(0.2, 0.65, 0.3)][k], Vector3(1, 1, 0.5), 8, 4)
+		var ice := Color(0.82, 0.94, 1.0)
+		var bright := Color(0.97, 1.0, 1.0)
+		kit.cylinder(0.065, 0.06, Vector3.ZERO, bright, 6, Vector3(PI / 2, 0, 0))
+		for arm in 6:
+			var angle := arm * TAU / 6.0
+			var out := Vector3(cos(angle), sin(angle), 0)
+			kit.capsule_between(out * 0.04, out * 0.28, 0.024, ice, 6)
+			kit.sphere(0.032, out * 0.29, bright, Vector3(1, 1, 0.6), 8, 5)
+			for branch in [[0.13, 0.08], [0.21, 0.055]]:
+				var at: Vector3 = out * float(branch[0])
+				for side in [-1.0, 1.0]:
+					var tilt: float = angle + side * PI / 3.0
+					kit.capsule_between(at, at + Vector3(cos(tilt), sin(tilt), 0) * float(branch[1]), 0.016, ice, 5)
 		return kit.build())
 
 
-## Project icing onto the actual flattened capsule/sphere surface. The
-## wrist and ankle decorations use the same rotated axes as the biscuit.
-static func _ginger_point(point: Vector2) -> Vector3:
-	var depth := 0.0
-	for part in [Vector4(0, 0.2, 0.13, 0.26), Vector4(0, -0.02, 0.12, 0.3), Vector4(-0.15, 0.03, 0.06, 0.26), Vector4(0.15, 0.03, 0.06, 0.26), Vector4(-0.07, -0.2, 0.065, 0.28), Vector4(0.07, -0.2, 0.065, 0.28)]:
-		var angle := 0.0
-		if absf(part.x) > 0.1: angle = signf(part.x) * 1.1
-		elif part.x != 0: angle = signf(part.x) * 0.35
-		var along := Vector2(-sin(angle), cos(angle))
-		var local := point - Vector2(part.x, part.y)
-		var half := maxf(part.w * 0.5 - part.z, 0)
-		var distance := (local - along * clampf(local.dot(along), -half, half)).length_squared()
-		depth = maxf(depth, sqrt(maxf(0, part.z * part.z - distance)) * 0.4)
-	return Vector3(point.x, point.y, -depth + 0.002)
+## A Swedish cinnamon bun standing on its edge, facing -Z: a spiral of pale
+## golden dough, domed in the middle, with cinnamon only in the grooves
+## between the turns and fine pearl sugar on top.
+static func cinnamon_bun() -> ArrayMesh:
+	return cached_mesh("cinnamon_bun", func() -> ArrayMesh:
+		var kit := MeshKit.new()
+		var dough := Color(0.9, 0.66, 0.36)
+		var crust := Color(0.82, 0.55, 0.26)
+		var cinnamon := Color(0.45, 0.22, 0.09)
+		var sugar := Color(0.99, 0.98, 0.95)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 7
+		kit.sphere(0.2, Vector3(0, 0, 0.01), crust, Vector3(1, 1, 0.4), 20, 10)
+		var turns := 3.0
+		var previous := Vector3.ZERO
+		var groove := Vector3.ZERO
+		for k in 110:
+			var t := k / 109.0
+			var angle := t * TAU * turns
+			var radius := 0.012 + 0.178 * t
+			# Thicker towards the middle, like a risen bun.
+			var depth := -0.04 - 0.07 * (1.0 - t) * (1.0 - t)
+			var point := Vector3(cos(angle) * radius, sin(angle) * radius, depth)
+			# The cinnamon line sits half a turn's spacing outside the dough.
+			var outside := radius + 0.178 / turns * 0.5
+			var line := Vector3(cos(angle) * outside, sin(angle) * outside, depth + 0.018)
+			if k > 0:
+				# Only between turns: the outside of the roll is plain dough.
+				if outside < 0.168:
+					kit.capsule_between(groove, line, 0.008, cinnamon, 5)
+				kit.capsule_between(previous, point, 0.027, dough if k % 4 else dough.lightened(0.05), 8)
+			for grain in 2:
+				if rng.randf() < 0.55:
+					var spot := point + Vector3(rng.randf_range(-0.014, 0.014), rng.randf_range(-0.014, 0.014), -0.025)
+					kit.box(Vector3.ONE * rng.randf_range(0.008, 0.012), spot, sugar, Vector3(rng.randf(), rng.randf(), rng.randf()))
+			previous = point
+			groove = line
+		return kit.build())
 
 
 ## A red knitted mitten like the ones counting your lives: a rounded palm,

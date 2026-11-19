@@ -756,7 +756,12 @@ func _place_pickups(chunk: Chunk, rng: RandomNumberGenerator, d0: float, d1: flo
 				continue
 			var hw := field.half_width(d)
 			var x := field.center_x(d) + (offset + sin(k * 0.8) * wiggle) * hw
-			_add_pickup(chunk, Pickup.Kind.GINGERBREAD, x, d)
+			_add_pickup(chunk, Pickup.Kind.SNOWFLAKE, x, d)
+	# Now and then a cinnamon bun, worth five snowflakes.
+	if d0 > 150.0 and rng.randf() < 0.08:
+		var d := rng.randf_range(d0, d1)
+		if not field.near_road(d, 2.0):
+			_add_pickup(chunk, Pickup.Kind.BUN, field.center_x(d) + rng.randf_range(-0.7, 0.7) * field.half_width(d), d)
 	if d0 > 300.0 and rng.randf() < 0.07:
 		var d := rng.randf_range(d0, d1)
 		_add_pickup(chunk, Pickup.Kind.MITTEN, field.center_x(d) + rng.randf_range(-0.8, 0.8) * field.half_width(d), d)

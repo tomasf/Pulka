@@ -92,7 +92,8 @@ static func _entries(group: String) -> Array:
 		],
 		"rides": [],
 		"pickups": [
-			["gingerbread", func() -> Node3D: return _mesh(Props.gingerbread())],
+			["snowflake", func() -> Node3D: return _mesh(Props.snowflake())],
+			["cinnamon bun", func() -> Node3D: return _mesh(Props.cinnamon_bun())],
 			["mitten", func() -> Node3D: return _mesh(Props.mitten())],
 			["wax", func() -> Node3D: return _mesh(Props.wax())],
 			["gift", func() -> Node3D: return _mesh(Props.gift(0))],
@@ -125,6 +126,11 @@ static func _entries(group: String) -> Array:
 			var ride := _ride3d(VehicleSpec.Model.PULKA)
 			(ride.get_child(0) as RiderRig).dress(Palette.JACKETS[i], Palette.JACKETS[i + 3], i * 2 + 8 * i)
 			return _viewed(ride, Vector3(0.3, 0.4, -1))])
+	# Points pickups, face on and from the side.
+	groups["treats"] = []
+	for direction in [Vector3(0.0, 0.12, -1.0), Vector3(-0.9, 0.35, -0.6)]:
+		groups["treats"].append(["snowflake", func() -> Node3D: return _viewed(_mesh(Props.snowflake()), direction)])
+		groups["treats"].append(["cinnamon bun", func() -> Node3D: return _viewed(_mesh(Props.cinnamon_bun()), direction)])
 	groups["faces"] = []
 	for i in 8:
 		groups["faces"].append(["face %d" % i, func() -> Node3D:

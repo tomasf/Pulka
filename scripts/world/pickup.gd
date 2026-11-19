@@ -1,9 +1,9 @@
 class_name Pickup
 extends Node3D
-## Collectibles: gingerbread for points, a mitten for an extra life and
-## turbo wax for a burst of speed.
+## Collectibles: snowflakes for points (and the rarer cinnamon bun, worth
+## five), a mitten for an extra life and turbo wax for a burst of speed.
 
-enum Kind { GINGERBREAD, MITTEN, WAX }
+enum Kind { SNOWFLAKE, MITTEN, WAX, BUN }
 
 const RADIUS := 1.3
 
@@ -21,8 +21,12 @@ func configure(which: Kind, at: Vector3) -> Pickup:
 	_time = at.z * 0.3
 	_visual = MeshInstance3D.new()
 	match which:
-		Kind.GINGERBREAD:
-			_visual.mesh = Props.gingerbread()
+		Kind.SNOWFLAKE:
+			_visual.mesh = Props.snowflake()
+			_visual.scale = Vector3.ONE * 1.3
+		Kind.BUN:
+			_visual.mesh = Props.cinnamon_bun()
+			_visual.scale = Vector3.ONE * 1.4
 		Kind.MITTEN:
 			_visual.mesh = Props.mitten()
 			_visual.scale = Vector3.ONE * 1.6

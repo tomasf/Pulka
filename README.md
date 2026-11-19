@@ -72,7 +72,7 @@ brantare taknockar på sidorna. Gränderna ligger under de riktiga mellanrummen
 mellan husen. Vissa gränder är 14–16 meter breda och kräver ett aktivt hopp;
 de mindre mellanrummen och förskjutna takraderna ger lättare alternativ.
 Snökanter hjälper över små gap, skorstenar går att krascha i
-och pepparkakor visar möjliga landningar. Efter ett fall återkommer man på
+och snöflingor visar möjliga landningar. Efter ett fall återkommer man på
 ett helt tak. Provkör med `godot --path . -- --start-region=roofs`.
 Kör `godot --headless --path . --script res://tools/roofs_test.gd` för tester,
 eller ta bilder med den vanliga renderaren och `-- --capture`.

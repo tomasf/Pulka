@@ -23,8 +23,8 @@ var bonus := 0
 var bonus_fraction := 0.0
 var run_distance := 0.0
 var crash_timer := 0.0
-var cookie_streak := 0
-var cookie_timer := 0.0
+var flake_streak := 0
+var flake_timer := 0.0
 var over_cliff := false
 var last_crash_line := ""
 ## Race time when this player crossed the finish line, or -1.

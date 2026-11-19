@@ -1,7 +1,7 @@
 class_name BirdPopulation
 extends RefCounted
 ## Seeded separately from obstacles: adding wildlife never moves a tree,
-## cookie or ramp. Real mesh anchors keep perched feet on visible surfaces.
+## snowflake or ramp. Real mesh anchors keep perched feet on visible surfaces.
 
 static func ground_allowed(field: TerrainField, x: float, d: float) -> bool:
 	if field.region(d) not in [TerrainField.Region.SLOPE, TerrainField.Region.WOODS, TerrainField.Region.PARK, TerrainField.Region.TOWN, TerrainField.Region.HARBOR]: return false

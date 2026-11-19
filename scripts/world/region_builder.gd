@@ -517,11 +517,11 @@ func _place_roofs(chunk: Chunk, decor: Dictionary, lo: float, hi: float, span: V
 		chimney.position = Vector3(x, field.roof_height(roof, x, d), -d)
 		chunk.add_child(chimney)
 		chunk.obstacles.append(chimney)
-		# Cookies describe the landing line, with a floating cookie over the gap.
+		# Snowflakes describe the landing line, with a floating one over the gap.
 		var count := mini(5 if roof.lane < 0 else 3, maxi(1, int((roof.finish - roof.start - 12) / 4) + 1))
 		for i in count:
 			d = lerpf(roof.start + 6, roof.finish - 6, (i + 0.5) / count)
-			world._add_pickup(chunk, Pickup.Kind.GINGERBREAD, roof.center(d), d)
+			world._add_pickup(chunk, Pickup.Kind.SNOWFLAKE, roof.center(d), d)
 		if roof.gap_after > 0:
 			var arc_count := 3 if roof.requires_jump else 1
 			var launch_y := field.roof_height(roof, roof.center(roof.finish), roof.finish)
@@ -531,9 +531,9 @@ func _place_roofs(chunk: Chunk, decor: Dictionary, lo: float, hi: float, span: V
 				d = roof.finish + along
 				x = roof.center(d)
 				var y := launch_y + roof.dy * along + 0.9 + sin(PI * t) * (1.0 if roof.requires_jump else 0.6)
-				var cookie := Pickup.new().configure(Pickup.Kind.GINGERBREAD, Vector3(x, y, -d))
-				chunk.add_child(cookie)
-				chunk.pickups.append(cookie)
+				var flake := Pickup.new().configure(Pickup.Kind.SNOWFLAKE, Vector3(x, y, -d))
+				chunk.add_child(flake)
+				chunk.pickups.append(flake)
 	# Neighbouring blocks frame the playable roof rows without hiding landings.
 	var d := ceilf(lo / 30.0) * 30.0
 	while d < hi:

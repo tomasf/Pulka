@@ -8,7 +8,7 @@ func _initialize() -> void: _run.call_deferred()
 func _run() -> void:
 	# Exercise the builders, not a possibly stale archive from an earlier export.
 	Props.use_baked_world = false
-	var models := {"plough": Props.plow(), "gingerbread": Props.gingerbread(), "reeds": Props.reeds(), "lamp": SewerPipe.lamp(), "locomotive": RegionProps.locomotive(), "ship": ContainerHarbor.ship(), "rat0": SewerRat.body(0), "rat1": SewerRat.body(1), "paw": SewerRat.paw()}
+	var models := {"plough": Props.plow(), "snowflake": Props.snowflake(), "cinnamon_bun": Props.cinnamon_bun(), "reeds": Props.reeds(), "lamp": SewerPipe.lamp(), "locomotive": RegionProps.locomotive(), "ship": ContainerHarbor.ship(), "rat0": SewerRat.body(0), "rat1": SewerRat.body(1), "paw": SewerRat.paw()}
 	for i in 3: models["tail%d" % i] = SewerRat.tail_piece(i)
 	for name: String in models:
 		var mesh: ArrayMesh = models[name]

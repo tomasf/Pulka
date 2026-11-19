@@ -109,11 +109,11 @@ static func populate(world: SlopeWorld, chunk: Chunk, decor: Dictionary, lo: flo
 	d = ceilf(lo / 8) * 8
 	while d < hi:
 		var u := d - span.x
-		world._add_pickup(chunk, Pickup.Kind.GINGERBREAD, field.center_x(d), d)
+		world._add_pickup(chunk, Pickup.Kind.SNOWFLAKE, field.center_x(d), d)
 		if u >= 72 and u < 150 and field.harbor_route_lift(d) >= 0:
-			world._add_pickup(chunk, Pickup.Kind.GINGERBREAD, field.center_x(d) - 7, d)
+			world._add_pickup(chunk, Pickup.Kind.SNOWFLAKE, field.center_x(d) - 7, d)
 		if u >= 160 and u <= 238:
-			world._add_pickup(chunk, Pickup.Kind.GINGERBREAD, field.center_x(d) + field.harbor_gangway_x(d), d)
+			world._add_pickup(chunk, Pickup.Kind.SNOWFLAKE, field.center_x(d) + field.harbor_gangway_x(d), d)
 		d += 8
 	var ship_d := span.x + 146
 	if ship_d >= lo and ship_d < hi:
