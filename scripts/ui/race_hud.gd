@@ -187,10 +187,10 @@ func show_race() -> void:
 
 ## `left` is metres still to go; `place` is 1 or 2.
 func update_race(left: float, speed: float, place: int, finished: bool) -> void:
-	_left.text = "I mål!" if finished else Hud.group_digits(int(ceilf(maxf(left, 0.0)))) + " m kvar"
+	_left.text = "I mål!" if finished else tr("%s m kvar") % Hud.group_digits(int(ceilf(maxf(left, 0.0))))
 	_speed.text = "%d km/h" % int(speed * 3.6)
-	var text := "1:a" if place == 1 else "2:a"
-	if place != _shown_place:
+	var text := tr("1:a") if place == 1 else tr("2:a")
+	if place != _shown_place or _place.text != text:
 		_shown_place = place
 		_place.text = text
 		_place.add_theme_color_override("font_color", Hud.WARM if place == 1 else Color(0.8, 0.85, 0.95))

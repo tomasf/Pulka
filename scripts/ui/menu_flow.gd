@@ -59,11 +59,16 @@ var _thumb_views: Array[SubViewport] = []
 ## Keyboard keys have a raised edge; controller buttons are round.
 ## Plain strings are action names, arrays are [kind, key], and null adds space.
 class InputHint extends HBoxContainer:
+	var _parts: Array = []
+	var _points := 17
+
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_theme_constant_override("separation", 6)
 
 	func set_parts(parts: Array, points := 17) -> void:
+		_parts = parts
+		_points = points
 		for child in get_children():
 			remove_child(child)
 			child.queue_free()
@@ -78,7 +83,7 @@ class InputHint extends HBoxContainer:
 				var word := MenuFlow.caption(part, points)
 				word.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 				add_child(word)
-				spoken.append(part)
+				spoken.append(TranslationServer.translate(part))
 			else:
 				var kind: String = part[0]
 				var key: String = part[1]
@@ -97,7 +102,7 @@ class InputHint extends HBoxContainer:
 				cap.add_theme_stylebox_override("panel", surface)
 				if kind == "stick":
 					cap.add_child(StickIcon.new())
-					spoken.append("spak")
+					spoken.append(TranslationServer.translate("spak"))
 				else:
 					var glyph := MenuFlow.caption("↵" if key == "Enter" else key, points)
 					glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -106,6 +111,10 @@ class InputHint extends HBoxContainer:
 					spoken.append(key)
 				add_child(cap)
 		accessibility_name = " ".join(spoken)
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_TRANSLATION_CHANGED and not _parts.is_empty():
+			set_parts.call_deferred(_parts, _points)
 
 	func set_player(controls: PlayerControls) -> void:
 		var parts: Array = []
@@ -411,7 +420,7 @@ func _build_players() -> void:
 
 func _player_card(count: int, at: Vector2) -> Button:
 	var button := _button("", &"solo" if count == 1 else &"duo", at, Vector2(310, 390))
-	button.tooltip_text = "%d spelare" % count
+	button.tooltip_text = "1 spelare" if count == 1 else "2 spelare"
 	button.accessibility_name = button.tooltip_text
 	players.add_child(button)
 	_text(button, "SOLO" if count == 1 else "DUELL", 14, Vector2(214, 28), MUTED)
@@ -419,7 +428,7 @@ func _player_card(count: int, at: Vector2) -> Button:
 	preview.position = Vector2(-10, 60)
 	preview.size = Vector2(330, 226)
 	button.add_child(preview)
-	_text(button, "%d spelare" % count, 31, Vector2(28, 292), WHITE, true)
+	_text(button, "1 spelare" if count == 1 else "2 spelare", 31, Vector2(28, 292), WHITE, true)
 	_text(button, "En oändlig backe" if count == 1 else "Först till mål", 18, Vector2(30, 340), MUTED)
 	_text(button, "↗", 30, Vector2(252, 291), LIME)
 	return button
@@ -676,7 +685,7 @@ func _settle_page(page: Control) -> void:
 func update_vehicle(spec: VehicleSpec, unlocked: bool, best_distance: float, best_score: int, unlocked_distance := -1.0) -> void:
 	_name.text = spec.title
 	_tagline.text = ["Den röda klassikern.", "Lätt. Hal. Härligt ostyrig.", "Ratt, skidor och attityd.", "Ett varv till.", "Från köket till backen."][int(spec.model)]
-	_locked.text = "Åk %s m för att låsa upp" % Hud.group_digits(int(spec.unlock_distance)) if not unlocked else ""
+	_locked.text = tr("Åk %s m för att låsa upp") % Hud.group_digits(int(spec.unlock_distance)) if not unlocked else ""
 	start.disabled = not unlocked
 	start.text = "NU ÅKER VI  →" if unlocked else "LÅST"
 	var values := [spec.stat_speed, spec.stat_handling, spec.stat_grip]
@@ -689,7 +698,7 @@ func update_vehicle(spec: VehicleSpec, unlocked: bool, best_distance: float, bes
 		cards[i].add_theme_stylebox_override("normal", surface)
 		cards[i].add_theme_stylebox_override("focus", focus_ring(surface))
 		cards[i].modulate.a = 1.0 if maxf(best_distance, unlocked_distance) >= VehicleSpec.all()[i].unlock_distance else 0.42
-	_record.text = "REKORD   %s m   /   %s poäng" % [Hud.group_digits(int(best_distance)), Hud.group_digits(best_score)] if best_distance > 0 else "5 ÅKDON"
+	_record.text = tr("REKORD   %s m   /   %s poäng") % [Hud.group_digits(int(best_distance)), Hud.group_digits(best_score)] if best_distance > 0 else "5 ÅKDON"
 	start.accessibility_name = start.text
 
 

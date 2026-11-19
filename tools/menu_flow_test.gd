@@ -21,6 +21,8 @@ func _run() -> void:
 	root.add_child(main)
 	main.set_process(false)
 	main.set("_autopilot", true) # Never write test choices to the player's save.
+	main.get("_save").language = "sv"
+	TranslationServer.set_locale("sv")
 	main.set("_no_crash", true)
 	main.get("_save").best_distance = 0
 	main.get("_save").unlocked_distance = 0

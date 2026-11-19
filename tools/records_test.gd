@@ -22,6 +22,7 @@ func _run() -> void:
 	main.set_process(false)
 	main.set("_autopilot", true)
 	main.set("_save", data)
+	TranslationServer.set_locale(data.language)
 	var hud: Hud = main.get("_hud")
 	main.call("_refresh_menu")
 	main.call("_on_hud_pressed", &"settings")

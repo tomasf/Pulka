@@ -15,6 +15,7 @@ var music_volume := 0.8
 var effects_volume := 1.0
 var fullscreen := false
 var show_fps := false
+var language := "sv"
 
 
 static func load_saved(path := PATH) -> SaveData:
@@ -31,6 +32,8 @@ static func load_saved(path := PATH) -> SaveData:
 		data.effects_volume = float(config.get_value("audio", "effects", 1.0))
 		data.fullscreen = bool(config.get_value("settings", "fullscreen", false))
 		data.show_fps = bool(config.get_value("settings", "show_fps", false))
+		var language := str(config.get_value("settings", "language", "sv"))
+		data.language = language if language in ["sv", "en"] else "sv"
 	return data
 
 
@@ -48,6 +51,7 @@ func store() -> void:
 	config.set_value("settings", "vehicle", vehicle_id)
 	config.set_value("settings", "fullscreen", fullscreen)
 	config.set_value("settings", "show_fps", show_fps)
+	config.set_value("settings", "language", language)
 	config.set_value("audio", "master", master_volume)
 	config.set_value("audio", "music", music_volume)
 	config.set_value("audio", "effects", effects_volume)

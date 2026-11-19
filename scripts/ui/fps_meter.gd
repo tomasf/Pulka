@@ -52,7 +52,7 @@ func _process(delta: float) -> void:
 	# Green when smooth, yellow when it starts to stutter, red when it crawls.
 	var color := Color(0.5, 1.0, 0.55) if fps >= 55.0 else (Hud.WARM if fps >= 30.0 else Color(1.0, 0.45, 0.4))
 	add_theme_color_override("font_color", color)
-	text = "%d FPS · skärm %d Hz · värst %.0f ms · %s · 3D %s\nlogik %.1f ms · rendering %.1f ms · GPU %.1f ms · %d ritanrop · %d objekt" % [
+	text = tr("%d FPS · skärm %d Hz · värst %.0f ms · %s · 3D %s\nlogik %.1f ms · rendering %.1f ms · GPU %.1f ms · %d ritanrop · %d objekt") % [
 		roundi(fps), roundi(DisplayServer.screen_get_refresh_rate()), _slowest * 1000.0, _renderer(), _resolution(),
 		_logic_usec / 1000.0 / _frames, _render_cpu / _frames, _gpu / _frames,
 		Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),

@@ -1,0 +1,716 @@
+# Pulka! English interface. Swedish source strings are the message IDs.
+# Keep names, ride/trick names, song titles and world signage Swedish.
+msgid ""
+msgstr "Language: en\nContent-Type: text/plain; charset=UTF-8\nPlural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Inställningar"
+msgstr "Settings"
+
+msgid "Om spelet"
+msgstr "About"
+
+msgid "Avsluta"
+msgstr "Quit"
+
+msgid "UT I\nBACKEN."
+msgstr "HIT THE\nSLOPES."
+
+msgid "Snö i nacken. Ett åk till."
+msgstr "Snow down your neck. One more run."
+
+msgid "Två spelare på samma skärm"
+msgstr "Two players on the same screen"
+
+msgid "Två spelare kräver tangentbord eller handkontroller"
+msgstr "Two players need a keyboard or controllers"
+
+msgid "Välj ditt sällskap. Resten går utför."
+msgstr "Pick your company. It's all downhill from here."
+
+msgid "1 spelare"
+msgstr "1 player"
+
+msgid "2 spelare"
+msgstr "2 players"
+
+msgid "DUELL"
+msgstr "DUEL"
+
+msgid "En oändlig backe"
+msgstr "An endless slope"
+
+msgid "Först till mål"
+msgstr "First to the finish"
+
+msgid "‹  Spelare"
+msgstr "‹  Players"
+
+msgid "DITT ÅK BÖRJAR HÄR"
+msgstr "YOUR RUN STARTS HERE"
+
+msgid "Den röda klassikern."
+msgstr "The red classic."
+
+msgid "Lätt. Hal. Härligt ostyrig."
+msgstr "Light. Slippery. Delightfully unruly."
+
+msgid "Ratt, skidor och attityd."
+msgstr "A steering wheel, skis and attitude."
+
+msgid "Ett varv till."
+msgstr "One more spin."
+
+msgid "Från köket till backen."
+msgstr "From the kitchen to the slope."
+
+msgid "Fart"
+msgstr "Speed"
+
+msgid "Styrning"
+msgstr "Handling"
+
+msgid "Grepp"
+msgstr "Grip"
+
+msgid "Åk %s m för att låsa upp"
+msgstr "Ride %s m to unlock"
+
+msgid "NU ÅKER VI  →"
+msgstr "LET'S GO  →"
+
+msgid "LÅST"
+msgstr "LOCKED"
+
+msgid "REKORD   %s m   /   %s poäng"
+msgstr "BEST   %s m   /   %s points"
+
+msgid "5 ÅKDON"
+msgstr "5 RIDES"
+
+msgid "Tryck på ett åkdon"
+msgstr "Tap a ride"
+
+msgid "Tryck för att åka"
+msgstr "Tap to ride"
+
+msgid "Tryck på sidorna  Styr"
+msgstr "Hold the sides  Steer"
+
+msgid "↑ Svep  Hoppa"
+msgstr "↑ Swipe  Jump"
+
+msgid "Välj åkdon"
+msgstr "Choose ride"
+
+msgid "Åk"
+msgstr "Ride"
+
+msgid "Styr"
+msgstr "Steer"
+
+msgid "Hoppa"
+msgstr "Jump"
+
+msgid "spak"
+msgstr "stick"
+
+msgid "Svep /"
+msgstr "Swipe /"
+
+msgid "Klick /"
+msgstr "Click /"
+
+msgid "KLAR"
+msgstr "READY"
+
+msgid "Väntar…"
+msgstr "Waiting…"
+
+msgid "I mål!"
+msgstr "Finished!"
+
+msgid "%s m kvar"
+msgstr "%s m left"
+
+msgid "1:a"
+msgstr "1st"
+
+msgid "2:a"
+msgstr "2nd"
+
+msgid "Poäng 0"
+msgstr "Score 0"
+
+msgid "Poäng %s"
+msgstr "Score %s"
+
+msgid "Fönsterläge"
+msgstr "Windowed"
+
+msgid "Fullskärm"
+msgstr "Fullscreen"
+
+msgid "Lämna fullskärm (Esc / F)"
+msgstr "Exit fullscreen (Esc / F)"
+
+msgid "Visa i fullskärm (F)"
+msgstr "Enter fullscreen (F)"
+
+msgid "Paus"
+msgstr "Paused"
+
+msgid "Fortsätt"
+msgstr "Continue"
+
+msgid "Börja om"
+msgstr "Restart"
+
+msgid "Till menyn"
+msgstr "Main menu"
+
+msgid "SPELAS NU"
+msgstr "NOW PLAYING"
+
+msgid "NYTT REKORD!"
+msgstr "NEW BEST!"
+
+msgid "Åk igen"
+msgstr "Ride again"
+
+msgid "Målgång"
+msgstr "Race results"
+
+msgid "Sträcka"
+msgstr "Distance"
+
+msgid "Poäng"
+msgstr "Score"
+
+msgid "REKORD: %s m"
+msgstr "BEST: %s m"
+
+msgid "REKORD: %s"
+msgstr "BEST: %s"
+
+msgid "NYA REKORD!"
+msgstr "NEW RECORDS!"
+
+msgid "NYTT POÄNGREKORD!"
+msgstr "NEW HIGH SCORE!"
+
+msgid "NYTT DISTANSREKORD!"
+msgstr "NEW DISTANCE RECORD!"
+
+msgid "Om Pulka!"
+msgstr "About Pulka!"
+
+msgid "Licenser"
+msgstr "Licenses"
+
+msgid "Tillbaka"
+msgstr "Back"
+
+msgid "Huvudvolym"
+msgstr "Master volume"
+
+msgid "Musik"
+msgstr "Music"
+
+msgid "Ljudeffekter"
+msgstr "Sound effects"
+
+msgid "Visa FPS"
+msgstr "Show FPS"
+
+msgid "Klar"
+msgstr "Done"
+
+msgid "Nollställ high score"
+msgstr "Reset records"
+
+msgid "Avbryt"
+msgstr "Cancel"
+
+msgid "Ja, nollställ"
+msgstr "Yes, reset"
+
+msgid "På"
+msgstr "On"
+
+msgid "Av"
+msgstr "Off"
+
+msgid "Nollställa poäng och distans? Åkdonen behålls."
+msgstr "Reset score and distance? Unlocked rides are kept."
+
+msgid "High score nollställd."
+msgstr "Records reset."
+
+msgid "Språk"
+msgstr "Language"
+
+msgid "Låg"
+msgstr "Low"
+
+msgid "Medel"
+msgstr "Medium"
+
+msgid "Hög"
+msgstr "High"
+
+msgid "ÅK!"
+msgstr "GO!"
+
+msgid "Bakvind!"
+msgstr "Slipstream!"
+
+msgid "VINST!"
+msgstr "WINNER!"
+
+msgid "Spelare %d är i mål! %d s kvar"
+msgstr "Player %d finished! %d s left"
+
+msgid "%d. Spelare %d"
+msgstr "%d. Player %d"
+
+msgid "Spelare %d vinner!"
+msgstr "Player %d wins!"
+
+msgid "Ett par vantar! Extraliv!"
+msgstr "A pair of mittens! Extra life!"
+
+msgid "Turbovalla!"
+msgstr "Turbo wax!"
+
+msgid "Tomtens skydd! Inget kan stoppa dig."
+msgstr "Santa's protection! Nothing can stop you."
+
+msgid "En påse kanelbullar! +250"
+msgstr "A bag of cinnamon buns! +250"
+
+msgid "Kol. Du har varit stygg i år."
+msgstr "Coal. You've been naughty this year."
+
+msgid "Ett par raggsockor. +1"
+msgstr "A pair of woolly socks. +1"
+
+msgid "Ett mjukt paket. +1"
+msgstr "A soft parcel. +1"
+
+msgid "Vurpa!"
+msgstr "Wipeout!"
+
+msgid "Hoppla!"
+msgstr "Whoops!"
+
+msgid "Puh, klarade mig!"
+msgstr "Phew, made it!"
+
+msgid "Det där gjorde ont i stoltheten."
+msgstr "That hurt my pride."
+
+msgid "Hoppsan! +30"
+msgstr "Oops! +30"
+
+msgid "Taklandning! +%d"
+msgstr "Rooftop landing! +%d"
+
+msgid "Snögubbe-strike! +25"
+msgstr "Snowman strike! +25"
+
+msgid "Haren hoppade undan!"
+msgstr "The hare hopped out of the way!"
+
+msgid "Krasch!"
+msgstr "Crash!"
+
+msgid "Rakt in i isväggen!"
+msgstr "Straight into the ice wall!"
+
+msgid "Fel väg till lagret!"
+msgstr "Wrong way to the warehouse!"
+
+msgid "Du ramlade av bron!"
+msgstr "You fell off the bridge!"
+
+msgid "Rakt in i broräcket!"
+msgstr "Straight into the bridge railing!"
+
+msgid "Rakt in i skyltfönstret!"
+msgstr "Straight into the shop window!"
+
+msgid "Du provade en tröja. Med ansiktet."
+msgstr "You tried on a jumper. With your face."
+
+msgid "Öppet köp gäller inte."
+msgstr "No refunds."
+
+msgid "In i sargen!"
+msgstr "Into the rink boards!"
+
+msgid "Utvisning, tio minuter!"
+msgstr "Ten-minute penalty!"
+
+msgid "In i granskogen!"
+msgstr "Into the spruce forest!"
+
+msgid "Barr överallt."
+msgstr "Needles everywhere."
+
+msgid "Skogen tog dig."
+msgstr "The forest got you."
+
+msgid "Du handlade lite på vägen."
+msgstr "You did some shopping on the way."
+
+msgid "Butiken har stängt. Nu."
+msgstr "The shop is closed. Now."
+
+msgid "Vilse i villaområdet!"
+msgstr "Lost in the suburbs!"
+
+msgid "Kanelbulle! +%d"
+msgstr "Cinnamon bun! +%d"
+
+msgid "Varma vantar, mer fart!"
+msgstr "Warm mittens, more speed!"
+
+msgid "Plask!"
+msgstr "Splash!"
+
+msgid "Blöta byxor!"
+msgstr "Wet trousers!"
+
+msgid "Isvak!"
+msgstr "A hole in the ice!"
+
+msgid "För lite fart, för mycket vatten."
+msgstr "Too little speed, too much water."
+
+msgid "Du överlevde stupet! +%d"
+msgstr "You survived the drop! +%d"
+
+msgid "Takhopp! +50"
+msgstr "Rooftop jump! +50"
+
+msgid "Luftfärd! %s s +%d"
+msgstr "Airtime! %s s +%d"
+
+msgid "Glömde sätta sig!"
+msgstr "Forgot to sit down!"
+
+msgid "Landade mitt i tricket."
+msgstr "Landed halfway through the trick."
+
+msgid "Glömde landa först."
+msgstr "Forgot to land first."
+
+msgid "Stel som en pinne. Landade som en."
+msgstr "Stiff as a plank. Landed like one."
+
+msgid "Granen vann."
+msgstr "The spruce won."
+
+msgid "Trädkramare!"
+msgstr "Tree hugger!"
+
+msgid "Barr i munnen."
+msgstr "A mouthful of needles."
+
+msgid "Granen stod där först."
+msgstr "The spruce was there first."
+
+msgid "Stenhårt!"
+msgstr "Rock solid!"
+
+msgid "Stenen rörde sig inte en millimeter."
+msgstr "The rock didn't budge a millimetre."
+
+msgid "Aj, aj, sten!"
+msgstr "Ow, ow, rock!"
+
+msgid "Stubben var där först."
+msgstr "The stump was there first."
+
+msgid "Stubbad!"
+msgstr "Stumped!"
+
+msgid "Stopp i avloppet!"
+msgstr "Blocked drain!"
+
+msgid "Du fastnade i gallret!"
+msgstr "You got stuck in the grate!"
+
+msgid "Ispelaren stod stadigt."
+msgstr "The ice pillar stood its ground."
+
+msgid "Iskallt möte!"
+msgstr "An icy encounter!"
+
+msgid "Containern vann."
+msgstr "The container won."
+
+msgid "Du blev fraktgods!"
+msgstr "You've been shipped!"
+
+msgid "Skorstenen vann."
+msgstr "The chimney won."
+
+msgid "Sotare för en dag!"
+msgstr "Chimney sweep for a day!"
+
+msgid "Rakt in i skorstenen!"
+msgstr "Straight into the chimney!"
+
+msgid "Ursäkta! Ursäkta!"
+msgstr "Excuse me! Excuse me!"
+
+msgid "%s såg dig inte komma."
+msgstr "%s didn't see you coming."
+
+msgid "%s tappade termosen!"
+msgstr "%s dropped the thermos!"
+
+msgid "%s spillde ut hela kaffet."
+msgstr "%s spilled all the coffee."
+
+msgid "Förlåt, %s!"
+msgstr "Sorry, %s!"
+
+msgid "%s ska ringa kommunen om det här."
+msgstr "%s is calling the council about this."
+
+msgid "%s skakar på huvudet."
+msgstr "%s is shaking their head."
+
+msgid "%s hade precis borstat av sig."
+msgstr "%s had just brushed off the snow."
+
+msgid "Strike på %s!"
+msgstr "Strike on %s!"
+
+msgid "%s skriver ett argt inlägg i Facebookgruppen."
+msgstr "%s is writing an angry post in the Facebook group."
+
+msgid "%s hör av sig till länsstyrelsen."
+msgstr "%s is contacting the county administrative board."
+
+msgid "Barnet skrattade. Du grät."
+msgstr "The child laughed. You cried."
+
+msgid "%s vann den duellen."
+msgstr "%s won that duel."
+
+msgid "%s ska skvallra för fröken."
+msgstr "%s is telling the teacher."
+
+msgid "%s vill åka en gång till!"
+msgstr "%s wants another go!"
+
+msgid "%s tappade vanten."
+msgstr "%s lost a mitten."
+
+msgid "%s står kvar. Du ligger ner."
+msgstr "%s is still standing. You're on the ground."
+
+msgid "Voff!"
+msgstr "Woof!"
+
+msgid "Hunden trodde du var en pinne."
+msgstr "The dog thought you were a stick."
+
+msgid "Taxen tog ingen skada. Du däremot..."
+msgstr "The dachshund is fine. You, on the other hand..."
+
+msgid "Räven vann den här gången."
+msgstr "The fox won this time."
+
+msgid "Listig, men inte osynlig."
+msgstr "Cunning, but not invisible."
+
+msgid "Du tog fel väg till grytet."
+msgstr "You took the wrong way to the den."
+
+msgid "Mjau!"
+msgstr "Meow!"
+
+msgid "Katten hade företräde."
+msgstr "The cat had right of way."
+
+msgid "Nio liv. Inget tålamod."
+msgstr "Nine lives. No patience."
+
+msgid "Älgen är okej. Det är inte du."
+msgstr "The moose is fine. You aren't."
+
+msgid "Skogens konung vinner alltid."
+msgstr "The king of the forest always wins."
+
+msgid "Du blev älgad."
+msgstr "You've been moosed."
+
+msgid "Rådjuret blev mest förvånat."
+msgstr "The deer was mostly just surprised."
+
+msgid "Bambi: 1, Du: 0"
+msgstr "Bambi: 1, You: 0"
+
+msgid "Du väckte björnen. Grattis."
+msgstr "You woke the bear. Congratulations."
+
+msgid "Björnen ville bara sova."
+msgstr "The bear just wanted to sleep."
+
+msgid "Det var inte Nalle Puh."
+msgstr "That wasn't Nalle Puh."
+
+msgid "Skogens tyngsta kram."
+msgstr "The heaviest hug in the forest."
+
+msgid "Björnen har inte gått i ide än. Nu vet du varför."
+msgstr "The bear hasn't hibernated yet. Now you know why."
+
+msgid "Mästerbrumm vann."
+msgstr "Mästerbrumm won."
+
+msgid "Tuuut! Bilen hade företräde."
+msgstr "Honk! The car had right of way."
+
+msgid "Titta åt båda hållen nästa gång!"
+msgstr "Look both ways next time!"
+
+msgid "Pulka mot bil. Bil vann."
+msgstr "Sled versus car. Car won."
+
+msgid "Plogbilen plogade dig."
+msgstr "The snowplough ploughed you."
+
+msgid "Du blev en snövall."
+msgstr "You became a snowbank."
+
+msgid "Soptunnan tog hand om dig."
+msgstr "The bin took care of you."
+
+msgid "Rätt i återvinningen!"
+msgstr "Straight into the recycling!"
+
+msgid "Kundvagnen vann."
+msgstr "The shopping trolley won."
+
+msgid "Du blev handlad."
+msgstr "You've been checked out."
+
+msgid "Kassa 3 är stängd."
+msgstr "Checkout 3 is closed."
+
+msgid "Fikusen överlevde."
+msgstr "The ficus survived."
+
+msgid "Rakt in i grönskan."
+msgstr "Straight into the greenery."
+
+msgid "Plask i fontänen!"
+msgstr "A splash in the fountain!"
+
+msgid "Önska något!"
+msgstr "Make a wish!"
+
+msgid "Konen stod där av en anledning."
+msgstr "The cone was there for a reason."
+
+msgid "Pling, kon!"
+msgstr "Ding, cone!"
+
+msgid "Tåget går inte att stoppa."
+msgstr "There's no stopping the train."
+
+msgid "Fel spår!"
+msgstr "Wrong track!"
+
+msgid "Inte ens försenat."
+msgstr "Not even delayed."
+
+msgid "Flyget väntar inte på någon."
+msgstr "The plane waits for no one."
+
+msgid "Försenad avgång."
+msgstr "Delayed departure."
+
+msgid "Bagaget kom fram. Du inte."
+msgstr "The luggage arrived. You didn't."
+
+msgid "Bagagebandet nästa!"
+msgstr "Next stop: baggage claim!"
+
+msgid "Långtradaren vann."
+msgstr "The lorry won."
+
+msgid "Fel fil!"
+msgstr "Wrong lane!"
+
+msgid "Chauffören fick en historia att berätta."
+msgstr "The driver got a story to tell."
+
+msgid "Självmål!"
+msgstr "Own goal!"
+
+msgid "Rakt i nätet!"
+msgstr "Straight into the net!"
+
+msgid "Pimpelfiskaren är inte glad."
+msgstr "The ice fisher isn't happy."
+
+msgid "Abborrarna skrattar åt dig."
+msgstr "The perch are laughing at you."
+
+msgid "Björken vann."
+msgstr "The birch won."
+
+msgid "Näver i munnen."
+msgstr "A mouthful of birch bark."
+
+msgid "Björken stod där först."
+msgstr "The birch was there first."
+
+msgid "Björken rörde inte en kvist."
+msgstr "The birch didn't move a twig."
+
+msgid "Pulkan har talat."
+msgstr "The sled has spoken."
+
+msgid "Nu får du gå upp igen."
+msgstr "Now you have to walk back up."
+
+msgid "Snö i nacken, snö i själen."
+msgstr "Snow down your neck, snow in your soul."
+
+msgid "Mamma ropar på middag!"
+msgstr "Mum's calling you for dinner!"
+
+msgid "Vantarna är slut."
+msgstr "Out of mittens."
+
+msgid "Det var ändå ett bra åk."
+msgstr "It was a good run, though."
+
+msgid "Klassisk röd plastpulka. Stabil, pålitlig och lite tråkig – som en gammal Volvo."
+msgstr "A classic red plastic sled. Stable, reliable and a bit dull – like an old Volvo."
+
+msgid "Snabb som en hal tvål. Snurrar gärna – med eller utan din tillåtelse."
+msgstr "Fast as a slippery bar of soap. Loves to spin – with or without your permission."
+
+msgid "Ratt, skidor och attityd. Greppar som en dröm men är tung i luften."
+msgstr "A steering wheel, skis and attitude. Grips like a dream, but heavy in the air."
+
+msgid "Ett snurrande plastfat. Går dit backen vill, du får mest åka med."
+msgstr "A spinning plastic saucer. Goes where the slope wants. You're mostly along for the ride."
+
+msgid "Lånad ur köket utan lov. Svinsnabb, snurrar som en propeller och luktar vitlök."
+msgstr "Borrowed from the kitchen without asking. Blazing fast, spins like a propeller and smells of garlic."
+
+msgid "%d FPS · skärm %d Hz · värst %.0f ms · %s · 3D %s\nlogik %.1f ms · rendering %.1f ms · GPU %.1f ms · %d ritanrop · %d objekt"
+msgstr "%d FPS · display %d Hz · worst %.0f ms · %s · 3D %s\nlogic %.1f ms · rendering %.1f ms · GPU %.1f ms · %d draw calls · %d objects"
+
+msgid "En oändlig vinterbacke. Fem åkdon. Ett åk till.\nJaga rekord på egen hand eller utmana en kompis i duell.\n\n[font_size=16][color=#c9f36b]SKAPAT AV[/color][/font_size]\n[font_size=30][color=#f6f8ff]Tomas Wincent Franzén[/color][/font_size]\n\n[font_size=20][color=#a2accb]Byggt med Godot Engine (MIT).\nFugaz One av LatinoType · Nunito av The Nunito Project Authors.\nTypsnitten används under SIL Open Font License 1.1.[/color][/font_size]"
+msgstr "An endless winter slope. Five rides. One more run.\nChase records on your own or challenge a friend to a duel.\n\n[font_size=16][color=#c9f36b]CREATED BY[/color][/font_size]\n[font_size=30][color=#f6f8ff]Tomas Wincent Franzén[/color][/font_size]\n\n[font_size=20][color=#a2accb]Built with Godot Engine (MIT).\nFugaz One by LatinoType · Nunito by The Nunito Project Authors.\nFonts used under the SIL Open Font License 1.1.[/color][/font_size]"
+

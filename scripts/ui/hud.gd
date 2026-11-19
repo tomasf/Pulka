@@ -133,6 +133,7 @@ var _default_focus: Dictionary = {}
 
 ## Emitted while a volume slider moves: 0 = master, 1 = music, 2 = effects.
 signal volume_changed(channel: int, value: float)
+signal language_changed(language: String)
 ## Emitted by on-screen buttons: start, previous, next, settings, pause,
 ## resume, menu, retry, close_settings.
 signal pressed(action: StringName)
@@ -143,6 +144,7 @@ var _pause_button: Button
 var _fullscreen_button: Button
 var _fullscreen_toggle: Button
 var _fps_toggle: Button
+var _language_buttons: Array[Button] = []
 var _fps_meter: FpsMeter
 
 var settings_open: bool:
@@ -349,7 +351,7 @@ func _build_game() -> void:
 func update_game(distance: float, score: int, speed: float, lives: int, max_lives: int, multiplier: float) -> void:
 	_distance.text = group_digits(int(distance)) + " m"
 	var boosted := multiplier > 1.0
-	_score.text = "Poäng " + group_digits(score) + ("  ×%d" % int(multiplier) if boosted else "")
+	_score.text = tr("Poäng %s") % group_digits(score) + ("  ×%d" % int(multiplier) if boosted else "")
 	_score.add_theme_color_override("font_color", Color(0.5, 1.0, 0.7) if boosted else WARM)
 	var kmh := int(speed * 3.6)
 	_speed.text = str(kmh)
@@ -673,8 +675,8 @@ func show_game_over(title: String, cause: String, distance: float, score: int, b
 	_over_cause.add_theme_color_override("font_color", MenuFlow.CORAL)
 	_over_title.text = title
 	_set_over_rows([
-		["Sträcka", "%s m" % group_digits(int(distance)), MenuFlow.LIME if record else MenuFlow.MUTED, "REKORD: %s m" % group_digits(int(best_distance))],
-		["Poäng", group_digits(score), MenuFlow.LIME if score_record else MenuFlow.MUTED, "REKORD: %s" % group_digits(best_score)],
+		["Sträcka", "%s m" % group_digits(int(distance)), MenuFlow.LIME if record else MenuFlow.MUTED, tr("REKORD: %s m") % group_digits(int(best_distance))],
+		["Poäng", group_digits(score), MenuFlow.LIME if score_record else MenuFlow.MUTED, tr("REKORD: %s") % group_digits(best_score)],
 	])
 	_over_record.text = "NYA REKORD!" if record and score_record else ("NYTT POÄNGREKORD!" if score_record else "NYTT DISTANSREKORD!")
 	_over_record.visible = record or score_record
@@ -765,7 +767,7 @@ func _build_settings() -> void:
 	_settings = _full_rect()
 	_dim(_settings, 0.7)
 	var canvas := _dialog_canvas(_settings)
-	_dialog_panel(canvas, Rect2(310, 100, 980, 700))
+	_dialog_panel(canvas, Rect2(310, 80, 980, 760))
 	_dialog_label(canvas, "PULKA!", 20, Vector2(350, 130), MenuFlow.LIME, true)
 	_dialog_label(canvas, "Inställningar", 60, Vector2(346, 164), MenuFlow.WHITE, true)
 	var track := MenuFlow.style(Color("3d465e"), Color.TRANSPARENT, 5)
@@ -834,11 +836,12 @@ func _build_settings() -> void:
 	if desktop:
 		_fullscreen_toggle = _settings_toggle(canvas, "Fullskärm", &"fullscreen", Rect2(350, 536, 438, 64))
 	_fps_toggle = _settings_toggle(canvas, "Visa FPS", &"show_fps", Rect2(812 if desktop else 350, 536, 438 if desktop else 900, 64))
+	_build_language_choice(canvas)
 	var done := _dialog_button(canvas, "Klar", &"close_settings", Rect2(990, 680, 260, 76), true)
 	_settings_done = done
 	_reset_button = _dialog_button(canvas, "Nollställ high score", &"ask_reset_records", Rect2(350, 680, 450, 76))
 	_reset_button.add_theme_color_override("font_color", MenuFlow.CORAL)
-	_reset_note = _dialog_label(canvas, "", 22, Vector2(350, 630), MenuFlow.MUTED)
+	_reset_note = _dialog_label(canvas, "", 22, Vector2(350, 780), MenuFlow.MUTED)
 	_reset_confirm = Control.new()
 	canvas.add_child(_reset_confirm)
 	_reset_cancel = _dialog_button(_reset_confirm, "Avbryt", &"cancel_reset_records", Rect2(350, 680, 240, 76))
@@ -848,7 +851,7 @@ func _build_settings() -> void:
 	_reset_yes.focus_neighbor_left = _reset_cancel.get_path()
 	_reset_yes.focus_neighbor_right = done.get_path()
 	for button in [_reset_button, _reset_cancel, _reset_yes]:
-		button.focus_neighbor_top = (_fullscreen_toggle if desktop else _fps_toggle).get_path()
+		button.focus_neighbor_top = _language_buttons[0].get_path()
 		button.focus_neighbor_bottom = _sliders[0].get_path()
 	_reset_button.focus_neighbor_right = done.get_path()
 	_reset_confirm.hide()
@@ -856,16 +859,59 @@ func _build_settings() -> void:
 		_sliders[i].focus_neighbor_top = (_sliders[i - 1] if i > 0 else done).get_path()
 		_sliders[i].focus_neighbor_bottom = (_sliders[i + 1] if i < _sliders.size() - 1 else (_fullscreen_toggle if desktop else _fps_toggle)).get_path()
 	_fps_toggle.focus_neighbor_top = _sliders.back().get_path()
-	_fps_toggle.focus_neighbor_bottom = done.get_path()
+	_fps_toggle.focus_neighbor_bottom = _language_buttons[1].get_path()
 	if desktop:
 		_fullscreen_toggle.focus_neighbor_top = _sliders.back().get_path()
 		_fullscreen_toggle.focus_neighbor_right = _fps_toggle.get_path()
-		_fullscreen_toggle.focus_neighbor_bottom = _reset_button.get_path()
+		_fullscreen_toggle.focus_neighbor_bottom = _language_buttons[0].get_path()
 		_fps_toggle.focus_neighbor_left = _fullscreen_toggle.get_path()
-	done.focus_neighbor_top = _fps_toggle.get_path()
+	for button in _language_buttons:
+		button.focus_neighbor_top = (_fullscreen_toggle if desktop else _fps_toggle).get_path()
+		button.focus_neighbor_bottom = (_reset_button if button == _language_buttons[0] else done).get_path()
+	_language_buttons[0].focus_neighbor_right = _language_buttons[1].get_path()
+	_language_buttons[1].focus_neighbor_left = _language_buttons[0].get_path()
+	done.focus_neighbor_top = _language_buttons[1].get_path()
 	done.focus_neighbor_bottom = _sliders[0].get_path()
 	done.focus_neighbor_left = _reset_button.get_path()
 	_settings.visible = false
+
+
+func _build_language_choice(canvas: Control) -> void:
+	var panel := Panel.new()
+	panel.position = Vector2(350, 614)
+	panel.size = Vector2(900, 54)
+	panel.add_theme_stylebox_override("panel", MenuFlow.style(MenuFlow.PANEL, Color(1, 1, 1, 0.06), 16))
+	canvas.add_child(panel)
+	_dialog_label(panel, "Språk", 22, Vector2(22, 12))
+	var group := ButtonGroup.new()
+	for i in 2:
+		var language: String = ["sv", "en"][i]
+		var button := _dialog_button(panel, "Svenska" if i == 0 else "English", &"", Rect2(470 + i * 208, 7, 196, 40))
+		button.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		button.add_theme_font_size_override("font_size", 22)
+		for state in ["normal", "hover", "pressed"]:
+			var surface := button.get_theme_stylebox(state).duplicate() as StyleBoxFlat
+			surface.content_margin_top = 4
+			surface.content_margin_bottom = 4
+			surface.set_corner_radius_all(12)
+			button.add_theme_stylebox_override(state, surface)
+		button.toggle_mode = true
+		button.button_group = group
+		button.pressed.connect(func() -> void: language_changed.emit(language))
+		var selected := MenuFlow.style(MenuFlow.LIME, Color.TRANSPARENT, 12)
+		selected.content_margin_top = 4
+		selected.content_margin_bottom = 4
+		button.add_theme_stylebox_override("pressed", selected)
+		button.add_theme_color_override("font_pressed_color", MenuFlow.NIGHT)
+		button.add_theme_color_override("font_hover_pressed_color", MenuFlow.NIGHT)
+		_language_buttons.append(button)
+
+
+func update_language_choice(language: String) -> void:
+	for i in _language_buttons.size():
+		var selected := language == ("sv" if i == 0 else "en")
+		_language_buttons[i].set_pressed_no_signal(selected)
+		_language_buttons[i].add_theme_color_override("font_focus_color", MenuFlow.NIGHT if selected else MenuFlow.WHITE)
 
 
 func _slider_thumb(color: Color, size := 28) -> Texture2D:

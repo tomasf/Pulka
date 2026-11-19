@@ -180,6 +180,7 @@ func _ready() -> void:
 	if _muted: AudioServer.set_bus_mute(AudioServer.get_bus_index(&"Master"), true)
 	get_window().content_scale_factor = Quality.ui_scale()
 	_save = SaveData.load_saved()
+	TranslationServer.set_locale(_save.language)
 	if _graphics_override >= 0:
 		Quality.level = _graphics_override as Quality.Level
 	_specs = VehicleSpec.all()
@@ -191,6 +192,8 @@ func _ready() -> void:
 	_rng.randomize()
 
 	_world_root = Node3D.new()
+	# Names, shop signs and other text in the Swedish setting stay Swedish.
+	_world_root.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	_world_root.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(_world_root)
 	_sound = SoundBank.new()
@@ -227,6 +230,8 @@ func _ready() -> void:
 	_touch.mode_changed.connect(_hud.set_touch_mode)
 	_hud.set_touch_mode(DisplayServer.is_touchscreen_available() and Quality.is_mobile())
 	_hud.volume_changed.connect(_on_volume_changed)
+	_hud.language_changed.connect(_on_language_changed)
+	_hud.update_language_choice(_save.language)
 	SoundBank.apply_volumes(_save.master_volume, _save.music_volume, _save.effects_volume)
 	if _muted:
 		AudioServer.set_bus_mute(AudioServer.get_bus_index(&"Master"), true)
@@ -1028,7 +1033,7 @@ func _update_race(delta: float) -> void:
 			_grace = FINISH_GRACE
 			for other in _players:
 				if other != p:
-					other.say("Spelare %d är i mål! %d s kvar" % [p.index + 1, int(FINISH_GRACE)], Hud.HOT, 44, 2.5)
+					other.say(tr("Spelare %d är i mål! %d s kvar") % [p.index + 1, int(FINISH_GRACE)], Hud.HOT, 44, 2.5)
 	if _grace > 0.0:
 		_grace -= delta
 	_update_race_hud()
@@ -1115,9 +1120,9 @@ func _end_race() -> void:
 	var goal := _start_d + _race_length
 	var rows := []
 	for p: Player in order:
-		var result := _race_clock(p.finish_time) if p.finished() else "%s m kvar" % Hud.group_digits(int(goal - p.sled.distance()))
-		rows.append(["%d. Spelare %d" % [_place_of(p), p.index + 1], result, p.color])
-	_hud.show_race_result("Spelare %d vinner!" % (winner.index + 1), rows)
+		var result := _race_clock(p.finish_time) if p.finished() else tr("%s m kvar") % Hud.group_digits(int(goal - p.sled.distance()))
+		rows.append([tr("%d. Spelare %d") % [_place_of(p), p.index + 1], result, p.color])
+	_hud.show_race_result(tr("Spelare %d vinner!") % (winner.index + 1), rows)
 	_sound.set_music_ducked(true)
 	_input_cooldown = Hud.OVER_GUARD
 
@@ -1125,7 +1130,8 @@ func _end_race() -> void:
 ## A race time as minutes, seconds and tenths: 1:23,4.
 static func _race_clock(seconds: float) -> String:
 	var tenths := int(roundf(seconds * 10.0))
-	return "%d:%02d,%d" % [tenths / 600, (tenths / 10) % 60, tenths % 10]
+	var separator := "." if TranslationServer.get_locale().begins_with("en") else ","
+	return ("%d:%02d" % [tenths / 600, (tenths / 10) % 60]) + separator + str(tenths % 10)
 
 
 func _add_bonus(p: Player, points: int) -> void:
@@ -1314,6 +1320,8 @@ func _close_settings() -> void:
 ## window remembers fullscreen (the window button may have changed it).
 ## Apple TV's Menu button pauses or goes back a step.
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED and is_instance_valid(_hud) and _hud.is_node_ready():
+		_refresh_language.call_deferred()
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		_remember_fullscreen()
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
@@ -1346,6 +1354,21 @@ func _update_go_back() -> void:
 
 
 # --- Settings ---
+
+func _on_language_changed(language: String) -> void:
+	if language not in ["sv", "en"] or language == _save.language: return
+	_save.language = language
+	TranslationServer.set_locale(language)
+	if not _autopilot: _save.store()
+
+
+func _refresh_language() -> void:
+	_refresh_menu()
+	_hud.update_language_choice(_save.language)
+	if _racing: _update_race_hud()
+	var p := _players[0]
+	_hud.update_game(p.run_distance, p.score(), p.sled.speed(), p.lives, maxi(START_LIVES, p.lives), _director.multiplier)
+
 
 func _update_settings_input() -> void:
 	if _menu_return_pending: return
@@ -1470,7 +1493,7 @@ func _roof_bounce(p: Player, obstacle: Obstacle) -> void:
 	p.sled.velocity += Vector3(obstacle.velocity.x * 0.3, 0.0, 0.0)
 	var points := 400 if obstacle.kind == Obstacle.Kind.PLOW else 250
 	_add_bonus(p, points)
-	p.say("Taklandning! +%d" % points, Hud.HOT, 60)
+	p.say(tr("Taklandning! +%d") % points, Hud.HOT, 60)
 	_sound.play("horn", 0.0, 1.15)
 	_sound.play("jump", 0.0, 0.8)
 	p.camera.add_shake(0.5)
@@ -1584,7 +1607,7 @@ func _crash_into(p: Player, obstacle: Obstacle) -> void:
 		Obstacle.Kind.PERSON, Obstacle.Kind.KID:
 			_sound.play("oops", 0.0, 1.3)
 	var lines := _crash_lines(obstacle)
-	var line: String = lines[_rng.randi_range(0, lines.size() - 1)]
+	var line := tr(lines[_rng.randi_range(0, lines.size() - 1)])
 	if line.contains("%s"):
 		var names: Array = KID_NAMES if obstacle.kind == Obstacle.Kind.KID else PERSON_NAMES
 		line = line % names[_rng.randi_range(0, names.size() - 1)]
@@ -1761,7 +1784,7 @@ func _check_pickups(p: Player = null) -> void:
 				p.flake_timer = 1.5
 				var points := FLAKE_POINTS * BUN_FLAKES * mini(p.flake_streak, 6)
 				_add_bonus(p, points)
-				p.say("Kanelbulle! +%d" % points, Hud.WARM)
+				p.say(tr("Kanelbulle! +%d") % points, Hud.WARM)
 				_sound.play("coin", 0.0, 0.8)
 				_sound.play("cocoa", -6.0)
 			Pickup.Kind.MITTEN:
@@ -1817,7 +1840,7 @@ func _on_landed(air_time: float, impact: float, spin: float, grab: float, p: Pla
 		p.over_cliff = false
 		var points := CLIFF_BONUS + int(air_time * 40.0)
 		_add_bonus(p, points)
-		p.say("Du överlevde stupet! +%d" % points, Hud.WARM, 60, 2.0)
+		p.say(tr("Du överlevde stupet! +%d") % points, Hud.WARM, 60, 2.0)
 		_sound.play("trick")
 		p.camera.add_shake(0.8)
 		p.sled.puff()
@@ -1836,7 +1859,7 @@ func _on_landed(air_time: float, impact: float, spin: float, grab: float, p: Pla
 		var points := int(air_time * 40.0)
 		_add_bonus(p, points)
 		if air_time >= 2.0:
-			p.say("Luftfärd! %s s +%d" % [("%.1f" % air_time).replace(".", ","), points], Hud.WARM)
+			p.say(tr("Luftfärd! %s s +%d") % [("%.1f" % air_time).replace(".", "." if TranslationServer.get_locale().begins_with("en") else ","), points], Hud.WARM)
 
 
 ## A flight that ended in a bounce or a skip on water: its spin and grab
