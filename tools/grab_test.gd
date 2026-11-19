@@ -2,7 +2,8 @@ extends SceneTree
 ## Grab tricks: holding jump through the take-off never grabs, quick taps
 ## don't either, pressing and holding it again in the air does. Letting go in
 ## good time lands safely, and so does a grab that never got all the way in;
-## letting go of a finished one too late, or not at all, lands in the trick. Every ride eases into
+## letting go of a finished one too late, or not at all, lands in the trick.
+## A bounce mid-flight hands the spin so far over to be scored. Every ride eases into
 ## and out of its pose.
 ## Godot --headless --path . --script res://tools/grab_test.gd
 
@@ -115,6 +116,18 @@ func _run() -> void:
 			turned_alone = maxf(turned_alone, absf(float(sled.get("_spin_angle")) - before))
 		_check("%s: landing in a grab is reported" % name, _landings.size() >= 1 and _landings[0][1])
 		_check("%s: the ride doesn't spin by itself in the air" % name, turned_alone == 0.0)
+		# A spin cut short by a bounce (off an animal, a car roof) still
+		# counts: the flight hands its spin over before starting again.
+		var banked := []
+		var bank := func(_air: float, spin: float, _grab: float) -> void: banked.append(spin)
+		sled.tricked.connect(bank)
+		_launch(sled)
+		for i in 60:
+			sled.step(DT, 1.0, false, false)
+		var spun := sled.air_spin
+		sled.bounce(3.0)
+		_check("%s: a bounce mid-flight hands over the spin so far" % name, banked.size() == 1 and absf(banked[0] - spun) < 0.001 and absf(spun) > PI and sled.air_spin == 0.0)
+		sled.tricked.disconnect(bank)
 		sled.queue_free()
 		await process_frame
 	print("grab test: %s" % ("ok" if _failures == 0 else "%d failures" % _failures))

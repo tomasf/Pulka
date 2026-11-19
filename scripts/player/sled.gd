@@ -7,6 +7,9 @@ extends Node3D
 signal jumped
 ## `grab` is how long a grab was held in the flight (see `grabbing`).
 signal landed(air_time: float, impact: float, spin: float, grab: float)
+## A flight ended in a new one instead of a landing (a bounce off
+## something, a skip across water): the tricks so far still count.
+signal tricked(air_time: float, spin: float, grab: float)
 ## Skipped across open water like a flat stone.
 signal skimmed(speed: float)
 ## Too slow on open water: in you go.
@@ -555,6 +558,7 @@ func _touch_water() -> void:
 	# swallow a clean, fast crossing before the far shore is reachable.
 	velocity *= 0.97
 	velocity.y = 2.4 + current * 0.035
+	_bank_tricks()
 	on_ground = false
 	_air_since = 1.0
 	_ground_time = 0.0
@@ -578,6 +582,7 @@ func knock(normal: Vector3, push: float, separation: float, spin := 0.0) -> void
 
 ## Springs the ride back into the air, e.g. off a car roof.
 func bounce(upward: float) -> void:
+	_bank_tricks()
 	velocity.y = maxf(velocity.y, 0.0) + upward
 	on_ground = false
 	_air_since = 1.0
@@ -586,6 +591,12 @@ func bounce(upward: float) -> void:
 	air_spin = 0.0
 	grab_time = 0.0
 	_puff.restart()
+
+
+## Hands on the spin and grab of a flight that is about to restart.
+func _bank_tricks() -> void:
+	if not on_ground and not crashed and (absf(air_spin) > 0.3 or grab_time > 0.0):
+		tricked.emit(air_time, air_spin, grab_time)
 
 
 func crash() -> void:

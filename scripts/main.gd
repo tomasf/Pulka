@@ -407,6 +407,7 @@ func _make_player(index: int, camera: ChaseCamera, controls: PlayerControls) -> 
 	p.vehicle = _vehicle
 	sled.jumped.connect(_on_jumped.bind(p))
 	sled.landed.connect(_on_landed.bind(p))
+	sled.tricked.connect(_on_tricked.bind(p))
 	sled.skimmed.connect(_on_skimmed.bind(p))
 	sled.sank.connect(_on_sank.bind(p))
 	camera.target = sled
@@ -1712,8 +1713,6 @@ func _on_landed(air_time: float, impact: float, spin: float, grab: float, p: Pla
 	if p.sled.in_trick():
 		_crash(GRAB_CRASH_LINES[_rng.randi_range(0, GRAB_CRASH_LINES.size() - 1)], p)
 		return
-	var grab_points := int(grab * GRAB_POINTS) if grab >= GRAB_MIN else 0
-	var grab_title := GrabTrick.for_model(p.sled.spec.model).title
 	if impact > 4.0:
 		_sound.play("land", linear_to_db(clampf(impact / 14.0, 0.2, 1.0)))
 		p.camera.add_shake(clampf(impact * 0.04, 0.0, 0.8))
@@ -1721,30 +1720,19 @@ func _on_landed(air_time: float, impact: float, spin: float, grab: float, p: Pla
 		p.rumble(0.3, clampf(impact / 20.0, 0.1, 0.8), 0.15)
 	if p.over_cliff:
 		p.over_cliff = false
-		var points := CLIFF_BONUS + int(air_time * 40.0) + grab_points
+		var points := CLIFF_BONUS + int(air_time * 40.0)
 		_add_bonus(p, points)
-		var cliff_line := "Du överlevde stupet!" if grab_points == 0 else "%s över stupet!" % grab_title
-		p.say("%s +%d" % [cliff_line, points], Hud.WARM, 60, 2.0)
+		p.say("Du överlevde stupet! +%d" % points, Hud.WARM, 60, 2.0)
 		_sound.play("trick")
 		p.camera.add_shake(0.8)
 		p.sled.puff()
 		p.rumble(0.6, 0.9, 0.35)
+		# Tricks over the cliff count on top.
+		_score_tricks(p, spin, grab)
 		return
-	var trick := _spin_trick(spin)
-	if trick.x > 0 and grab_points > 0:
-		var points := int((trick.y + grab_points) * GRAB_COMBO)
-		_add_bonus(p, points)
-		p.say("%s %d°! +%d" % [grab_title, trick.x, points], Hud.HOT, 60)
-		_sound.play("trick")
-	elif trick.x > 0:
-		_add_bonus(p, trick.y)
-		p.say("%d°! +%d" % [trick.x, trick.y], Hud.HOT, 60)
-		_sound.play("trick")
-	elif grab_points > 0:
-		_add_bonus(p, grab_points)
-		p.say("%s! +%d" % [grab_title, grab_points], Hud.HOT, 56)
-		_sound.play("trick")
-	elif air_time > 0.35 and _field.in_rooftops(p.sled.distance()):
+	if _score_tricks(p, spin, grab):
+		return
+	if air_time > 0.35 and _field.in_rooftops(p.sled.distance()):
 		_add_bonus(p, 50)
 		p.say("Takhopp! +50", Hud.WARM)
 		_sound.play("trick", -4.0)
@@ -1754,6 +1742,34 @@ func _on_landed(air_time: float, impact: float, spin: float, grab: float, p: Pla
 		_add_bonus(p, points)
 		if air_time >= 2.0:
 			p.say("Luftfärd! %s s +%d" % [("%.1f" % air_time).replace(".", ","), points], Hud.WARM)
+
+
+## A flight that ended in a bounce or a skip on water: its spin and grab
+## count as on a landing (no crash for a grab still held: it carries on).
+func _on_tricked(_air_time: float, spin: float, grab: float, p: Player) -> void:
+	if state == State.PLAYING and not p.sled.crashed:
+		_score_tricks(p, spin, grab)
+
+
+## Scores a flight's spin and grab, alone or together; false if neither counts.
+func _score_tricks(p: Player, spin: float, grab: float) -> bool:
+	var grab_points := int(grab * GRAB_POINTS) if grab >= GRAB_MIN else 0
+	var grab_title := GrabTrick.for_model(p.sled.spec.model).title
+	var trick := _spin_trick(spin)
+	if trick.x > 0 and grab_points > 0:
+		var points := int((trick.y + grab_points) * GRAB_COMBO)
+		_add_bonus(p, points)
+		p.say("%s %d°! +%d" % [grab_title, trick.x, points], Hud.HOT, 60)
+	elif trick.x > 0:
+		_add_bonus(p, trick.y)
+		p.say("%d°! +%d" % [trick.x, trick.y], Hud.HOT, 60)
+	elif grab_points > 0:
+		_add_bonus(p, grab_points)
+		p.say("%s! +%d" % [grab_title, grab_points], Hud.HOT, 56)
+	else:
+		return false
+	_sound.play("trick")
+	return true
 
 
 ## A landed spin of `spin` radians: (degrees credited, points), or zero
