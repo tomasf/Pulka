@@ -1599,17 +1599,62 @@ func _check_bounds(p: Player = null) -> void:
 			_crash("Du ramlade av bron!" if above_deck < -0.5 else "Rakt in i broräcket!", p)
 		return
 	if outside <= _field.side_margin(d): return
+	_hit_side(p, d, outside - _field.side_margin(d))
+
+
+## Riding into the course's side limit (where the net shows), judged like any
+## other collision: by how fast you close on it, softened by the ride's
+## protection. A gentle touch bounces you back in, a firmer one throws you off
+## balance, and only a hard hit crashes. `depth` is how far past it you are.
+func _hit_side(p: Player, d: float, depth: float) -> void:
+	var side := signf(p.sled.position.x - _field.center_x(d))
+	var track := _field.track_dir(d)
+	var outward := Vector3(-track.z, 0.0, track.x).normalized() * side
+	# Where the course narrows the limit closes in on you too.
+	var limit := _field.half_width(d) + _field.side_margin(d)
+	var limit_ahead := _field.half_width(d + 1.0) + _field.side_margin(d + 1.0)
+	var travel := p.sled.travel_velocity()
+	var closing := maxf(travel.dot(outward) + (limit - limit_ahead) * maxf(-travel.z, 0.0), 0.0)
+	var severity := closing / p.sled.spec.protection
+	if severity >= CRASH_SEVERITY and not _no_crash:
+		_crash(_side_crash_line(_field.region(d)), p)
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	var fresh := now - p.side_bump_at > 0.4
+	p.side_bump_at = now
+	# Turned a little away from the side, so holding on into it isn't a
+	# string of bumps.
+	var away := -side * 0.2
+	if severity >= WIPEOUT_SEVERITY:
+		p.sled.knock(-outward, closing * 1.2, depth + 0.05, away * 3.0)
+		p.sled.velocity *= 0.6
+		p.sled.bounce(1.5)
+		_sound.play("oops", 0.0, 0.9)
+		_sound.play("land", 2.0, 0.8)
+		p.camera.add_shake(0.6)
+		p.rumble(0.6, 0.6, 0.3)
+		p.say(WIPEOUT_LINES[_rng.randi_range(0, WIPEOUT_LINES.size() - 1)], Hud.WARM, 52)
+	else:
+		# Scraping along costs a little speed, a square knock more.
+		p.sled.knock(-outward, closing * 1.3 + 0.5, depth + 0.05, away)
+		p.sled.velocity *= 1.0 - minf(closing * 0.03, 0.2)
+		if fresh:
+			_sound.play("land", -4.0, 1.2)
+			p.camera.add_shake(clampf(severity * 0.08, 0.1, 0.35))
+			p.rumble(0.3, 0.2, 0.1)
+
+
+func _side_crash_line(kind: TerrainField.Region) -> String:
 	match kind:
 		TerrainField.Region.MALL:
-			_crash(["Rakt in i skyltfönstret!", "Du provade en tröja. Med ansiktet.", "Öppet köp gäller inte."][_rng.randi_range(0, 2)], p)
+			return ["Rakt in i skyltfönstret!", "Du provade en tröja. Med ansiktet.", "Öppet köp gäller inte."][_rng.randi_range(0, 2)]
 		TerrainField.Region.BANDY:
-			_crash(["In i sargen!", "Utvisning, tio minuter!"][_rng.randi_range(0, 1)], p)
+			return ["In i sargen!", "Utvisning, tio minuter!"][_rng.randi_range(0, 1)]
 		TerrainField.Region.WOODS:
-			_crash(["In i granskogen!", "Barr överallt.", "Skogen tog dig."][_rng.randi_range(0, 2)], p)
+			return ["In i granskogen!", "Barr överallt.", "Skogen tog dig."][_rng.randi_range(0, 2)]
 		TerrainField.Region.TOWN:
-			_crash(["Rakt in i skyltfönstret!", "Du handlade lite på vägen.", "Butiken har stängt. Nu."][_rng.randi_range(0, 2)], p)
-		_:
-			_crash("Vilse i villaområdet!", p)
+			return ["Rakt in i skyltfönstret!", "Du handlade lite på vägen.", "Butiken har stängt. Nu."][_rng.randi_range(0, 2)]
+	return "Vilse i villaområdet!"
 
 
 func _check_pickups(p: Player = null) -> void:

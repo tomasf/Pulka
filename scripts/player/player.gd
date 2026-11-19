@@ -32,6 +32,9 @@ var finish_time := -1.0
 var vehicle := 0
 ## Race time of the last "Bakvind!" call-out, so it is not repeated.
 var draft_said := -100.0
+## When this player last bumped the side of the course (seconds, engine
+## clock), so leaning on it doesn't repeat the thud every frame.
+var side_bump_at := -100.0
 
 
 func _init(number: int, ride: Sled, view: ChaseCamera, input: PlayerControls) -> void:

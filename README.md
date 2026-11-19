@@ -40,7 +40,9 @@ Kör utan `--headless` och lägg till `--capture` för spelbilder och en jämfö
 som kontrollerar att utomhusbildens ljus inte ändras när den andra går in.
 
 Ett genomskinligt säkerhetsnät tonar fram nära osynliga sidogränser och följer
-den faktiska kraschgränsen längs terrängen. Det förvarnar även när man är på väg
+den faktiska gränsen längs terrängen. Nuddar man nätet i låg fart studsar man
+tillbaka in på banan; en hårdare stöt får en att tappa balansen och bara en
+riktigt hård träff blir en krasch. Nätet förvarnar även när man är på väg
 mot en snävare region och tonar bort när man styr tillbaka. Varje spelare ser
 sitt eget nät; synliga väggar och räcken behåller sina vanliga markeringar.
 Testa gränser, toning och separata vyer med

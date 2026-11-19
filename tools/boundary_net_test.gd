@@ -1,5 +1,5 @@
 extends SceneTree
-## Real crash limits, gradual reveal, terrain alignment and per-camera nets.
+## Real limits (a gentle touch bounces back, a hard hit crashes), gradual reveal, terrain alignment and per-camera nets.
 ## Native --capture writes solo/split review images and checks render isolation.
 var failures := 0
 
@@ -28,9 +28,18 @@ func _run() -> void:
 			_check("inside the warning net is in bounds", not p.sled.crashed)
 			p.boundary_net.update_net(field, p.sled, 1, true)
 			_check("the approached side reveals its net", p.boundary_net.strength[0 if side < 0 else 1] > 0.99)
-			p.sled.place_at(d, side * (bounds.y + 0.05))
+			# Drifting into the net slowly bounces you back in.
+			p.sled.place_at(d, side * (bounds.y + 0.05), 6.0)
+			p.sled.velocity.x = side * 2.0
 			main.call("_check_bounds", p)
-			_check("crossing that same net triggers the real crash", p.sled.crashed)
+			var track := field.track_dir(d)
+			var outward: Vector3 = Vector3(-track.z, 0.0, track.x).normalized() * side
+			_check("touching that same net gently bounces back", not p.sled.crashed and p.sled.velocity.dot(outward) < 0.0 and absf(p.sled.position.x - field.center_x(d)) < bounds.y)
+			# Hitting it hard is the real crash.
+			p.sled.place_at(d, side * (bounds.y + 0.05), 6.0)
+			p.sled.velocity.x = side * 14.0
+			main.call("_check_bounds", p)
+			_check("hitting that same net hard triggers the real crash", p.sled.crashed)
 		p.sled.place_at(d, 0)
 		var before := maxf(p.boundary_net.strength.x, p.boundary_net.strength.y)
 		p.boundary_net.update_net(field, p.sled, 1.0 / 60, true)
