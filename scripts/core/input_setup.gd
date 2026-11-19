@@ -27,6 +27,8 @@ static func configure() -> void:
 	_action(&"fullscreen", [_key(KEY_F11), _key(KEY_F)])
 	if Quality.is_tv():
 		_add_siri_remote()
+	# Menus read the sticks through StickNavigator, which can't flicker.
+	StickNavigator.claim_actions()
 
 
 ## The Siri Remote: swiping or holding an edge of the clickpad steers, a

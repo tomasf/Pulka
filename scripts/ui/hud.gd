@@ -85,8 +85,13 @@ var _pause: Control
 var _over: Control
 var _over_title: Label
 var _over_cause: Label
-var _over_body: Label
+## One row per result line (a stat, or a racer and their time).
+var _over_rows: VBoxContainer
 var _over_record: Label
+## The result dialog's parts that move with its content's height.
+var _over_panel: Panel
+var _over_column: VBoxContainer
+var _over_buttons: Array[Button] = []
 var _time := 0.0
 
 var _settings: Control
@@ -108,7 +113,6 @@ var _lobby_bar: Control
 ## shows menus, pause and results.
 var racing := false
 var _touch_mode := false
-var _last_row_first: Button
 ## The button each screen focuses first, for keyboard and controller play.
 var _default_focus: Dictionary = {}
 
@@ -224,39 +228,13 @@ func _dim(parent: Control, alpha: float) -> void:
 	_backdrops.append(shade)
 
 
-func _centered_column(parent: Control, separation := 14) -> VBoxContainer:
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(center)
-	var column := VBoxContainer.new()
-	column.alignment = BoxContainer.ALIGNMENT_CENTER
-	column.add_theme_constant_override("separation", separation)
-	center.add_child(column)
-	return column
-
-
 func _button(text: String, action: StringName, font_size := 34, accent := false, focusable := true) -> Button:
 	var button := Button.new()
 	button.text = text
+	button.accessibility_name = text
 	button.focus_mode = Control.FOCUS_ALL if focusable else Control.FOCUS_NONE
+	MenuFlow.skin(button, accent)
 	button.add_theme_font_size_override("font_size", font_size)
-	button.add_theme_color_override("font_color", INK if accent else Color(1, 1, 1))
-	button.add_theme_color_override("font_hover_color", INK if accent else WARM)
-	button.add_theme_color_override("font_pressed_color", INK)
-	for state in ["normal", "hover", "pressed"]:
-		var box := StyleBoxFlat.new()
-		var base := WARM if accent else Color(0.08, 0.1, 0.22, 0.65)
-		box.bg_color = base.lightened(0.15) if state == "hover" else (WARM if state == "pressed" else base)
-		box.border_color = Color(1, 1, 1, 0.5)
-		box.set_border_width_all(2)
-		box.set_corner_radius_all(16)
-		box.content_margin_left = 26
-		box.content_margin_right = 26
-		box.content_margin_top = 8
-		box.content_margin_bottom = 10
-		button.add_theme_stylebox_override(state, box)
-	button.add_theme_stylebox_override("focus", MenuFlow.focus_ring(button.get_theme_stylebox("normal") as StyleBoxFlat, WARM if not accent else Color.WHITE, 6.0, 5))
 	button.pressed.connect(func() -> void: pressed.emit(action))
 	return button
 
@@ -435,8 +413,7 @@ func _build_menu() -> void:
 
 func _build_lobby_bar() -> void:
 	_lobby_bar = _full_rect()
-	var back := _button("‹  Spelare", &"players", 24)
-	MenuFlow.skin(back)
+	var back := _button("‹  Spelare", &"players", 26)
 	back.position = Vector2(30, 24)
 	_lobby_bar.add_child(back)
 	var title := MenuFlow.caption("PULKA!", 40, Color.WHITE, true)
@@ -447,7 +424,6 @@ func _build_lobby_bar() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_lobby_bar.add_child(title)
 	var settings := _button("⚙", &"settings", 26)
-	MenuFlow.skin(settings)
 	settings.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	settings.offset_left = -110
 	settings.offset_right = -30
@@ -530,77 +506,143 @@ func _build_pause() -> void:
 	_pause = _full_rect()
 	_dim(_pause, 0.64)
 	var canvas := _dialog_canvas(_pause)
-	_dialog_panel(canvas, Rect2(450, 166, 700, 542))
-	_dialog_label(canvas, "PULKA!", 20, Vector2(490, 197), MenuFlow.LIME, true)
-	_dialog_label(canvas, "Paus", 76, Vector2(486, 233), MenuFlow.WHITE, true)
-	var resume := _dialog_button(canvas, "Fortsätt", &"resume", Rect2(490, 358, 620, 84), true)
-	var retry := _dialog_button(canvas, "Börja om", &"retry", Rect2(490, 460, 300, 72))
-	var settings := _dialog_button(canvas, "Inställningar", &"settings", Rect2(810, 460, 300, 72))
-	var menu := _dialog_button(canvas, "Till menyn", &"menu", Rect2(490, 550, 620, 64))
+	_dialog_panel(canvas, Rect2(450, 193, 700, 488))
+	_dialog_label(canvas, "PULKA!", 20, Vector2(490, 224), MenuFlow.LIME, true)
+	_dialog_label(canvas, "Paus", 76, Vector2(486, 260), MenuFlow.WHITE, true)
+	var resume := _dialog_button(canvas, "Fortsätt", &"resume", Rect2(490, 385, 620, 84), true)
+	var retry := _dialog_button(canvas, "Börja om", &"retry", Rect2(490, 487, 300, 72))
+	var settings := _dialog_button(canvas, "Inställningar", &"settings", Rect2(810, 487, 300, 72))
+	var menu := _dialog_button(canvas, "Till menyn", &"menu", Rect2(490, 577, 620, 64))
 	var arrow := MenuFlow.caption("→", 30, MenuFlow.NIGHT)
 	arrow.position = Vector2(564, 18)
 	resume.add_child(arrow)
-	# Keep the ordered actions reachable both vertically and horizontally.
-	var buttons: Array[Button] = [resume, retry, settings, menu]
-	for i in buttons.size():
-		var previous := buttons[posmod(i - 1, buttons.size())].get_path()
-		var next := buttons[(i + 1) % buttons.size()].get_path()
-		buttons[i].focus_neighbor_top = previous
-		buttons[i].focus_neighbor_left = previous
-		buttons[i].focus_neighbor_bottom = next
-		buttons[i].focus_neighbor_right = next
+	# Up and down move between the rows (wrapping), left and right only
+	# within the middle row; a wide button stays put sideways.
+	_link_grid([[resume], [retry, settings], [menu]])
 	_default_focus[_pause] = resume
+
+
+## Wires focus for rows of buttons laid out top to bottom: up/down go to the
+## row above or below (wrapping round, to the button in the same column where
+## there is one), left/right stay within a row and stop at its ends.
+func _link_grid(rows: Array) -> void:
+	for r in rows.size():
+		var row: Array = rows[r]
+		var above: Array = rows[posmod(r - 1, rows.size())]
+		var below: Array = rows[(r + 1) % rows.size()]
+		for c in row.size():
+			var button: Button = row[c]
+			button.focus_neighbor_top = (above[mini(c, above.size() - 1)] as Button).get_path()
+			button.focus_neighbor_bottom = (below[mini(c, below.size() - 1)] as Button).get_path()
+			button.focus_neighbor_left = (row[maxi(c - 1, 0)] as Button).get_path()
+			button.focus_neighbor_right = (row[mini(c + 1, row.size() - 1)] as Button).get_path()
 
 
 func _build_game_over() -> void:
 	_over = _full_rect()
-	_dim(_over, 0.45)
-	var column := _centered_column(_over, 18)
-	_over_cause = label("", 40, HOT, 12)
-	_over_cause.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_over_cause)
-	_over_title = label("", 84, WARM, 20)
-	_over_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_over_title)
-	_over_body = label("", 40, Color(1, 1, 1), 10)
-	_over_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(_over_body)
-	_over_record = label("NYTT REKORD!", 60, HOT, 16)
+	_dim(_over, 0.6)
+	var canvas := _dialog_canvas(_over)
+	_dialog_panel(canvas, Rect2(450, 140, 700, 620))
+	_over_panel = canvas.get_child(canvas.get_child_count() - 1) as Panel
+	_over_column = VBoxContainer.new()
+	_over_column.size = Vector2(620, 0)
+	_over_column.add_theme_constant_override("separation", 6)
+	canvas.add_child(_over_column)
+	var brand := MenuFlow.caption("PULKA!", 20, MenuFlow.LIME, true)
+	_over_column.add_child(brand)
+	_over_cause = MenuFlow.caption("", 24, MenuFlow.CORAL)
+	_over_cause.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_over_cause.custom_minimum_size = Vector2(620, 0)
+	_over_column.add_child(_over_cause)
+	_over_title = MenuFlow.caption("", 46, MenuFlow.WHITE, true)
+	_over_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_over_title.custom_minimum_size = Vector2(620, 0)
+	_over_title.add_theme_constant_override("line_spacing", -16)
+	_over_column.add_child(_over_title)
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0, 18)
+	_over_column.add_child(gap)
+	_over_rows = VBoxContainer.new()
+	_over_rows.add_theme_constant_override("separation", 10)
+	_over_column.add_child(_over_rows)
+	_over_record = MenuFlow.caption("NYTT REKORD!", 22, MenuFlow.NIGHT, true)
 	_over_record.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_over_record.pivot_offset = Vector2(300, 30)
-	column.add_child(_over_record)
-	column.add_child(_button_row([["Åk igen", &"retry", true], ["Meny", &"menu", false]]))
-	_default_focus[_over] = _last_row_first
+	_over_record.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var badge := MenuFlow.style(MenuFlow.LIME, Color.TRANSPARENT, 18)
+	badge.content_margin_top = 4
+	badge.content_margin_bottom = 4
+	_over_record.add_theme_stylebox_override("normal", badge)
+	_over_record.size = Vector2(220, 40)
+	_over_record.pivot_offset = _over_record.size * 0.5
+	canvas.add_child(_over_record)
+	var again := _dialog_button(canvas, "Åk igen", &"retry", Rect2(490, 650, 380, 80), true)
+	var arrow := MenuFlow.caption("→", 30, MenuFlow.NIGHT)
+	arrow.position = Vector2(330, 16)
+	again.add_child(arrow)
+	var menu := _dialog_button(canvas, "Till menyn", &"menu", Rect2(890, 650, 220, 80))
+	_over_buttons = [again, menu]
+	_link_grid([[again, menu]])
+	_default_focus[_over] = again
 
 
-## A centred row of buttons from [text, action, accent] entries.
-func _button_row(entries: Array) -> CenterContainer:
-	var center := CenterContainer.new()
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 24)
-	for entry: Array in entries:
-		row.add_child(_button(entry[0], entry[1], 34, entry[2]))
-	center.add_child(row)
-	_last_row_first = row.get_child(0) as Button
-	return center
+## Fits the result dialog round its content and centres it on screen.
+func _layout_over() -> void:
+	var content := _over_column.get_combined_minimum_size().y
+	var height := 40.0 + content + 40.0 + 80.0 + 40.0
+	var top := (MenuFlow.DESIGN.y - height) * 0.5
+	_over_panel.position = Vector2(450, top)
+	_over_panel.size = Vector2(700, height)
+	_over_column.position = Vector2(490, top + 30.0)
+	_over_record.position = Vector2(890, top + 26.0)
+	for button in _over_buttons:
+		button.position.y = top + height - 40.0 - 80.0
 
 
-## Results of a two-player race: who won, and each rider's time.
-func show_race_result(title: String, body: String) -> void:
-	_over_cause.visible = false
+## Fills the result rows from [label, value, label colour] entries.
+func _set_over_rows(rows: Array) -> void:
+	for child in _over_rows.get_children():
+		_over_rows.remove_child(child)
+		child.queue_free()
+	for entry: Array in rows:
+		var panel := PanelContainer.new()
+		panel.custom_minimum_size = Vector2(620, 68)
+		panel.add_theme_stylebox_override("panel", MenuFlow.style(MenuFlow.PANEL, Color(1, 1, 1, 0.06), 16))
+		var row := HBoxContainer.new()
+		panel.add_child(row)
+		var name := MenuFlow.caption(entry[0], 26, entry[2] if entry.size() > 2 else MenuFlow.MUTED)
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.add_child(name)
+		var value := MenuFlow.caption(entry[1], 30, MenuFlow.WHITE, true)
+		value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.add_child(value)
+		_over_rows.add_child(panel)
+
+
+## Results of a two-player race: who won, and a row per rider as
+## [place and name, time or distance left, rider colour].
+func show_race_result(title: String, rows: Array) -> void:
+	_over_cause.text = "Målgång"
+	_over_cause.add_theme_color_override("font_color", MenuFlow.ICE)
 	_over_title.text = title
-	_over_body.text = body
+	_set_over_rows(rows)
 	_over_record.visible = false
+	_layout_over()
 	show_screen("over", 0.8)
 
 
 ## `cause` is the line from the final crash, shown above the title.
 func show_game_over(title: String, cause: String, distance: float, score: int, best_distance: float, record: bool) -> void:
 	_over_cause.text = cause
-	_over_cause.visible = cause != ""
+	_over_cause.add_theme_color_override("font_color", MenuFlow.CORAL)
 	_over_title.text = title
-	_over_body.text = "Du åkte %s m\n%s poäng\nRekord: %s m" % [group_digits(int(distance)), group_digits(score), group_digits(int(best_distance))]
+	_set_over_rows([
+		["Sträcka", "%s m" % group_digits(int(distance))],
+		["Poäng", group_digits(score)],
+		["Rekord", "%s m" % group_digits(int(best_distance))],
+	])
 	_over_record.visible = record
+	_layout_over()
 	show_screen("over", 0.8)
 
 

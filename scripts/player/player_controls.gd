@@ -15,6 +15,9 @@ var keys := Keys.ALL
 var pad := -1
 var _jump_held := false
 var _jumped := false
+## Keys and d-pad as -1/0/1, and the step they made this frame (menus).
+var _digital := 0
+var _digital_step := 0
 
 
 static func everything() -> PlayerControls:
@@ -58,6 +61,19 @@ func poll() -> void:
 	var held := _jump_down()
 	_jumped = held and not _jump_held
 	_jump_held = held
+	var digital := int(signf(_digital_axis()))
+	_digital_step = digital if digital != _digital else 0
+	_digital = digital
+
+
+## A left/right step in a menu this frame: a key or d-pad press, or this
+## player's stick through `sticks` (which can't flicker on the edge).
+func menu_step(sticks: StickNavigator) -> int:
+	if _digital_step != 0:
+		return _digital_step
+	if pad >= 0:
+		return sticks.tap(pad).x
+	return sticks.any_tap().x if keys == Keys.ALL else 0
 
 
 func steer() -> float:
@@ -109,6 +125,24 @@ func _jump_down() -> bool:
 	if (keys == Keys.KEYBOARD or keys == Keys.RIGHT) and (Input.is_physical_key_pressed(KEY_ENTER) or Input.is_physical_key_pressed(KEY_KP_ENTER)):
 		return true
 	return pad >= 0 and Input.is_joy_button_pressed(pad, JOY_BUTTON_A)
+
+
+## This player's keys and d-pad only (no stick).
+func _digital_axis() -> float:
+	var value := 0.0
+	if keys == Keys.ALL or keys == Keys.KEYBOARD:
+		value += _key_axis([KEY_A, KEY_LEFT], [KEY_D, KEY_RIGHT])
+	elif keys == Keys.LEFT:
+		value += _key_axis([KEY_A], [KEY_D])
+	elif keys == Keys.RIGHT:
+		value += _key_axis([KEY_LEFT], [KEY_RIGHT])
+	var pads: Array = [pad] if pad >= 0 else (Input.get_connected_joypads() if keys == Keys.ALL else [])
+	for device: int in pads:
+		if Input.is_joy_button_pressed(device, JOY_BUTTON_DPAD_LEFT):
+			value -= 1.0
+		if Input.is_joy_button_pressed(device, JOY_BUTTON_DPAD_RIGHT):
+			value += 1.0
+	return value
 
 
 static func _key_axis(negative: Array, positive: Array) -> float:

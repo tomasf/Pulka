@@ -44,6 +44,8 @@ func _run() -> void:
 	var sled: Sled = main.get("_sled")
 	var stopped := sled.position
 	await _tick(20)
+	# The fade runs on real time, which headless frames outrun.
+	await create_timer(0.25, true).timeout
 	_check("pause fades in while the tree is paused", paused and hud._pause.visible and hud._pause.modulate.a > 0.99)
 	_check("pause focuses Continue", root.gui_get_focus_owner() is Button and root.gui_get_focus_owner().text == "Fortsätt")
 	await _shot("pause")

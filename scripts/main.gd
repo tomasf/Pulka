@@ -126,6 +126,8 @@ var _start_d := START_D
 var _start_event := ""
 var _director: EventDirector
 var _touch: TouchControls
+## Clean menu presses from the gamepad sticks.
+var _sticks: StickNavigator
 var _start_vehicle := -1
 ## Testing aid: a kind of obstacle made common (Obstacle.Kind), or -1.
 var _spawn_kind := -1
@@ -139,7 +141,6 @@ var _race_time := 0.0
 ## Seconds left for the second rider once the first is home, or -1.
 var _grace := -1.0
 var _ready_flags: Array[bool] = [false, false]
-var _lobby_steer: Array[float] = [0.0, 0.0]
 var _split: CanvasLayer
 var _finish_line: Node3D
 
@@ -160,6 +161,8 @@ var _lives: int:
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	InputSetup.configure()
+	_sticks = StickNavigator.new()
+	add_child(_sticks)
 	_parse_args()
 	var device_profile := OS.get_environment("PULKA_DEVICE_PROFILE") == "1"
 	if device_profile:
@@ -726,7 +729,6 @@ func _enter_lobby() -> void:
 	_director.stop()
 	state = State.LOBBY
 	_ready_flags = [false, false]
-	_lobby_steer = [0.0, 0.0]
 	for p in _players:
 		p.sled.set_vehicle(_specs[p.vehicle], _rng, Player.COLORS[p.index])
 		p.sled.frozen = true
@@ -753,14 +755,9 @@ func _update_lobby(delta: float) -> void:
 		_back_to_solo()
 		return
 	for p in _players:
-		var steer := p.controls.steer()
-		var was := _lobby_steer[p.index]
-		_lobby_steer[p.index] = steer
-		if not _ready_flags[p.index]:
-			if steer < -0.6 and was >= -0.6:
-				_pick(p, -1)
-			elif steer > 0.6 and was <= 0.6:
-				_pick(p, 1)
+		var step := p.controls.menu_step(_sticks)
+		if step != 0 and not _ready_flags[p.index]:
+			_pick(p, step)
 		if p.controls.jump():
 			_ready_flags[p.index] = not _ready_flags[p.index]
 			_sound.play("beep" if _ready_flags[p.index] else "whoosh", -4.0, 1.3)
@@ -1059,11 +1056,11 @@ func _end_race() -> void:
 	order.sort_custom(func(a: Player, b: Player) -> bool: return _place_of(a) < _place_of(b))
 	var winner: Player = order[0]
 	var goal := _start_d + _race_length
-	var lines: Array[String] = []
+	var rows := []
 	for p: Player in order:
 		var result := _race_clock(p.finish_time) if p.finished() else "%s m kvar" % Hud.group_digits(int(goal - p.sled.distance()))
-		lines.append("%d. Spelare %d – %s" % [_place_of(p), p.index + 1, result])
-	_hud.show_race_result("Spelare %d vinner!" % (winner.index + 1), "\n".join(lines))
+		rows.append(["%d. Spelare %d" % [_place_of(p), p.index + 1], result, Player.COLORS[p.index]])
+	_hud.show_race_result("Spelare %d vinner!" % (winner.index + 1), rows)
 	_sound.set_music_ducked(true)
 	_input_cooldown = 0.8
 
