@@ -166,6 +166,7 @@ var _lives: int:
 
 
 func _ready() -> void:
+	ShaderWarmup.start()
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	InputSetup.configure()
 	_sticks = StickNavigator.new()

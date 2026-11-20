@@ -124,6 +124,15 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute("res://generated/world_meshes")
 	var error := ResourceSaver.save(archive, Props.BAKED_WORLD, ResourceSaver.FLAG_COMPRESS)
 	assert(error == OK, error_string(error))
+	# Loaded first at startup so every shader compiles before meshes arrive.
+	var materials := Resource.new()
+	var found: Array[Material] = []
+	for meta in archive.get_meta_list():
+		ShaderWarmup.collect_materials(archive.get_meta(meta), found)
+	materials.set_meta("materials", found)
+	error = ResourceSaver.save(materials, ShaderWarmup.BAKED_MATERIALS, ResourceSaver.FLAG_COMPRESS)
+	assert(error == OK, error_string(error))
+	print("Warmup materials: ", found.size())
 	# Verify that serialization preserves rendered vertex/index data and the
 	# material-name metadata used to dress each crowd member individually.
 	var loaded: Resource = ResourceLoader.load(Props.BAKED_WORLD, "", ResourceLoader.CACHE_MODE_IGNORE)
