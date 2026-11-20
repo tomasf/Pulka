@@ -1256,7 +1256,7 @@ func _on_hud_pressed(action: StringName) -> void:
 			if state == State.SELECT:
 				_start_run()
 		&"duo":
-			if state == State.MENU and not Quality.is_mobile():
+			if state == State.MENU and PlayerControls.two_can_play():
 				_two_players = true
 				_sound.play("whoosh", -6.0, 1.2)
 				_enter_lobby()

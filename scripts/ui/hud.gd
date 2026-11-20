@@ -466,6 +466,7 @@ func _note_y(row: int) -> float:
 func _build_menu() -> void:
 	_menu = MenuFlow.new()
 	add_child(_menu)
+	_backdrops.append(_menu.backdrop)
 	_menu.pressed.connect(func(action: StringName) -> void: pressed.emit(action))
 
 

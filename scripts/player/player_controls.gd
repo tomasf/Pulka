@@ -27,6 +27,12 @@ static func everything() -> PlayerControls:
 	return PlayerControls.new()
 
 
+## Whether two can play right now. A touch screen cannot be shared, so
+## phones and tablets need a controller for each player.
+static func two_can_play() -> bool:
+	return not Quality.is_mobile() or Input.get_connected_joypads().size() >= 2
+
+
 ## Who gets what when two play: with two pads each player has one (and a
 ## keyboard half too); with one pad the first player has the keyboard and
 ## the second the pad; with none they share the keyboard.

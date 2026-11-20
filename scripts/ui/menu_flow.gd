@@ -27,6 +27,9 @@ var picker: Control
 ## The shared header; each player's actual picker lives in RaceHud.
 var lobby: Control
 var solo: Button
+var _duo_subtitle: Label
+var _duo_arrow: Label
+var _duo_preview: Control
 var duo: Button
 var start: Button
 var settings: Button
@@ -45,6 +48,11 @@ var _controls_hint: InputHint
 var _touch_mode := false
 var _gamepad_mode := false
 var _background: WinterBackdrop
+## The full-screen winter backdrop, which the HUD stretches past safe-area
+## insets so the world never shows round the menu.
+var backdrop: Control:
+	get:
+		return _background
 var _picker_shade: TextureRect
 var _picker_fill: ColorRect
 var _transition: Tween
@@ -357,6 +365,7 @@ func _ready() -> void:
 	_background = WinterBackdrop.new()
 	_background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_background.resized.connect(func() -> void: _background.pivot_offset = _background.size * 0.5)
 	add_child(_background)
 	canvas = Control.new()
 	canvas.size = DESIGN
@@ -410,15 +419,16 @@ func _fit() -> void:
 	if fit <= 0.0: return
 	canvas.scale = Vector2.ONE * fit
 	canvas.position = (size - DESIGN * fit) * 0.5
-	_background.pivot_offset = size * 0.5
 	if is_instance_valid(_picker_shade):
 		# Keep the existing fade beside the text; continue its leftmost tint
-		# across the extra viewport space outside the fitted design canvas.
-		var extra := canvas.position / fit
-		var height := DESIGN.y + extra.y * 2.0
-		_picker_fill.position = -extra
-		_picker_fill.size = Vector2(extra.x, height)
-		_picker_shade.position.y = -extra.y
+		# across the extra viewport space outside the fitted design canvas,
+		# and past any safe-area inset the HUD gives the menu.
+		var before := (canvas.position + Vector2(offset_left, offset_top)) / fit
+		var below := (canvas.position.y - offset_bottom) / fit
+		var height := DESIGN.y + before.y + below
+		_picker_fill.position = -before
+		_picker_fill.size = Vector2(before.x, height)
+		_picker_shade.position.y = -before.y
 		_picker_shade.size.y = height
 
 
@@ -453,8 +463,8 @@ func _build_players() -> void:
 	_text(players, "Snö i nacken. Ett åk till.", 26, Vector2(126, 521), ICE)
 	solo = _player_card(1, Vector2(756, 234))
 	duo = _player_card(2, Vector2(1108, 278))
-	duo.disabled = Quality.is_mobile()
-	duo.tooltip_text = "Två spelare på samma skärm" if not duo.disabled else "Två spelare kräver tangentbord eller handkontroller"
+	_update_duo()
+	Input.joy_connection_changed.connect(func(_device: int, _connected: bool) -> void: _update_duo())
 	_record = _text(players, "", 19, Vector2(126, 736), MUTED)
 	solo.focus_neighbor_right = duo.get_path()
 	duo.focus_neighbor_left = solo.get_path()
@@ -470,13 +480,32 @@ func _player_card(count: int, at: Vector2) -> Button:
 	preview.position = Vector2(-10, 60)
 	preview.size = Vector2(330, 226)
 	button.add_child(preview)
+	if count == 2:
+		_duo_preview = preview
+		# Unavailable reads as see-through rather than as a different grey.
+		button.add_theme_stylebox_override("disabled", style(Color(PANEL, 0.3), Color(1, 1, 1, 0.10)))
 	_text(button, "1 spelare" if count == 1 else "2 spelare", 31, Vector2(28, 292), WHITE, true)
-	_text(button, "En oändlig backe" if count == 1 else "Först till mål", 18, Vector2(30, 340), MUTED)
+	var subtitle := _text(button, "En oändlig backe" if count == 1 else "Först till mål", 18, Vector2(30, 340), MUTED)
+	if count == 2:
+		_duo_subtitle = subtitle
 	# Right-aligned so the arrow keeps the card's 28 px right margin.
 	var arrow := _text(button, "→", 30, Vector2(222, 291), LIME)
 	arrow.size.x = 60
 	arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	if count == 2:
+		_duo_arrow = arrow
 	return button
+
+
+## On phones and tablets the duel needs two controllers; say so on the card,
+## since a disabled button otherwise just ignores taps.
+func _update_duo() -> void:
+	var available := PlayerControls.two_can_play()
+	duo.disabled = not available
+	duo.tooltip_text = "Två spelare på samma skärm" if available else "Anslut två handkontroller"
+	_duo_subtitle.text = "Först till mål" if available else "Anslut två handkontroller"
+	_duo_arrow.visible = available
+	_duo_preview.modulate.a = 1.0 if available else 0.3
 
 
 func _build_picker() -> void:

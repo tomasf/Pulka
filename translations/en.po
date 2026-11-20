@@ -21,8 +21,8 @@ msgstr "Snow down your neck. One more run."
 msgid "Två spelare på samma skärm"
 msgstr "Two players on the same screen"
 
-msgid "Två spelare kräver tangentbord eller handkontroller"
-msgstr "Two players need a keyboard or controllers"
+msgid "Anslut två handkontroller"
+msgstr "Connect two controllers"
 
 msgid "1 spelare"
 msgstr "1 player"
