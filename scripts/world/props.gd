@@ -872,6 +872,15 @@ static func town_house(variant: int) -> ArrayMesh:
 				var lit := (variant + f + i) % 3 != 0
 				var wx := -2.8 + i * 2.8
 				window(kit, Vector3(wx, 3.0 * f + 1.5, front), Vector3(0, 0, -1), Vector2(1.05, 1.4), trim, lit)
+		# The back and the gable sides show wherever a house stands on its own
+		# or at a corner, so they get windows too (the back down to the ground floor).
+		for f in floors:
+			for i in 3:
+				window(kit, Vector3(2.8 - i * 2.8, 3.0 * f + 1.5, -front), Vector3(0, 0, 1), Vector2(1.05, 1.4), trim, (variant + f + i) % 3 == 1)
+		for f in range(1, floors):
+			for sx in [-1.0, 1.0]:
+				for z in [-1.8, 1.8]:
+					window(kit, Vector3(sx * width * 0.5, 3.0 * f + 1.5, z), Vector3(sx, 0, 0), Vector2(1.05, 1.4), trim, (variant + f + int(z + sx * 3.0)) % 3 == 0)
 		var roof_h := 3.0
 		var roof := Color(0.45, 0.16, 0.12) if variant % 2 == 0 else Color(0.22, 0.22, 0.26)
 		kit.prism(Vector3(depth + 0.8, roof_h, width + 0.2), Vector3(0, wall_h + roof_h * 0.5, 0), roof, Vector3(0, PI / 2, 0))

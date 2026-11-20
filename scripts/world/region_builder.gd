@@ -540,7 +540,7 @@ func _place_roofs(chunk: Chunk, decor: Dictionary, lo: float, hi: float, span: V
 		for side in [-1.0, 1.0]:
 			var x: float = field.center_x(d) + side * 29.0
 			var y := field.height(x, d, false, false)
-			world.add_decor(decor, Props.town_house(int(field.hash01(int(d), int(side)) * 11)), Transform3D(Basis(Vector3.UP, -side * PI / 2), Vector3(x, y, -d)))
+			world.add_decor(decor, Props.town_house(int(field.hash01(int(d), int(side)) * 11)), Transform3D(Basis(Vector3.UP, side * PI / 2), Vector3(x, y, -d)))
 		d += 30
 
 

@@ -88,6 +88,22 @@ class InputHint extends HBoxContainer:
 				var kind: String = part[0]
 				var key: String = part[1]
 				var height := roundf(points * 1.65)
+				if kind == "pad":
+					var button := PadIcon.new()
+					button.letter = key
+					button.points = points
+					button.custom_minimum_size = Vector2(height, height)
+					button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+					add_child(button)
+					spoken.append(key)
+					continue
+				if kind == "stick":
+					var stick := StickIcon.new()
+					stick.custom_minimum_size = Vector2(height, height)
+					stick.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+					add_child(stick)
+					spoken.append(TranslationServer.translate("spak"))
+					continue
 				var cap := PanelContainer.new()
 				cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				cap.custom_minimum_size = Vector2(height, height)
@@ -96,19 +112,15 @@ class InputHint extends HBoxContainer:
 				surface.border_color = Color(1, 1, 1, 0.5)
 				surface.set_border_width_all(1)
 				surface.border_width_bottom = 2
-				surface.set_corner_radius_all(int(height * 0.5) if kind == "pad" else 5)
+				surface.set_corner_radius_all(5)
 				surface.content_margin_left = 7 if key.length() > 1 else 3
 				surface.content_margin_right = surface.content_margin_left
 				cap.add_theme_stylebox_override("panel", surface)
-				if kind == "stick":
-					cap.add_child(StickIcon.new())
-					spoken.append(TranslationServer.translate("spak"))
-				else:
-					var glyph := MenuFlow.caption("↵" if key == "Enter" else key, points)
-					glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-					glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-					cap.add_child(glyph)
-					spoken.append(key)
+				var glyph := MenuFlow.caption("↵" if key == "Enter" else key, points)
+				glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				cap.add_child(glyph)
+				spoken.append(key)
 				add_child(cap)
 		accessibility_name = " ".join(spoken)
 
@@ -132,13 +144,39 @@ class InputHint extends HBoxContainer:
 		set_parts(parts, 15)
 
 
+## An analog stick seen from above, standing on its own (no keycap) and
+## scaled to its box: the well as a ring, the thumb cap nudged forward.
 class StickIcon extends Control:
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 	func _draw() -> void:
 		var center := size * 0.5
-		draw_arc(center, 7, 0, TAU, 24, WHITE, 1.3, true)
-		draw_circle(center + Vector2(0, -2), 3.5, WHITE)
+		var radius := minf(size.x, size.y) * 0.5
+		# Same well as PadIcon's button, so the two hints weigh the same.
+		draw_circle(center, radius - 0.5, Color(1, 1, 1, 0.09), true, -1.0, true)
+		draw_arc(center, radius - 0.75, 0, TAU, 64, Color(1, 1, 1, 0.5), 1.5, true)
+		draw_circle(center + Vector2(0, -radius * 0.32), radius * 0.38, WHITE, true, -1.0, true)
+
+
+## A round controller button, drawn rather than a StyleBoxFlat: a stadium box
+## leaves bright seams where its corner arcs meet, and a keycap's thicker bottom
+## edge pushes the letter off centre. The letter is centred on its cap height.
+class PadIcon extends Control:
+	## Nunito's cap height, in em.
+	const CAP_HEIGHT := 0.705
+	var letter := ""
+	var points := 17
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+	func _draw() -> void:
+		var center := size * 0.5
+		var radius := minf(size.x, size.y) * 0.5
+		draw_circle(center, radius - 0.5, Color(1, 1, 1, 0.09), true, -1.0, true)
+		draw_arc(center, radius - 0.75, 0, TAU, 64, Color(1, 1, 1, 0.5), 1.5, true)
+		var font := MenuFlow.font()
+		var width := font.get_string_size(letter, HORIZONTAL_ALIGNMENT_LEFT, -1, points).x
+		var baseline := Vector2(center.x - width * 0.5, center.y + points * CAP_HEIGHT * 0.5)
+		draw_string(font, baseline, letter, HORIZONTAL_ALIGNMENT_LEFT, -1, points, WHITE)
 
 
 class WinterBackdrop extends Control:
@@ -240,11 +278,16 @@ static func caption(text: String, points: int, tint := WHITE, display := false) 
 	return label
 
 
+## A translucent border would show the backdrop instead of the surface, and
+## where its anti-aliased inner edge overlaps the fill's it leaves a bright
+## seam. So the border is the fill with the tint mixed in, as opaque as the fill.
 static func style(fill: Color, border := Color.TRANSPARENT, radius := 20) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = fill
-	box.border_color = border
-	box.set_border_width_all(2)
+	if border.a > 0.0:
+		var edge := Color(fill, 1.0).blend(border)
+		box.border_color = Color(edge, fill.a)
+		box.set_border_width_all(2)
 	box.set_corner_radius_all(radius)
 	box.content_margin_left = 22
 	box.content_margin_right = 22
@@ -413,7 +456,6 @@ func _build_players() -> void:
 	duo.disabled = Quality.is_mobile()
 	duo.tooltip_text = "Två spelare på samma skärm" if not duo.disabled else "Två spelare kräver tangentbord eller handkontroller"
 	_record = _text(players, "", 19, Vector2(126, 736), MUTED)
-	_text(players, "Välj ditt sällskap. Resten går utför.", 17, Vector2(948, 818), MUTED)
 	solo.focus_neighbor_right = duo.get_path()
 	duo.focus_neighbor_left = solo.get_path()
 
@@ -430,7 +472,10 @@ func _player_card(count: int, at: Vector2) -> Button:
 	button.add_child(preview)
 	_text(button, "1 spelare" if count == 1 else "2 spelare", 31, Vector2(28, 292), WHITE, true)
 	_text(button, "En oändlig backe" if count == 1 else "Först till mål", 18, Vector2(30, 340), MUTED)
-	_text(button, "↗", 30, Vector2(252, 291), LIME)
+	# Right-aligned so the arrow keeps the card's 28 px right margin.
+	var arrow := _text(button, "→", 30, Vector2(222, 291), LIME)
+	arrow.size.x = 60
+	arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	return button
 
 
@@ -458,7 +503,6 @@ func _build_picker() -> void:
 	_picker_details.size = DESIGN
 	_picker_details.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	picker.add_child(_picker_details)
-	_text(_picker_details, "DITT ÅK BÖRJAR HÄR", 16, Vector2(84, 198), LIME)
 	_name = _text(_picker_details, "Pulka", 76, Vector2(80, 228), WHITE, true)
 	_tagline = _text(_picker_details, "Den röda klassikern.", 25, Vector2(84, 332), ICE)
 	for i in 3:

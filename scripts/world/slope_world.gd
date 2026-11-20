@@ -498,8 +498,8 @@ func _place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator,
 		while d < d1:
 			if not field.near_road(d, 3.0):
 				var hw := field.half_width(d)
-				add_decor(decor, Props.lamp_post(), ground_xform(field.center_x(d) + hw + 4.0, d, -PI / 2.0))
-				add_decor(decor, Props.lamp_post(), ground_xform(field.center_x(d) - hw - 4.0, d, PI / 2.0))
+				add_decor(decor, Props.lamp_post(), ground_xform(field.center_x(d) + hw + 4.0, d, PI / 2.0))
+				add_decor(decor, Props.lamp_post(), ground_xform(field.center_x(d) - hw - 4.0, d, -PI / 2.0))
 			d += 25.0
 
 
@@ -584,7 +584,7 @@ func _place_roads(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, d
 			var hw := field.half_width(road_d)
 			for k in 2:
 				var lx: float = side * (hw + 6.0 + k * 22.0)
-				add_decor(decor, Props.lamp_post(), ground_xform(field.center_x(road_d) + lx, road_d - TerrainField.ROAD_HALF_WIDTH - 1.5, PI))
+				add_decor(decor, Props.lamp_post(), ground_xform(field.center_x(road_d) + lx, road_d - TerrainField.ROAD_HALF_WIDTH - 1.5, 0.0))
 			# Give-way signs facing the sledders just before the road.
 			var sign_d := road_d - TerrainField.ROAD_HALF_WIDTH - 2.0
 			var sign_x: float = field.center_x(sign_d) + side * (field.half_width(sign_d) + 1.0)

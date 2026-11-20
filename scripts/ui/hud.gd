@@ -904,6 +904,8 @@ func _build_language_choice(canvas: Control) -> void:
 		button.add_theme_stylebox_override("pressed", selected)
 		button.add_theme_color_override("font_pressed_color", MenuFlow.NIGHT)
 		button.add_theme_color_override("font_hover_pressed_color", MenuFlow.NIGHT)
+		# The ring _dialog_button made follows the old radius; rebuild it for the new corners.
+		button.add_theme_stylebox_override("focus", MenuFlow.focus_ring(button.get_theme_stylebox("normal") as StyleBoxFlat))
 		_language_buttons.append(button)
 
 
@@ -914,18 +916,13 @@ func update_language_choice(language: String) -> void:
 		_language_buttons[i].add_theme_color_override("font_focus_color", MenuFlow.NIGHT if selected else MenuFlow.WHITE)
 
 
+## A vector circle: the dialog canvas is scaled up to the screen, and a DPITexture
+## rasterizes at the size it is drawn, so the edge stays sharp at any scale.
 func _slider_thumb(color: Color, size := 28) -> Texture2D:
-	var gradient := Gradient.new()
-	gradient.offsets = PackedFloat32Array([0.0, 0.84, 1.0])
-	gradient.colors = PackedColorArray([color, color, Color(color, 0.0)])
-	var texture := GradientTexture2D.new()
-	texture.width = size
-	texture.height = size
-	texture.fill = GradientTexture2D.FILL_RADIAL
-	texture.fill_from = Vector2(0.5, 0.5)
-	texture.fill_to = Vector2(1.0, 0.5)
-	texture.gradient = gradient
-	return texture
+	var radius := size * 0.5
+	var svg := "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%d\" height=\"%d\"><circle cx=\"%s\" cy=\"%s\" r=\"%s\" fill=\"#%s\"/></svg>" % [
+		size, size, radius, radius, radius - 1.0, color.to_html(false)]
+	return DPITexture.create_from_string(svg)
 
 
 func _settings_toggle(canvas: Control, text: String, action: StringName, rect: Rect2) -> Button:

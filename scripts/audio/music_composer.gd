@@ -1286,10 +1286,11 @@ static func _schottis() -> AudioStreamWAV:
 	, 0.26)
 
 
-## A quick sledding waltz: bass on one, chords on two and three, a flute
-## lead over a music-box ostinato; a B part on new chords and a finale a tone up.
+## A quick sledding waltz: bass on one with a fifth leaning into the next bar,
+## chords on two and three, ticking hats, a flute lead over a music-box
+## ostinato; a B part on new chords and a finale a tone up.
 static func _waltz() -> AudioStreamWAV:
-	var song := Song.new(176.0, 2, 3, 2, false, 47)
+	var song := Song.new(204.0, 2, 3, 2, false, 47)
 	song.leads = [
 		[[Voice.lead(), 0.15, 0, 0.97]],
 		[[Voice.reed(2400.0), 0.11, 0, 0.97], [Voice.bell(), 0.03, 12, 0.5]],
@@ -1320,11 +1321,17 @@ static func _waltz() -> AudioStreamWAV:
 		if part.has(BASS):
 			_note(s.buffer, t, e * 1.9, root, 0.32, Voice.bass())
 			_note(s.buffer, t, e * 1.6, root, 0.15, Voice.sub())
+			# A pickup fifth on the last eighth pushes into the next downbeat.
+			_note(s.buffer, t + e * 5.0, e * 0.9, root + 7, 0.2, Voice.bass())
 		if part.has(DRUMS) or part.has(HALF):
 			_kick(s.buffer, t)
+		if part.has(DRUMS):
+			for k in 6:
+				_hat(s.buffer, t + k * e, 0.035 if k % 2 == 0 and k > 0 else 0.016, false, s.rng)
 		if part.has(BIG):
 			for beat in [1, 2]:
 				_snare(s.buffer, t + beat * e * 2.0, s.rng, 0.35)
+			_kick(s.buffer, t + e * 5.0)
 			_note(s.buffer, t, e * 1.6, root + 12, 0.1, Voice.bass())
 		if part.has(COMP):
 			for beat in [1, 2]:

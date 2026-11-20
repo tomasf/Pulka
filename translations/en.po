@@ -24,9 +24,6 @@ msgstr "Two players on the same screen"
 msgid "Två spelare kräver tangentbord eller handkontroller"
 msgstr "Two players need a keyboard or controllers"
 
-msgid "Välj ditt sällskap. Resten går utför."
-msgstr "Pick your company. It's all downhill from here."
-
 msgid "1 spelare"
 msgstr "1 player"
 
@@ -44,9 +41,6 @@ msgstr "First to the finish"
 
 msgid "‹  Spelare"
 msgstr "‹  Players"
-
-msgid "DITT ÅK BÖRJAR HÄR"
-msgstr "YOUR RUN STARTS HERE"
 
 msgid "Den röda klassikern."
 msgstr "The red classic."
