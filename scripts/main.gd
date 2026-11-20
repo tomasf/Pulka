@@ -229,6 +229,7 @@ func _ready() -> void:
 	_touch = TouchControls.new()
 	add_child(_touch)
 	_touch.mode_changed.connect(_hud.set_touch_mode)
+	_touch.back_swiped.connect(_on_back_swiped)
 	_hud.set_touch_mode(DisplayServer.is_touchscreen_available() and Quality.is_mobile())
 	_hud.volume_changed.connect(_on_volume_changed)
 	_hud.language_changed.connect(_on_language_changed)
@@ -1346,6 +1347,14 @@ func _go_back() -> void:
 	var release := press.duplicate() as InputEventAction
 	release.pressed = false
 	Input.parse_input_event.call_deferred(release)
+
+
+## A swipe to the right goes back a step in menus and screens. During a
+## run the screen is for steering, so it is left alone there.
+func _on_back_swiped() -> void:
+	if state == State.PLAYING or state == State.COUNTDOWN:
+		return
+	_go_back()
 
 
 ## Only the top level hands Menu back to the system.
