@@ -24,14 +24,45 @@ const POPUP_TEXT_SCALE := 0.85
 
 
 class Mittens extends Control:
+	const POP_TIME := 0.7
 	var lives := 3
 	var max_lives := 3
+	## The mitten that was just won, and how far (0..1) its pop has got.
+	var _popping := -1
+	var _pop := 1.0:
+		set(value):
+			_pop = value
+			queue_redraw()
+	var _pop_tween: Tween
+
+	## Shows `count` of `most` mittens; `gained` makes the newest one throb in.
+	func show_lives(count: int, most: int, gained: bool) -> void:
+		lives = count
+		max_lives = most
+		if gained:
+			_popping = count - 1
+			if _pop_tween != null: _pop_tween.kill()
+			_pop = 0.0
+			_pop_tween = create_tween()
+			_pop_tween.tween_property(self, "_pop", 1.0, POP_TIME)
+		queue_redraw()
 
 	## Drawn from the right edge, so extra mittens grow the row leftwards.
 	func _draw() -> void:
 		for i in max_lives:
 			var origin := Vector2(size.x - (max_lives - i) * 46.0, 0.0)
+			var centre := origin + Vector2(20, 22)
+			var popping := i == _popping and _pop < 1.0
+			if popping:
+				# A ring of light spreads from the new mitten and fades, while
+				# the mitten throbs: a big beat, a smaller one, then rest.
+				var ring := Color(1, 0.95, 0.8, 0.85 * (1.0 - _pop))
+				draw_arc(centre, 18.0 + 34.0 * ease(_pop, 0.4), 0, TAU, 48, ring, 4.0 * (1.0 - _pop) + 1.0, true)
+				var beat := 1.0 + 0.6 * sin(_pop * PI * 3.0) * pow(1.0 - _pop, 1.5)
+				draw_set_transform(centre * (1.0 - beat), 0.0, Vector2.ONE * beat)
 			var color := Color(0.92, 0.18, 0.2) if i < lives else Color(0.4, 0.4, 0.45, 0.5)
+			if popping:
+				color = color.lerp(Color(1, 0.75, 0.7), 1.0 - _pop)
 			draw_rect(Rect2(origin + Vector2(4, 30), Vector2(30, 10)), Color(1, 1, 1) if i < lives else color)
 			draw_circle(origin + Vector2(19, 14), 15.0, color)
 			draw_rect(Rect2(origin + Vector2(4, 14), Vector2(30, 18)), color)
@@ -40,6 +71,8 @@ class Mittens extends Control:
 			draw_rect(Rect2(origin + Vector2(4, 16), Vector2(30, 3)), stripe)
 			draw_rect(Rect2(origin + Vector2(4, 23), Vector2(30, 3)), stripe)
 			draw_circle(origin + Vector2(36, 20), 6.0, color)
+			if popping:
+				draw_set_transform(Vector2.ZERO)
 
 
 ## One pop-up line and what is animating it.
@@ -359,9 +392,9 @@ func update_game(distance: float, score: int, speed: float, lives: int, max_live
 	_speed.add_theme_color_override("font_color", Color(1, 1, 1).lerp(HOT, heat))
 	_speed.scale = Vector2.ONE
 	if _mittens.lives != lives or _mittens.max_lives != max_lives:
-		_mittens.lives = lives
-		_mittens.max_lives = max_lives
-		_mittens.queue_redraw()
+		# A new run resets the count at the top of the hill; only a mitten
+		# picked up along the way throbs.
+		_mittens.show_lives(lives, max_lives, lives > _mittens.lives and distance > 1.0)
 
 
 func splat() -> void:
