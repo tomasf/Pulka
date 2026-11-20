@@ -30,6 +30,9 @@ func _run() -> void:
 	# Cover the finite decorative variant sets independently of the seeds.
 	for variant in 12: Props.town_house(variant)
 	for variant in 10: Props.house(variant)
+	for variant in Props.SPRUCE_SHAPES.size(): Props.spruce(variant)
+	for variant in Props.SNOWMAN_COUNT: Props.snowman(variant)
+	for variant in Props.ROCK_COUNT: Props.rock(variant)
 	for variant in CarModels.variant_count(): Props.car(variant)
 	for span_width in range(7, 49):
 		Props.light_string(span_width)

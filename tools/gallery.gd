@@ -2,7 +2,7 @@ extends SceneTree
 ## Renders a contact sheet of models, each framed to fit its own cell, for
 ## reviewing how they look side by side.
 ## Run: Godot --path . --script res://tools/gallery.gd -- <group> <out.png> [cell size]
-## Groups: nature, people, vehicles, town, shops, regions, rides, pickups, all.
+## Groups: variety, rocks, nature, people, vehicles, town, shops, regions, rides, pickups, all.
 
 const COLUMNS := 6
 
@@ -17,14 +17,44 @@ static func _entries(group: String) -> Array:
 	var jacket := Color(0.9, 0.3, 0.6)
 	var hat := Color(0.95, 0.8, 0.1)
 	var groups := {
+		# The distinct variants of the common props, side by side (spruces
+		# 1 and 2 are near copies of 0).
+		"variety": [
+			["spruce0", func() -> Node3D: return _mesh(Props.spruce(0))],
+			["spruce3", func() -> Node3D: return _mesh(Props.spruce(3))],
+			["spruce4", func() -> Node3D: return _mesh(Props.spruce(4))],
+			["spruce5", func() -> Node3D: return _mesh(Props.spruce(5))],
+			["snowman0", func() -> Node3D: return _mesh(Props.snowman(0))],
+			["snowman1", func() -> Node3D: return _mesh(Props.snowman(1))],
+			["snowman2", func() -> Node3D: return _mesh(Props.snowman(2))],
+			["snowman3", func() -> Node3D: return _mesh(Props.snowman(3))],
+			["dog0", func() -> Node3D: return Props.posed(Props.dog(0), 0.8)],
+			["dog1", func() -> Node3D: return Props.posed(Props.dog(1), 0.8)],
+			["dog2", func() -> Node3D: return Props.posed(Props.dog(2), 0.8)],
+			["dog3", func() -> Node3D: return Props.posed(Props.dog(3), 0.8)],
+		],
+		"rocks": [
+			["rock0", func() -> Node3D: return _mesh(Props.rock(0))],
+			["rock1", func() -> Node3D: return _mesh(Props.rock(1))],
+			["rock2", func() -> Node3D: return _mesh(Props.rock(2))],
+			["rock3", func() -> Node3D: return _mesh(Props.rock(3))],
+			["rock4", func() -> Node3D: return _mesh(Props.rock(4))],
+		],
 		"nature": [
 			["spruce0", func() -> Node3D: return _mesh(Props.spruce(0))],
 			["spruce1", func() -> Node3D: return _mesh(Props.spruce(1))],
+			["spruce2", func() -> Node3D: return _mesh(Props.spruce(2))],
+			["spruce3", func() -> Node3D: return _mesh(Props.spruce(3))],
+			["spruce4", func() -> Node3D: return _mesh(Props.spruce(4))],
+			["spruce5", func() -> Node3D: return _mesh(Props.spruce(5))],
 			["birch", func() -> Node3D: return _mesh(Props.birch())],
 			["rock0", func() -> Node3D: return _mesh(Props.rock(0))],
 			["rock1", func() -> Node3D: return _mesh(Props.rock(1))],
 			["stump", func() -> Node3D: return _mesh(Props.stump())],
-			["snowman", func() -> Node3D: return _mesh(Props.snowman())],
+			["snowman0", func() -> Node3D: return _mesh(Props.snowman(0))],
+			["snowman1", func() -> Node3D: return _mesh(Props.snowman(1))],
+			["snowman2", func() -> Node3D: return _mesh(Props.snowman(2))],
+			["snowman3", func() -> Node3D: return _mesh(Props.snowman(3))],
 			["log", func() -> Node3D: return _mesh(Props.fallen_log())],
 			["mushrooms", func() -> Node3D: return _mesh(Props.mushroom_ring())],
 			["reeds", func() -> Node3D: return _mesh(Props.reeds())],
@@ -36,7 +66,10 @@ static func _entries(group: String) -> Array:
 			["person1", func() -> Node3D: return Props.posed(Props.person(1, 13), 2.0)],
 			["bather", func() -> Node3D: return Props.posed(Props.dressed("gal_bath", Color(0.2, 0.4, 0.9), Color(0.9, 0.2, 0.2), Color.WHITE, Color.BLACK, true, false, 6), 0.5)],
 			["bandy", func() -> Node3D: return Props.posed(Props.dressed("gal_bandy", Color(0.9, 0.8, 0.1), Color(0.1, 0.2, 0.6), Color.WHITE, Color(0.1, 0.2, 0.6), false, true, 20), 0.5)],
-			["dog", func() -> Node3D: return Props.posed(Props.dog(), 0.8)],
+			["dog0", func() -> Node3D: return Props.posed(Props.dog(0), 0.8)],
+			["dog1", func() -> Node3D: return Props.posed(Props.dog(1), 0.8)],
+			["dog2", func() -> Node3D: return Props.posed(Props.dog(2), 0.8)],
+			["dog3", func() -> Node3D: return Props.posed(Props.dog(3), 0.8)],
 			["moose", func() -> Node3D: return Props.posed(Props.moose(), 0.8)],
 			["deer", func() -> Node3D: return Props.posed(Props.deer(), 0.8)],
 			["hare", func() -> Node3D: return Props.posed(Props.hare(), 0.0)],

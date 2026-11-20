@@ -102,7 +102,7 @@ func _place_woods(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, l
 		var gap := rng.randf_range(0.9, 30.0)
 		gap = gap * gap / 30.0 + 0.9
 		var x := field.center_x(d) + side * (field.half_width(d) + gap)
-		var mesh: Mesh = Props.birch() if rng.randf() < 0.15 else Props.spruce(rng.randi_range(0, 2))
+		var mesh: Mesh = Props.birch() if rng.randf() < 0.15 else Props.random_spruce(rng)
 		world.add_tree(chunk, decor, mesh, world.ground_xform(x, d, rng.randf() * TAU, rng.randf_range(1.0, 2.0), 0.2))
 	for i in int((hi - lo) / 12.0):
 		var d := rng.randf_range(lo, hi)
@@ -114,7 +114,7 @@ func _place_woods(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, l
 		elif pick < 0.7:
 			world.add_decor(decor, Props.fallen_log(), world.ground_xform(x, d, rng.randf() * TAU, rng.randf_range(0.7, 1.1), 0.1))
 		else:
-			world.add_decor(decor, Props.rock(rng.randi_range(0, 1)), world.ground_xform(x, d, rng.randf() * TAU, rng.randf_range(0.8, 1.6), 0.3))
+			world.add_decor(decor, Props.random_rock(rng), world.ground_xform(x, d, rng.randf() * TAU, rng.randf_range(0.8, 1.6), 0.3))
 
 
 func _place_river(decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: float, span: Vector3) -> void:
@@ -123,7 +123,7 @@ func _place_river(decor: Dictionary, rng: RandomNumberGenerator, lo: float, hi: 
 		var side := -1.0 if rng.randf() < 0.5 else 1.0
 		var hw := field.half_width(d)
 		var lx := side * (hw + rng.randf_range(0.5, 6.0))
-		world.add_decor(decor, Props.rock(rng.randi_range(0, 1)), world.ground_xform(field.center_x(d) + lx, d, rng.randf() * TAU, rng.randf_range(1.2, 2.8), 0.5))
+		world.add_decor(decor, Props.random_rock(rng), world.ground_xform(field.center_x(d) + lx, d, rng.randf() * TAU, rng.randf_range(1.2, 2.8), 0.5))
 		if rng.randf() < 0.6:
 			var reed_x := field.center_x(d) + side * (hw - rng.randf_range(0.2, 1.2))
 			world.add_decor(decor, Props.reeds(), world.ground_xform(reed_x, d + rng.randf_range(-3.0, 3.0), rng.randf() * TAU, rng.randf_range(0.8, 1.3)))
@@ -462,7 +462,7 @@ func _place_cliff(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, l
 			# stretch it so the cap sits on the lip and the foot at the bottom.
 			var tall := (top - below) / 1.45
 			var shape := Basis(Vector3.UP, rng.randf_range(-0.4, 0.4)).scaled(Vector3(rng.randf_range(3.0, 4.5), tall, rng.randf_range(2.0, 3.0)))
-			world.add_decor(decor, Props.rock(rng.randi_range(0, 1)), Transform3D(shape, Vector3(x, top - tall * 1.2, -(edge + 2.6))))
+			world.add_decor(decor, Props.random_rock(rng), Transform3D(shape, Vector3(x, top - tall * 1.2, -(edge + 2.6))))
 			x += rng.randf_range(4.5, 6.5)
 	# Spectators either side of where the landing hill levels out.
 	var crowd := edge + TerrainField.CLIFF_LIP + TerrainField.CLIFF_RUNOUT * 0.8

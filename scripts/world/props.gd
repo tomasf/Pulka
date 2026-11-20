@@ -129,29 +129,48 @@ static func _legs(rig: Rig, leg: ArrayMesh, half_width: float, front_z: float, b
 
 # --- Nature ---
 
+## Spruce silhouettes as [height, tiers, skirt radius, taper, lobes, rim dip]:
+## three classic trees, then a tall slender one, a short bushy one and a
+## scraggly one with sparse, ragged tiers.
+const SPRUCE_SHAPES := [
+	[6.0, 7, 1.9, 0.85, 10, 1.0], [6.25, 8, 1.9, 0.85, 10, 1.0], [6.5, 7, 1.9, 0.85, 10, 1.0],
+	[7.4, 10, 1.4, 0.7, 9, 1.0], [4.4, 6, 1.75, 1.05, 11, 1.0], [6.6, 6, 1.6, 0.8, 7, 1.6],
+]
+
+
+## Any of the spruce silhouettes.
+static func random_spruce(rng: RandomNumberGenerator) -> ArrayMesh:
+	return spruce(rng.randi_range(0, SPRUCE_SHAPES.size() - 1))
+
+
+## A spruce mesh carries its collision size as metadata: `spruce_top` (the
+## leader's tip) and `spruce_reach` (how far the lowest branches stick out).
 static func spruce(variant: int) -> ArrayMesh:
 	return cached_mesh("spruce%d" % variant, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var perches := PackedVector3Array()
 		var green: Color = Palette.SPRUCE[variant % Palette.SPRUCE.size()]
+		var form: Array = SPRUCE_SHAPES[variant % SPRUCE_SHAPES.size()]
+		var top: float = form[0]
+		var tiers: int = form[1]
+		var spread: float = form[2]
 		kit.cylinder(0.17, 1.6, Vector3(0, 0.8, 0), Palette.TRUNK, 8, Vector3.ZERO, 0.1)
 		# Tiers of drooping branches, each a skirt whose rim goes in and out
 		# round the branch tips, snow lying along the tops of the branches.
-		var tiers := 7 + variant % 2
-		var top := 6.0 + variant * 0.25
 		var crown := 0.0
 		for i in tiers:
 			var f := float(i) / tiers
-			var radius := lerpf(1.9, 0.38, pow(f, 0.85))
+			var radius := lerpf(spread, 0.38, pow(f, form[3]))
 			var y := lerpf(0.8, top - 0.9, f)
 			var rise := lerpf(0.75, 0.6, f)
 			var droop := lerpf(0.4, 0.14, f)
-			var lobes := 10 - i / 2
+			var lobes: int = form[4] - i / 2
 			var seed := variant * 31 + i * 7
 			var shade := green.darkened(0.1 * (1.0 - f)).lerp(Color(0.1, 0.22, 0.2), 0.15 * float(i % 2))
 			# Radius (as a fraction), height and how deep the rim dips
 			# between branch tips, from the drooping tips in to the trunk.
-			var shape := [[1.0, -droop, 0.34], [0.64, rise * 0.35, 0.24], [0.3, rise * 0.72, 0.12], [0.03, rise, 0.0]]
+			var dip: float = form[5]
+			var shape := [[1.0, -droop, 0.34 * dip], [0.64, rise * 0.35, 0.24 * dip], [0.3, rise * 0.72, 0.12 * dip], [0.03, rise, 0.0]]
 			var skirt: Array[PackedVector3Array] = []
 			var snow: Array[PackedVector3Array] = []
 			for ring in shape:
@@ -174,6 +193,8 @@ static func spruce(variant: int) -> ArrayMesh:
 		kit.cone(0.09, 0.3, Vector3(0, crown + 0.6, 0), Palette.SNOW, 6)
 		var mesh := kit.build()
 		mesh.set_meta(&"bird_perches", perches)
+		mesh.set_meta(&"spruce_top", crown + 0.7)
+		mesh.set_meta(&"spruce_reach", spread * 0.84)
 		return mesh)
 
 
@@ -247,11 +268,32 @@ static func _along(points: Array[Vector3], t: float) -> Vector3:
 	return points[i].lerp(points[i + 1], scaled - i)
 
 
+## Extra boulder builds after the two classic ones, as lumps of
+## [radii, centre]: a low slab, a boulder split in two and a cluster of
+## three stones. Each lump gets its own cushion of snow.
+const ROCK_BUILDS := [
+	[[Vector3(1.2, 0.46, 1.0), Vector3(0, 0.2, 0)], [Vector3(0.6, 0.38, 0.6), Vector3(0.62, 0.14, -0.32)]],
+	[[Vector3(0.62, 0.82, 0.92), Vector3(-0.38, 0.3, 0)], [Vector3(0.58, 0.76, 0.86), Vector3(0.4, 0.27, 0.06)]],
+	[[Vector3(0.7, 0.6, 0.65), Vector3(-0.45, 0.22, 0.2)], [Vector3(0.6, 0.72, 0.55), Vector3(0.45, 0.28, -0.15)], [Vector3(0.45, 0.4, 0.5), Vector3(0.05, 0.12, 0.62)]],
+]
+## The two classic boulders plus ROCK_BUILDS.
+const ROCK_COUNT := 5
+
+
+## Any of the boulder builds.
+static func random_rock(rng: RandomNumberGenerator) -> ArrayMesh:
+	return rock(rng.randi_range(0, ROCK_COUNT - 1))
+
+
+## A rock mesh carries `obstacle_top`, the height of its snow-capped top,
+## so a boulder you land on is as tall as it looks.
 static func rock(variant: int) -> ArrayMesh:
 	return cached_mesh("rock%d" % variant, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 900 + variant
+		if variant >= 2:
+			return _rock_build(kit, rng, ROCK_BUILDS[(variant - 2) % ROCK_BUILDS.size()])
 		# A glacial boulder: a cluster of blunt, faceted lumps of granite,
 		# speckled with lichen, snow settled in a cushion on top.
 		var main := Vector3(1.15, 0.72, 0.95) if variant == 0 else Vector3(0.9, 0.85, 1.1)
@@ -273,7 +315,30 @@ static func rock(variant: int) -> ArrayMesh:
 		kit.ellipsoid(Vector3(main.x * 0.4, 0.14, main.z * 0.35), Vector3(0.55, 0.62, 0.3), Palette.SNOW)
 		var mesh := kit.build()
 		mesh.set_meta(&"bird_perches", PackedVector3Array([Vector3(0.05, 1.08, 0)]))
+		mesh.set_meta(&"obstacle_top", 0.95)
 		return mesh)
+
+
+static func _rock_build(kit: MeshKit, rng: RandomNumberGenerator, lumps: Array) -> ArrayMesh:
+	var highest := Vector3.ZERO
+	for lump: Array in lumps:
+		var radii: Vector3 = lump[0]
+		var at: Vector3 = lump[1]
+		var tone := Palette.ROCK.lerp(Color(0.52, 0.5, 0.47), rng.randf() * 0.6).darkened(rng.randf() * 0.12)
+		_facet(kit, radii, at, tone, Vector3(rng.randf_range(-0.25, 0.25), rng.randf() * TAU, rng.randf_range(-0.15, 0.15)))
+		for i in 3:
+			var angle := rng.randf() * TAU
+			var spot := at + Vector3(cos(angle) * radii.x * 0.85, rng.randf_range(-0.2, 0.15) * radii.y, sin(angle) * radii.z * 0.85)
+			kit.ellipsoid(Vector3(0.12, 0.08, 0.02) * rng.randf_range(0.6, 1.4), spot, Color(0.62, 0.66, 0.42), Vector3(0, -angle + PI / 2.0, 0))
+		# A cushion of snow, sitting a little into the stone's crown.
+		var cap := at + Vector3(rng.randf_range(-0.05, 0.05), radii.y * 0.82, 0)
+		kit.ellipsoid(Vector3(radii.x * 0.74, minf(radii.y * 0.3, 0.2), radii.z * 0.7), cap, Palette.SNOW, Vector3(rng.randf_range(-0.08, 0.08), rng.randf() * TAU, 0))
+		var crown := cap + Vector3.UP * minf(radii.y * 0.3, 0.2)
+		if crown.y > highest.y: highest = crown
+	var mesh := kit.build()
+	mesh.set_meta(&"bird_perches", PackedVector3Array([highest + Vector3.UP * 0.02]))
+	mesh.set_meta(&"obstacle_top", highest.y)
+	return mesh
 
 
 ## A low-poly lump with flat facets, like broken stone.
@@ -332,47 +397,85 @@ static func _disc(radius: float, height: float) -> CylinderMesh:
 	return mesh
 
 
-static func snowman() -> ArrayMesh:
-	return cached_mesh("snowman", func() -> ArrayMesh:
+const SNOWMAN_COUNT := 4
+
+
+## A snowman of one of SNOWMAN_COUNT builds, all on the same bottom ball
+## (so they collide alike): a top hat with its arms up, a knitted beanie
+## with its arms hanging, a tilted bucket and a wave, a bobble hat and a
+## head cocked to one side.
+static func snowman(variant := 0) -> ArrayMesh:
+	var build := posmod(variant, SNOWMAN_COUNT)
+	return cached_mesh("snowman%d" % build, func() -> ArrayMesh:
 		var kit := MeshKit.new()
 		var coal := Color(0.06, 0.06, 0.07)
 		var packed := Palette.SNOW.darkened(0.04)
+		var middle_r: float = [0.44, 0.47, 0.42, 0.45][build]
+		var head_r: float = [0.31, 0.29, 0.32, 0.3][build]
+		var middle := Vector3(0.02, 0.96 + middle_r * 0.66, 0)
+		var head := Vector3([0.0, 0.0, -0.02, 0.07][build], middle.y + middle_r * 0.75 + head_r * 0.65, -0.01)
 		# Rolled snowballs: a little squashed under their own weight and
 		# lumpy, with a ring of packed snow where each one sits on the next.
 		kit.sphere(0.6, Vector3(0, 0.5, 0), Palette.SNOW, Vector3(1.0, 0.88, 0.96), 16, 9)
-		kit.sphere(0.25, Vector3(0.35, 0.65, -0.2), Palette.SNOW, Vector3.ONE, 8, 5)
+		var lump := Vector3([0.35, -0.38, 0.3, -0.32][build], 0.65, [-0.2, -0.15, 0.22, -0.25][build])
+		kit.sphere(0.25, lump, Palette.SNOW, Vector3.ONE, 8, 5)
 		kit.torus(0.3, 0.42, Transform3D(Basis.IDENTITY, Vector3(0, 0.96, 0)), packed, 16, 6)
-		kit.sphere(0.44, Vector3(0.02, 1.25, 0), Palette.SNOW, Vector3(1.0, 0.92, 0.98), 16, 9)
-		kit.sphere(0.31, Vector3(0, 1.78, -0.01), Palette.SNOW, Vector3.ONE, 16, 9)
+		kit.sphere(middle_r, middle, Palette.SNOW, Vector3(1.0, 0.92, 0.98), 16, 9)
+		kit.sphere(head_r, head, Palette.SNOW, Vector3.ONE, 16, 9)
 		kit.ellipsoid(Vector3(0.75, 0.1, 0.75), Vector3(0, 0.0, 0), packed)
 		# Carrot nose, coal eyes and a coal smile.
-		kit.cone(0.055, 0.34, Vector3(0, 1.76, -0.44), Color(1.0, 0.48, 0.08), 8, Vector3(-PI / 2 + 0.12, 0, 0))
+		var face := head + Vector3(0, 0, -head_r)
+		kit.cone(0.055, 0.34, face + Vector3(0, -0.02, -0.13), Color(1.0, 0.48, 0.08), 8, Vector3(-PI / 2 + [0.12, 0.3, -0.05, 0.15][build], 0, 0))
 		for side in [-1.0, 1.0]:
-			kit.sphere(0.042, Vector3(0.11 * side, 1.87, -0.27), coal, Vector3(1, 1, 0.6), 8, 5)
+			kit.sphere(0.042, face + Vector3(0.11 * side, 0.09, 0.04), coal, Vector3(1, 1, 0.6), 8, 5)
 		for k in 5:
 			var t := (k - 2.0) / 2.0
-			kit.sphere(0.022, Vector3(t * 0.12, 1.66 + t * t * 0.035, -0.285 + t * t * 0.02), coal, Vector3.ONE, 6, 4)
+			kit.sphere(0.022, face + Vector3(t * 0.12, -0.12 + t * t * 0.035, 0.025 + t * t * 0.02), coal, Vector3.ONE, 6, 4)
 		for i in 3:
-			kit.sphere(0.045, Vector3(0, 1.05 + i * 0.18, -0.43 + absf(i - 1) * 0.02), coal, Vector3(1, 1, 0.6), 8, 5)
-		# Twig arms with forked fingers.
+			kit.sphere(0.045, Vector3(0, middle.y - 0.2 + i * 0.18, -middle_r + 0.01 + absf(i - 1) * 0.02), coal, Vector3(1, 1, 0.6), 8, 5)
+		# Twig arms with forked fingers: [reach out, height] of each hand.
+		var hands: Array = [[[0.95, 1.54], [0.95, 1.7]], [[0.8, 1.02], [0.82, 1.06]], [[0.85, 1.12], [0.75, 2.1]], [[0.92, 1.72], [0.86, 1.15]]][build]
 		for side in [-1.0, 1.0]:
-			var shoulder := Vector3(0.36 * side, 1.38, 0)
-			var hand := Vector3(0.95 * side, 1.62 + side * 0.08, -0.05)
+			var shoulder := Vector3(middle_r * 0.82 * side, middle.y + 0.13, 0)
+			var spot: Array = hands[0 if side < 0.0 else 1]
+			var hand := Vector3(spot[0] * side, spot[1], -0.05)
+			var out := (hand - shoulder).normalized()
 			kit.capsule_between(shoulder, hand, 0.022, Palette.TRUNK, 5)
 			for f in 3:
-				var bend := Vector3(0.15 * side, 0.1 * (f - 1) + 0.05, -0.05 * (f - 1))
+				var bend := out * 0.15 + Vector3(0, 0.1 * (f - 1), -0.05 * (f - 1))
 				kit.capsule_between(hand, hand + bend, 0.012, Palette.TRUNK, 4)
-			kit.capsule_between(shoulder.lerp(hand, 0.55), shoulder.lerp(hand, 0.55) + Vector3(0.05 * side, 0.18, 0), 0.012, Palette.TRUNK, 4)
-		# Knitted scarf with a hanging end, and a top hat with a band.
-		var red := Color(0.85, 0.15, 0.15)
-		kit.torus(0.27, 0.36, Transform3D(Basis.IDENTITY, Vector3(0, 1.5, 0)), red, 16, 6)
-		kit.capsule_between(Vector3(0.16, 1.48, -0.28), Vector3(0.22, 1.12, -0.36), 0.06, red, 8)
+			var twig := shoulder.lerp(hand, 0.55)
+			kit.capsule_between(twig, twig + Vector3(0.05 * side, 0.18, 0), 0.012, Palette.TRUNK, 4)
+		# Knitted scarf with a hanging end and white tassels.
+		var scarf: Color = [Color(0.85, 0.15, 0.15), Color(0.2, 0.4, 0.85), Color(0.2, 0.58, 0.32), Color(0.95, 0.72, 0.15)][build]
+		var neck := middle.y + middle_r * 0.57
+		kit.torus(0.27, 0.36, Transform3D(Basis.IDENTITY, Vector3(head.x * 0.5, neck, 0)), scarf, 16, 6)
+		var tail := -1.0 if build % 2 == 1 else 1.0
+		kit.capsule_between(Vector3(0.16 * tail, neck - 0.02, -0.28), Vector3(0.22 * tail, neck - 0.38, -0.36), 0.06, scarf, 8)
 		for f in 3:
-			kit.box(Vector3(0.025, 0.08, 0.02), Vector3(0.18 + f * 0.035, 1.04, -0.37), Color(1, 1, 1))
-		var hat := Color(0.08, 0.08, 0.1)
-		kit.cylinder(0.34, 0.04, Vector3(0, 2.02, 0), hat, 16, Vector3(0.0, 0, 0.1))
-		kit.cylinder(0.2, 0.38, Vector3(0.02, 2.22, 0), hat, 16, Vector3(0.0, 0, 0.1), 0.21)
-		kit.cylinder(0.205, 0.07, Vector3(0.013, 2.08, 0), Color(0.6, 0.1, 0.12), 16, Vector3(0.0, 0, 0.1))
+			kit.box(Vector3(0.025, 0.08, 0.02), Vector3((0.18 + f * 0.035) * tail, neck - 0.46, -0.37), Color(1, 1, 1))
+		var crown := head + Vector3(0, head_r, 0)
+		match build:
+			0:
+				# A top hat with a band.
+				var hat := Color(0.08, 0.08, 0.1)
+				kit.cylinder(0.34, 0.04, crown + Vector3(0, -0.07, 0.01), hat, 16, Vector3(0.0, 0, 0.1))
+				kit.cylinder(0.2, 0.38, crown + Vector3(0.02, 0.13, 0.01), hat, 16, Vector3(0.0, 0, 0.1), 0.21)
+				kit.cylinder(0.205, 0.07, crown + Vector3(0.013, -0.01, 0.01), Color(0.6, 0.1, 0.12), 16, Vector3(0.0, 0, 0.1))
+			1, 3:
+				# A knitted beanie with a turned-up brim and a bobble.
+				var wool: Color = Color(0.92, 0.92, 0.95) if build == 1 else Color(0.8, 0.12, 0.15)
+				var tilt := Vector3(0, 0, -0.25 if build == 3 else 0.0)
+				kit.sphere(head_r * 0.98, crown + Vector3(0, -head_r * 0.42, 0), wool, Vector3(1.04, 0.72, 1.04), 14, 7)
+				kit.torus(head_r * 0.82, head_r * 1.06, Transform3D(Basis.from_euler(tilt), crown + Vector3(0, -head_r * 0.48, 0)), wool.darkened(0.12), 16, 5)
+				kit.sphere(0.09, crown + Vector3(-0.08 if build == 3 else 0.0, 0.14, 0), scarf if build == 1 else Color(1, 1, 1), Vector3.ONE, 8, 5)
+			2:
+				# An upturned zinc bucket, knocked askew.
+				var zinc := Color(0.58, 0.62, 0.66)
+				var askew := Vector3(0.12, 0, -0.22)
+				kit.cylinder(0.26, 0.34, crown + Vector3(0.04, 0.1, 0), zinc, 14, askew, 0.2)
+				kit.cylinder(0.27, 0.035, crown + Vector3(0.0, -0.05, 0), zinc.darkened(0.2), 14, askew)
+				kit.torus(0.21, 0.235, Transform3D(Basis.from_euler(askew + Vector3(PI / 2, 0, 0)), crown + Vector3(0.09, 0.05, 0)), zinc.darkened(0.3), 14, 4)
 		return kit.build())
 
 
@@ -430,8 +533,14 @@ static func _bandy_stick() -> ArrayMesh:
 		return kit.build())
 
 
-static func dog() -> Rig:
-	return cached_rig("dog", func() -> Rig: return Rig.creature("dog", {}, 0.9))
+## Tints over the model's brown coat: brown, near-black, grey and cream
+## (above 1 to lift the brown toward pale).
+const DOG_COATS := [Color.WHITE, Color(0.3, 0.29, 0.3), Color(0.95, 1.15, 1.6), Color(1.5, 1.72, 2.1)]
+
+
+static func dog(variant := 0) -> Rig:
+	var coat: Color = DOG_COATS[posmod(variant, DOG_COATS.size())]
+	return cached_rig("dog%d" % posmod(variant, DOG_COATS.size()), func() -> Rig: return Rig.creature("dog", {"dog coat": coat}, 0.9))
 
 
 ## Winter red fox with a continuous coat and a white-tipped brush.

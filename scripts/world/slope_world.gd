@@ -388,6 +388,8 @@ func add_tree(chunk: Chunk, decor: Dictionary, mesh: Mesh, xform: Transform3D) -
 	collider.scale = Vector3.ONE * xform.basis.get_scale().x
 	if mesh == Props.birch():
 		collider.make_birch()
+	else:
+		collider.fit_spruce(mesh)
 	# Skirting the forest edge is not a near miss every few metres.
 	collider.near_miss_done = true
 	chunk.add_child(collider)
@@ -472,7 +474,7 @@ func _place_scenery(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator,
 			continue
 		if field.region(d) == TerrainField.Region.LAKE and field.lake_shore_distance(field.center_x(d) + lx, d) > -6:
 			continue
-		var mesh: Mesh = Props.birch() if rng.randf() < 0.12 else Props.spruce(rng.randi_range(0, 2))
+		var mesh: Mesh = Props.birch() if rng.randf() < 0.12 else Props.random_spruce(rng)
 		add_tree(chunk, decor, mesh, ground_xform(field.center_x(d) + lx, d, rng.randf() * TAU, rng.randf_range(0.8, 1.7), 0.2))
 	var houses := 3 if village else (1 if rng.randf() < 0.7 else 0)
 	for i in houses:
@@ -596,19 +598,19 @@ func _place_roads(chunk: Chunk, decor: Dictionary, rng: RandomNumberGenerator, d
 func obstacle_rig(kind: Obstacle.Kind, rng: RandomNumberGenerator) -> Props.Rig:
 	match kind:
 		Obstacle.Kind.TREE:
-			return Props.Rig.of(Props.spruce(rng.randi_range(0, 2)))
+			return Props.Rig.of(Props.random_spruce(rng))
 		Obstacle.Kind.ROCK:
-			return Props.Rig.of(Props.rock(rng.randi_range(0, 1)))
+			return Props.Rig.of(Props.random_rock(rng))
 		Obstacle.Kind.STUMP:
 			return Props.Rig.of(Props.stump())
 		Obstacle.Kind.CHIMNEY:
 			return Props.Rig.of(Roofscape.chimney())
 		Obstacle.Kind.SNOWMAN:
-			return Props.Rig.of(Props.snowman())
+			return Props.Rig.of(Props.snowman(rng.randi_range(0, Props.SNOWMAN_COUNT - 1)))
 		Obstacle.Kind.PERSON, Obstacle.Kind.KID:
 			return Props.random_person(rng)
 		Obstacle.Kind.DOG:
-			return Props.dog()
+			return Props.dog(rng.randi_range(0, Props.DOG_COATS.size() - 1))
 		Obstacle.Kind.FOX:
 			return Props.fox()
 		Obstacle.Kind.CAT:

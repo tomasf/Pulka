@@ -37,6 +37,8 @@ var brushed := false
 var birch := false
 var radius := 0.6
 var top := 2.0
+## How far a spruce's lowest branches reach out (the base of its cone).
+var branch_reach := 1.6
 ## Non-zero for box colliders: half size along local x and z.
 var half_extents := Vector2.ZERO
 ## Soft obstacles do not crash you; they just get in the way.
@@ -113,9 +115,10 @@ func configure(which: Kind, rig: Props.Rig, terrain: TerrainField) -> Obstacle:
 			radius = 0.45
 			top = 7.0
 			landable = false
+			fit_spruce(rig.body)
 		Kind.ROCK:
 			radius = 0.95
-			top = 0.95
+			top = rig.body.get_meta(&"obstacle_top", 0.95) if rig.body != null else 0.95
 		Kind.STUMP:
 			radius = 0.5
 			top = 0.6
@@ -242,6 +245,13 @@ func roll_wheels(distance: float) -> void:
 ## Height of the obstacle's top above its base, allowing for scaling (trees).
 func height() -> float:
 	return top * (scale.y if kind == Kind.TREE else 1.0)
+
+
+## Sizes a spruce's trunk-and-cone collider to the silhouette it shows.
+func fit_spruce(mesh: Mesh) -> void:
+	if mesh == null or not mesh.has_meta(&"spruce_top"): return
+	top = mesh.get_meta(&"spruce_top")
+	branch_reach = mesh.get_meta(&"spruce_reach")
 
 
 ## A tree that is a birch rather than a spruce: a slim bare trunk with no
@@ -417,7 +427,7 @@ func clearance(p: Vector3) -> float:
 		var h := (p.y - position.y) / scale.y
 		var reach := radius * scale.x
 		if h > BRANCHES_FROM and not birch:
-			reach = 1.6 * scale.x * maxf(1.0 - (h - BRANCHES_FROM) / (top - BRANCHES_FROM), 0.0)
+			reach = branch_reach * scale.x * maxf(1.0 - (h - BRANCHES_FROM) / (top - BRANCHES_FROM), 0.0)
 		return maxf(sqrt(dx * dx + dz * dz) - reach, 0.0)
 	if half_extents != Vector2.ZERO:
 		var c := cos(rotation.y)
