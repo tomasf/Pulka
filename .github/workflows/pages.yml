@@ -18,7 +18,9 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Rendering the music from scratch takes a while on a runner; it is
+    # cached below, so most runs are quick.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
 
@@ -49,7 +51,16 @@ jobs:
           unzip -q -j "$download_dir/Godot_v$GODOT_VERSION-stable_export_templates.tpz" \
             templates/web_nothreads_release.zip templates/web_nothreads_debug.zip -d "$template_dir"
 
+      - name: Cache the baked music and sound effects
+        id: audio-cache
+        uses: actions/cache@v4
+        with:
+          path: generated/web_audio
+          key: web-audio-${{ hashFiles('scripts/audio/**', 'tools/bake_web_audio.gd') }}
+
       - name: Build web version
+        env:
+          PULKA_BAKED_AUDIO: ${{ steps.audio-cache.outputs.cache-hit == 'true' && '1' || '' }}
         run: |
           export GODOT="$RUNNER_TEMP/godot/Godot_v$GODOT_VERSION-stable_linux.x86_64"
           sh tools/export_web.sh
